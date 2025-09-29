@@ -411,6 +411,14 @@ class SupabaseAPI {
           for (let k = 0; k < count; k++) {
             if (arr[i + k].num !== start + k) { ok = false; break; }
           }
+          // 通路を跨がない（C列の13-14間、25-26間を跨がない）
+          if (ok && row === 'C') {
+            const crossesFirstAisle = (start <= 13 && end >= 14);
+            const crossesSecondAisle = (start <= 25 && end >= 26);
+            if (crossesFirstAisle || crossesSecondAisle) {
+              ok = false;
+            }
+          }
           if (ok) {
             chosen = arr.slice(i, i + count).map(x => x.id);
             break;

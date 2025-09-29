@@ -492,19 +492,75 @@ function assignWalkInConsecutiveSeatsSupabase(group, day, timeslot, count) {
     
     const performanceId = performanceResult.data.id;
     
-    // 連続席の当日券割り当て（簡易実装）
-    const walkInResult = supabaseIntegration.assignWalkInSeats(performanceId, count);
-    if (!walkInResult.success) {
+    // 利用可能な座席を取得（行・番号付き）
+    const seatsResp = supabaseIntegration._request(
+      `seats?performance_id=eq.${performanceId}&status=eq.available&select=seat_id,row_letter,seat_number`
+    );
+    if (!seatsResp.success) {
+      return { success: false, message: '座席データの取得に失敗しました' };
+    }
+    const available = Array.isArray(seatsResp.data) ? seatsResp.data : [];
+    if (available.length < count) {
+      return { success: false, message: '利用可能な座席が不足しています' };
+    }
+    
+    // 行ごとに番号でソートして連続ブロックを探索
+    const byRow = {};
+    available.forEach(s => {
+      const row = String(s.row_letter);
+      if (!byRow[row]) byRow[row] = [];
+      byRow[row].push({ id: s.seat_id, num: Number(s.seat_number) });
+    });
+    
+    let chosen = null;
+    let chosenRow = null;
+    const rowPriority = Object.keys(byRow).sort(); // 既定: 行優先 A→Z
+    for (const row of rowPriority) {
+      const arr = byRow[row].sort((a, b) => a.num - b.num);
+      for (let i = 0; i + count - 1 < arr.length; i++) {
+        const start = arr[i].num;
+        const end = arr[i + count - 1].num;
+        if (end - start + 1 !== count) continue;
+        // 欠番チェック
+        let contiguous = true;
+        for (let k = 0; k < count; k++) {
+          if (arr[i + k].num !== start + k) { contiguous = false; break; }
+        }
+        if (!contiguous) continue;
+        // 通路跨ぎ禁止（C列の13-14間と25-26間）
+        if (row === 'C') {
+          const crossesFirst = (start <= 13 && end >= 14);
+          const crossesSecond = (start <= 25 && end >= 26);
+          if (crossesFirst || crossesSecond) continue;
+        }
+        chosen = arr.slice(i, i + count).map(x => x.id);
+        chosenRow = row;
+        break;
+      }
+      if (chosen) break;
+    }
+    
+    if (!chosen) {
+      return { success: false, message: '指定枚数の連続席が見つかりませんでした。' };
+    }
+    
+    // 選択した席を walkin に更新
+    const now = new Date();
+    const iso = now.toISOString();
+    const pad = n => (n < 10 ? '0' + n : '' + n);
+    const fmt = `${now.getFullYear()}/${pad(now.getMonth()+1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+    const reservedBy = `当日券_${fmt}`;
+    const updates = chosen.map(seatId => ({
+      seatId: seatId,
+      data: { status: 'walkin', walkin_at: iso, reserved_at: iso, reserved_by: reservedBy }
+    }));
+    const updateResp = supabaseIntegration.updateMultipleSeats(performanceId, updates);
+    if (!updateResp.success) {
       return { success: false, message: '当日券の割り当てに失敗しました' };
     }
     
-    const assignedSeats = walkInResult.data.map(result => result.seatId);
-    Logger.log(`Supabase連続当日券発行完了: ${assignedSeats.join(', ')}`);
-    return { 
-      success: true, 
-      message: `連続席(${count}席)を確保しました。\n座席: ${assignedSeats.join(', ')}`, 
-      seatIds: assignedSeats 
-    };
+    Logger.log(`Supabase連続当日券発行完了(${chosenRow}): ${chosen.join(', ')}`);
+    return { success: true, message: `連続席(${count}席)を確保しました。\n座席: ${chosen.join(', ')}`, seatIds: chosen };
     
   } catch (e) {
     Logger.log(`assignWalkInConsecutiveSeatsSupabase Error for ${group}-${day}-${timeslot}: ${e.message}`);

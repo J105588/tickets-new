@@ -869,7 +869,33 @@ function assignWalkInConsecutiveSeats(group, day, timeslot, count) {
       let assigned = null;
       let assignedRow = null;
       for (const rowLabel of ['A','B','C','D','E']) {
-        const seq = findConsecutive(rowToAvailableCols[rowLabel], count);
+        let seq = findConsecutive(rowToAvailableCols[rowLabel], count);
+        // 通路を跨がない条件を追加（C列の13-14間, 25-26間を跨がない）
+        if (seq && rowLabel === 'C') {
+          const start = seq[0];
+          const end = seq[seq.length - 1];
+          // 通路境界: 13-14, 25-26 → start<=13 && end>=14 はNG、start<=25 && end>=26 もNG
+          const crossesFirstAisle = (start <= 13 && end >= 14);
+          const crossesSecondAisle = (start <= 25 && end >= 26);
+          if (crossesFirstAisle || crossesSecondAisle) {
+            // 該当ブロックは不可。次の候補を探索するため、該当席群を一時的に除外して再探索
+            // 簡易実装: 不適合の先頭席を除外してズラしながら探索
+            const cols = rowToAvailableCols[rowLabel];
+            for (let offset = 1; offset + count - 1 < cols.length; offset++) {
+              const candidate = cols.slice(offset, offset + count);
+              const cStart = candidate[0];
+              const cEnd = candidate[candidate.length - 1];
+              const contiguous = candidate.every((n, idx) => idx === 0 || n === candidate[idx - 1] + 1);
+              const cross1 = (cStart <= 13 && cEnd >= 14);
+              const cross2 = (cStart <= 25 && cEnd >= 26);
+              if (contiguous && !cross1 && !cross2) { seq = candidate; break; }
+            }
+            // なおっていなければこの行は不採用
+            if (seq && (seq[0] <= 13 && seq[seq.length-1] >= 14 || seq[0] <= 25 && seq[seq.length-1] >= 26)) {
+              seq = null;
+            }
+          }
+        }
         if (seq) {
           assigned = seq;
           assignedRow = rowLabel;

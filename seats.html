@@ -69,12 +69,8 @@
                 <div class="screen">舞台</div>
                 <div id="seat-map-container" class="seat-map-container"></div>
                 
-                <!-- カスタムスクロールバー -->
-                <div class="custom-scrollbar" id="custom-scrollbar">
-                    <div class="custom-scrollbar-track">
-                        <div class="custom-scrollbar-thumb" id="scrollbar-thumb"></div>
-                    </div>
-                </div>
+                <!-- カスタムスクロールバー（非表示化） -->
+                <div class="custom-scrollbar" id="custom-scrollbar" style="display:none;"></div>
                 
                 <!-- ズームコントロール -->
                 <div class="zoom-controls">
@@ -157,6 +153,7 @@
   
   <!-- 既存のスクリプト（最適化されたローダーが管理） -->
   <script type="module" src="seats-main.js"></script>
+  <script type="module" src="pwa-install.js"></script>
   
   <!-- PWA Service Worker Registration -->
   <script>

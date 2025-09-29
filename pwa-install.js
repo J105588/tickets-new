@@ -30,6 +30,7 @@ class PWAInstallHandler {
     // ページ読み込み時にインストールボタンをチェック
     window.addEventListener('load', () => {
       this.createInstallButton();
+      this.maybeShowOSSpecificBanner();
     });
   }
 
@@ -39,6 +40,67 @@ class PWAInstallHandler {
         window.navigator.standalone === true) {
       this.isInstalled = true;
     }
+  }
+
+  detectPlatform() {
+    const ua = navigator.userAgent || navigator.vendor || window.opera;
+    const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isWindows = /Windows NT/i.test(ua);
+    return { isIOS, isWindows };
+  }
+
+  maybeShowOSSpecificBanner() {
+    if (this.isInstalled) return;
+    const { isIOS, isWindows } = this.detectPlatform();
+    // iOS Safari は beforeinstallprompt が無いのでガイダンス出す
+    if (isIOS) {
+      this.showInstallBanner('iOS', '共有ボタン → 「ホーム画面に追加」 でインストールできます。');
+      return;
+    }
+    // Windows Chrome/Edge の場合も初回ガイダンス
+    if (isWindows) {
+      this.showInstallBanner('Windows', 'アドレスバー右端の「インストール」アイコンから追加できます。');
+    }
+  }
+
+  showInstallBanner(osLabel, message) {
+    // 既に表示済みならスキップ
+    if (document.getElementById('pwa-install-banner')) return;
+    const banner = document.createElement('div');
+    banner.id = 'pwa-install-banner';
+    banner.style.cssText = `
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #0d6efd;
+      color: #fff;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      z-index: 10000;
+      box-shadow: 0 -6px 20px rgba(0,0,0,.15);
+    `;
+    banner.innerHTML = `
+      <div style="font-weight:600;">インストールのご案内（${osLabel}）</div>
+      <div style="flex:1;opacity:.95;">${message}</div>
+      <button id="pwa-install-now" style="background:#ffffff; color:#0d6efd; border:none; padding:6px 10px; border-radius:6px; font-weight:600; cursor:pointer;">今すぐ</button>
+      <button id="pwa-install-dismiss" style="background:transparent; color:#ffffff; border:1px solid rgba(255,255,255,.5); padding:6px 10px; border-radius:6px; cursor:pointer;">閉じる</button>
+    `;
+    document.body.appendChild(banner);
+    const dismiss = () => banner.remove();
+    document.getElementById('pwa-install-dismiss').addEventListener('click', dismiss);
+    document.getElementById('pwa-install-now').addEventListener('click', () => {
+      // iOS は手順モーダル、Windows/他は可能ならプロンプト
+      if (this.deferredPrompt) {
+        this.installApp();
+      } else {
+        this.showManualInstallInstructions();
+      }
+      dismiss();
+    });
   }
 
   createInstallButton() {
