@@ -60,17 +60,33 @@
 }
 
 .reserved-seat {
-  font-size: 48px;
-  font-weight: bold;
-  color: #28a745;
   margin: 20px 0;
-  text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
 }
 
 .reservation-title {
-  font-size: 24px;
-  color: #333;
+  font-size: 32px;
+  font-weight: 900;
+  color: #155724;
   margin-bottom: 10px;
+  letter-spacing: 0.5px;
+}
+
+/* Seat chip for strong visual emphasis */
+.seat-chip {
+  display: inline-block;
+  font-size: 28px;
+  font-weight: 800;
+  color: #155724;
+  background: #d4edda;
+  border: 2px solid #28a745;
+  border-radius: 10px;
+  padding: 10px 14px;
+  box-shadow: 0 3px 8px rgba(40, 167, 69, 0.15);
+  letter-spacing: 0.5px;
 }
 
 .reservation-details {

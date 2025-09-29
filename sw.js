@@ -155,19 +155,20 @@ self.addEventListener('fetch', (event) => {
 
 				// navigation preload があれば先に利用
 				let response = undefined;
-				if (event.preloadResponse) {
-					try {
-						response = await event.preloadResponse;
-					} catch (e) {
-						// preloadResponse がキャンセルされた場合は通常のfetchを使用
-						console.log('Navigation preload cancelled, falling back to fetch');
-					}
+				const preloadPromise = event.preloadResponse;
+				if (preloadPromise) {
+					// preload の解決/キャンセルを確実に待つ
+					const settlePreload = preloadPromise
+						.then(r => { response = r; })
+						.catch(() => { response = undefined; });
+					// settle を確実に待機してから次へ
+					await settlePreload;
 				}
 				if (!response) {
 					response = await fetch(req);
 				}
 
-				// キャッシュ書き込みは待たずに完了を待機
+				// キャッシュ書き込みは waitUntil で完了を待機
 				event.waitUntil((async () => {
 					try {
 						const clone = response.clone();

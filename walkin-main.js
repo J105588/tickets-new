@@ -200,40 +200,36 @@ async function issueWalkinConsecutive() {
     // ローカル処理成功時の座席表示
     if (response.success && response.offline && response.seatIds) {
       showLoader(false);
-      showSuccessNotification(response.message || '座席が確保されました。');
 
       const seats = response.seatIds;
-      let seatDisplay = '';
-      
-      if (seats.length === 1) {
-        seatDisplay = seats[0];
-      } else {
-        seatDisplay = seats.join(' / ');
-      }
-      
-      // ローカル処理であることを示すマークを追加
-      if (response.localProcessing) {
-        seatDisplay += ' (ローカル処理)';
-      }
-      
-      reservedSeatEl.textContent = seatDisplay;
+      const scopeLabel = `${GROUP} ${DAY}日目 ${DISPLAY_TIMESLOT}`;
+      const seatLines = seats.map(s => `${s}`);
+      showSuccessNotification(`当日券を確保しました（${scopeLabel}）\n\n${seatLines.join('\n')}`);
+
+      // タイトルに座席IDを表示（例: A6/A7/A8）
+      const titleEl = document.querySelector('.reservation-title');
+      if (titleEl) titleEl.textContent = seats.join('/');
+      // 大きく視認できるようにチップ表示
+      reservedSeatEl.innerHTML = seats.map(s => `<span class="seat-chip">${s}</span>`).join('');
       reservationResult.classList.add('show');
       return;
     }
     
     if (response.success) {
       showLoader(false);
-      showSuccessNotification(response.message || '座席が確保されました。');
 
       let seats = [];
       if (response.seatId) seats = [response.seatId];
       if (response.seatIds && Array.isArray(response.seatIds)) seats = response.seatIds;
 
-      if (seats.length === 1) {
-        reservedSeatEl.textContent = seats[0];
-      } else {
-        reservedSeatEl.textContent = seats.join(' / ');
-      }
+      // タイトルに座席IDを表示（例: A6/A7/A8）
+      const titleEl2 = document.querySelector('.reservation-title');
+      if (titleEl2) titleEl2.textContent = seats.join('/');
+      // 大きく視認できるようにチップ表示
+      reservedSeatEl.innerHTML = seats.map(s => `<span class=\"seat-chip\">${s}</span>`).join('');
+      const scopeLabel = `${GROUP} ${DAY}日目 ${DISPLAY_TIMESLOT}`;
+      const seatLines = seats.map(s => `${s}`);
+      showSuccessNotification(`当日券を確保しました（${scopeLabel}）\n\n${seatLines.join('\n')}`);
       reservationResult.classList.add('show');
     } else {
       showLoader(false);
@@ -295,42 +291,35 @@ async function issueWalkinAnywhere() {
     // ローカル処理成功時の座席表示
     if (response.success && response.offline && (response.seatIds || response.seatId)) {
       showLoader(false);
-      showSuccessNotification(response.message || '座席が確保されました。');
 
       let seats = [];
       if (response.seatId) seats = [response.seatId];
       if (response.seatIds && Array.isArray(response.seatIds)) seats = response.seatIds;
 
-      let seatDisplay = '';
-      if (seats.length === 1) {
-        seatDisplay = seats[0];
-      } else {
-        seatDisplay = seats.join(' / ');
-      }
-      
-      // ローカル処理であることを示すマークを追加
-      if (response.localProcessing) {
-        seatDisplay += ' (ローカル処理)';
-      }
-      
-      reservedSeatEl.textContent = seatDisplay;
+      // タイトルに座席IDを表示（例: A6/A7/A8）
+      const titleEl3 = document.querySelector('.reservation-title');
+      if (titleEl3) titleEl3.textContent = seats.join('/');
+      // 大きく視認できるようにチップ表示
+      reservedSeatEl.innerHTML = seats.map(s => `<span class=\"seat-chip\">${s}</span>`).join('');
+      const scopeLabel = `${GROUP} ${DAY}日目 ${DISPLAY_TIMESLOT}`;
+      const seatLines = seats.map(s => `${s}`);
+      showSuccessNotification(`当日券を確保しました（${scopeLabel}）\n\n${seatLines.join('\n')}`);
       reservationResult.classList.add('show');
       return;
     }
 
     if (response.success) {
       showLoader(false);
-      showSuccessNotification(response.message || '座席が確保されました。');
 
       let seats = [];
       if (response.seatId) seats = [response.seatId];
       if (response.seatIds && Array.isArray(response.seatIds)) seats = response.seatIds;
 
-      if (seats.length === 1) {
-        reservedSeatEl.textContent = seats[0];
-      } else {
-        reservedSeatEl.textContent = seats.join(' / ');
-      }
+      // 大きく視認できるようにチップ表示
+      reservedSeatEl.innerHTML = seats.map(s => `<span class=\"seat-chip\">${s}</span>`).join('');
+      const scopeLabel = `${GROUP} ${DAY}日目 ${DISPLAY_TIMESLOT}`;
+      const seatLines = seats.map(s => `${s}`);
+      showSuccessNotification(`当日券を確保しました（${scopeLabel}）\n\n${seatLines.join('\n')}`);
       reservationResult.classList.add('show');
     } else {
       showLoader(false);

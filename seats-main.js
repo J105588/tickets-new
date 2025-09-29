@@ -1243,13 +1243,13 @@ async function checkInSelected() {
     return;
   }
 
-  const selectedSeats = Array.from(selectedSeatElements).map(seatEl => ({
+  const selectedSeatInfos = Array.from(selectedSeatElements).map(seatEl => ({
     id: seatEl.dataset.id,
     columnD: seatEl.dataset.columnD || seatEl.dataset.seatName || ''
   }));
 
   // 選択された座席の一覧を表示
-  const seatList = selectedSeats.map(seat => `${seat.id}：${seat.columnD}`).join('\n');
+  const seatList = selectedSeatInfos.map(seat => `${seat.id}：${seat.columnD || '（名前未設定）'}`).join('\n');
   const confirmMessage = `以下の座席をチェックインしますか？\n\n${seatList}`;
   
   if (!confirm(confirmMessage)) {
@@ -1257,7 +1257,7 @@ async function checkInSelected() {
   }
 
   // 楽観的更新：即座にUIを更新（チェックイン済みとして表示）
-  const seatIds = selectedSeats.map(seat => seat.id);
+  const seatIds = selectedSeatInfos.map(seat => seat.id);
   
   // 選択された座席を即座にチェックイン済みとして表示
   selectedSeatElements.forEach(seatEl => {
@@ -1291,9 +1291,12 @@ async function checkInSelected() {
     if (response.success) {
       // 成功時：即座に成功メッセージを表示（ローダーは非表示）
       showLoader(false);
-      
-      // 成功通知を表示（非ブロッキング）
-      showSuccessNotification(`チェックインが完了しました！\n\n${response.message}`);
+
+      // 成功通知を表示（非ブロッキング）: 座席ID：名前 の形式で複数表示し、スコープを明示
+      const scopeLabel = `${GROUP} ${DAY}日目 ${DISPLAY_TIMESLOT}`;
+      const lines = selectedSeatInfos.map(s => `${s.id}：${s.columnD || '（名前未設定）'}`);
+      const message = `チェックインが完了しました（${scopeLabel}）\n\n${lines.join('\n')}`;
+      showSuccessNotification(message);
       
       // バックグラウンドで座席データを再取得（サイレント更新）
       setTimeout(async () => {
@@ -1763,6 +1766,11 @@ function applySeatStatusClasses(seatEl, status) {
     seatEl.classList.add('unavailable');
     seatEl.classList.add('seat-unavailable');
   }
+}
+
+// 色更新はCSSクラスで管理するため互換用の空関数
+function updateSeatColor(seatEl, status) {
+  // 互換目的: 色は applySeatStatusClasses で更新済み
 }
 
 // 座席のステータステキストを更新する関数
