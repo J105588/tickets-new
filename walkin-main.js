@@ -23,6 +23,36 @@ const ACTUAL_GROUP = DemoMode.enforceGeneproGroupForAPI(GROUP); // 実際にAPI�
 
 let _isIssuingWalkin = false;
 
+// 予約結果UIを一括で更新する関数
+function updateReservationUI(seats) {
+  const reservationResult = document.getElementById('reservation-result');
+  const reservedSeatEl = document.getElementById('reserved-seat');
+  const titleEl = document.querySelector('.reservation-title');
+  if (!reservationResult || !reservedSeatEl || !titleEl) return;
+
+  // タイトルに座席IDを表示（例: A6/A7/A8）
+  titleEl.textContent = Array.isArray(seats) ? seats.join('/') : String(seats || '');
+  // 下部のチップ表示は非表示に（重複表示を避ける）
+  try {
+    reservedSeatEl.innerHTML = '';
+    reservedSeatEl.style.display = 'none';
+  } catch (_) {}
+  reservationResult.classList.add('show');
+}
+
+// APIレスポンスから座席ID配列を抽出するユーティリティ
+function extractSeatsFromResponse(response) {
+  if (!response) return [];
+  // GAS 互換（トップレベル）
+  if (Array.isArray(response.seatIds) && response.seatIds.length) return response.seatIds;
+  if (typeof response.seatId === 'string' && response.seatId) return [response.seatId];
+  // Supabase 互換（data 内）
+  const data = response.data || {};
+  if (Array.isArray(data.seatIds) && data.seatIds.length) return data.seatIds;
+  if (typeof data.seatId === 'string' && data.seatId) return [data.seatId];
+  return [];
+}
+
 // 初期化
 window.onload = async () => {
   try {
@@ -198,39 +228,23 @@ async function issueWalkinConsecutive() {
     }
 
     // ローカル処理成功時の座席表示
-    if (response.success && response.offline && response.seatIds) {
+    if (response.success && response.offline && extractSeatsFromResponse(response).length) {
       showLoader(false);
-
-      const seats = response.seatIds;
+      const seats = extractSeatsFromResponse(response);
       const scopeLabel = `${GROUP} ${DAY}日目 ${DISPLAY_TIMESLOT}`;
       const seatLines = seats.map(s => `${s}`);
       showSuccessNotification(`当日券を確保しました（${scopeLabel}）\n\n${seatLines.join('\n')}`);
-
-      // タイトルに座席IDを表示（例: A6/A7/A8）
-      const titleEl = document.querySelector('.reservation-title');
-      if (titleEl) titleEl.textContent = seats.join('/');
-      // 大きく視認できるようにチップ表示
-      reservedSeatEl.innerHTML = seats.map(s => `<span class="seat-chip">${s}</span>`).join('');
-      reservationResult.classList.add('show');
+      updateReservationUI(seats);
       return;
     }
     
     if (response.success) {
       showLoader(false);
-
-      let seats = [];
-      if (response.seatId) seats = [response.seatId];
-      if (response.seatIds && Array.isArray(response.seatIds)) seats = response.seatIds;
-
-      // タイトルに座席IDを表示（例: A6/A7/A8）
-      const titleEl2 = document.querySelector('.reservation-title');
-      if (titleEl2) titleEl2.textContent = seats.join('/');
-      // 大きく視認できるようにチップ表示
-      reservedSeatEl.innerHTML = seats.map(s => `<span class=\"seat-chip\">${s}</span>`).join('');
+      const seats = extractSeatsFromResponse(response);
+      updateReservationUI(seats);
       const scopeLabel = `${GROUP} ${DAY}日目 ${DISPLAY_TIMESLOT}`;
       const seatLines = seats.map(s => `${s}`);
       showSuccessNotification(`当日券を確保しました（${scopeLabel}）\n\n${seatLines.join('\n')}`);
-      reservationResult.classList.add('show');
     } else {
       showLoader(false);
       // ローカル処理のエラーメッセージを適切に表示
@@ -289,38 +303,23 @@ async function issueWalkinAnywhere() {
     }
 
     // ローカル処理成功時の座席表示
-    if (response.success && response.offline && (response.seatIds || response.seatId)) {
+    if (response.success && response.offline && extractSeatsFromResponse(response).length) {
       showLoader(false);
-
-      let seats = [];
-      if (response.seatId) seats = [response.seatId];
-      if (response.seatIds && Array.isArray(response.seatIds)) seats = response.seatIds;
-
-      // タイトルに座席IDを表示（例: A6/A7/A8）
-      const titleEl3 = document.querySelector('.reservation-title');
-      if (titleEl3) titleEl3.textContent = seats.join('/');
-      // 大きく視認できるようにチップ表示
-      reservedSeatEl.innerHTML = seats.map(s => `<span class=\"seat-chip\">${s}</span>`).join('');
+      const seats = extractSeatsFromResponse(response);
+      updateReservationUI(seats);
       const scopeLabel = `${GROUP} ${DAY}日目 ${DISPLAY_TIMESLOT}`;
       const seatLines = seats.map(s => `${s}`);
       showSuccessNotification(`当日券を確保しました（${scopeLabel}）\n\n${seatLines.join('\n')}`);
-      reservationResult.classList.add('show');
       return;
     }
 
     if (response.success) {
       showLoader(false);
-
-      let seats = [];
-      if (response.seatId) seats = [response.seatId];
-      if (response.seatIds && Array.isArray(response.seatIds)) seats = response.seatIds;
-
-      // 大きく視認できるようにチップ表示
-      reservedSeatEl.innerHTML = seats.map(s => `<span class=\"seat-chip\">${s}</span>`).join('');
+      const seats = extractSeatsFromResponse(response);
+      updateReservationUI(seats);
       const scopeLabel = `${GROUP} ${DAY}日目 ${DISPLAY_TIMESLOT}`;
       const seatLines = seats.map(s => `${s}`);
       showSuccessNotification(`当日券を確保しました（${scopeLabel}）\n\n${seatLines.join('\n')}`);
-      reservationResult.classList.add('show');
     } else {
       showLoader(false);
       // ローカル処理のエラーメッセージを適切に表示
