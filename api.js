@@ -418,16 +418,32 @@ class GasAPI {
     return response;
   }
 
-  // GASの疎通テスト用関数
+  // GAS/Supabase 疎通テスト（現在の構成に適応）
   static async testGASConnection() {
+    console.log('疎通テスト開始 (GAS + Supabase)...');
     try {
-      console.log('GAS疎通テスト開始...');
-      const response = await this._callApi('testApi');
-      console.log('GAS疎通テスト成功:', response);
-      return { success: true, data: response };
+      // GAS側テストとクライアント直Supabaseテストを並行実行
+      const [gasResp, spResp] = await Promise.all([
+        this._callApi('testApi').catch(e => ({ success: false, error: e && e.message })),
+        (this.supabaseAPI && this.supabaseAPI.testConnection ? this.supabaseAPI.testConnection() : Promise.resolve({ success: false, error: 'no_supabase_client' }))
+          .catch(e => ({ success: false, error: e && e.message }))
+      ]);
+
+      const result = {
+        gas: gasResp,
+        supabase: spResp
+      };
+
+      const ok = !!(gasResp && gasResp.success) && !!(spResp && spResp.success);
+      if (ok) {
+        console.log('疎通テスト成功:', result);
+        return { success: true, data: result };
+      }
+      console.warn('疎通テスト一部または全体失敗:', result);
+      return { success: false, error: 'connectivity_check_failed', data: result };
     } catch (error) {
-      console.error('GAS疎通テスト失敗:', error);
-      return { success: false, error: error.message };
+      console.error('疎通テスト致命的失敗:', error);
+      return { success: false, error: error && error.message };
     }
   }
 

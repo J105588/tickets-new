@@ -329,8 +329,9 @@ class SupabaseAPI {
       return { success: false, error: '利用可能な座席がありません' };
     }
     
-    // 最初の利用可能な座席を選択
-    const availableSeat = seatsResult.data[0];
+    // ランダムな利用可能座席を選択
+    const idx = Math.floor(Math.random() * seatsResult.data.length);
+    const availableSeat = seatsResult.data[idx];
     // 発行タイムスタンプ
     const now = new Date();
     const iso = now.toISOString();
@@ -366,8 +367,15 @@ class SupabaseAPI {
       return { success: false, error: '利用可能な座席がありません' };
     }
     
-    // 指定された数の座席を選択
-    const selectedSeats = seatsResult.data.slice(0, count);
+    // ランダムに指定数の座席を選択（Fisher-Yatesでシャッフル）
+    const pool = seatsResult.data.slice();
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = pool[i];
+      pool[i] = pool[j];
+      pool[j] = t;
+    }
+    const selectedSeats = pool.slice(0, count);
     const now = new Date();
     const iso = now.toISOString();
     const fmt = this._formatYmdHms(now);
@@ -419,7 +427,8 @@ class SupabaseAPI {
       if (!byRow.has(row)) byRow.set(row, []);
       byRow.get(row).push({ id: s.seat_id, num: Number(s.seat_number) });
     }
-    let chosen = null;
+    // 全ての行で連続ブロックを列挙し、候補からランダムに選ぶ
+    const candidates = [];
     for (const [row, arr] of byRow.entries()) {
       arr.sort((a, b) => a.num - b.num);
       // スライディングウィンドウで連続 count を探す
@@ -441,17 +450,16 @@ class SupabaseAPI {
             }
           }
           if (ok) {
-            chosen = arr.slice(i, i + count).map(x => x.id);
-            break;
+            candidates.push(arr.slice(i, i + count).map(x => x.id));
           }
         }
       }
-      if (chosen) break;
     }
 
-    if (!chosen) {
+    if (!candidates.length) {
       return { success: false, error: '指定枚数の連続席が見つかりませんでした' };
     }
+    const chosen = candidates[Math.floor(Math.random() * candidates.length)];
 
     // 選択した席を walkin に更新
     const now = new Date();

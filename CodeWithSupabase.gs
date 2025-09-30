@@ -506,41 +506,44 @@ function assignWalkInConsecutiveSeatsSupabase(group, day, timeslot, count) {
       return { success: false, message: '利用可能な座席が不足しています' };
     }
     
-    // 行ごとに番号でソートして連続ブロックを探索
-    const byRow = {};
-    available.forEach(s => {
-      const row = String(s.row_letter);
-      if (!byRow[row]) byRow[row] = [];
-      byRow[row].push({ id: s.seat_id, num: Number(s.seat_number) });
-    });
-    
-    let chosen = null;
-    let chosenRow = null;
-    const rowPriority = Object.keys(byRow).sort(); // 既定: 行優先 A→Z
-    for (const row of rowPriority) {
-      const arr = byRow[row].sort((a, b) => a.num - b.num);
-      for (let i = 0; i + count - 1 < arr.length; i++) {
-        const start = arr[i].num;
-        const end = arr[i + count - 1].num;
-        if (end - start + 1 !== count) continue;
-        // 欠番チェック
-        let contiguous = true;
-        for (let k = 0; k < count; k++) {
-          if (arr[i + k].num !== start + k) { contiguous = false; break; }
-        }
-        if (!contiguous) continue;
-        // 通路跨ぎ禁止（C列の13-14間と25-26間）
-        if (row === 'C') {
-          const crossesFirst = (start <= 13 && end >= 14);
-          const crossesSecond = (start <= 25 && end >= 26);
-          if (crossesFirst || crossesSecond) continue;
-        }
-        chosen = arr.slice(i, i + count).map(x => x.id);
-        chosenRow = row;
-        break;
+  // 行ごとに番号でソートして連続ブロックを列挙し、ランダムに選ぶ
+  const byRow = {};
+  available.forEach(s => {
+    const row = String(s.row_letter);
+    if (!byRow[row]) byRow[row] = [];
+    byRow[row].push({ id: s.seat_id, num: Number(s.seat_number) });
+  });
+  
+  const candidateBlocks = [];
+  Object.keys(byRow).forEach(row => {
+    const arr = byRow[row].sort((a, b) => a.num - b.num);
+    for (let i = 0; i + count - 1 < arr.length; i++) {
+      const start = arr[i].num;
+      const end = arr[i + count - 1].num;
+      if (end - start + 1 !== count) continue;
+      // 欠番チェック
+      let contiguous = true;
+      for (let k = 0; k < count; k++) {
+        if (arr[i + k].num !== start + k) { contiguous = false; break; }
       }
-      if (chosen) break;
+      if (!contiguous) continue;
+      // 通路跨ぎ禁止（C列の13-14間と25-26間）
+      if (row === 'C') {
+        const crossesFirst = (start <= 13 && end >= 14);
+        const crossesSecond = (start <= 25 && end >= 26);
+        if (crossesFirst || crossesSecond) continue;
+      }
+      candidateBlocks.push({ row: row, seats: arr.slice(i, i + count).map(x => x.id) });
     }
+  });
+  
+  if (candidateBlocks.length === 0) {
+    return { success: false, message: '指定枚数の連続席が見つかりませんでした。' };
+  }
+  // ランダムに一つ選択
+  const picked = candidateBlocks[Math.floor(Math.random() * candidateBlocks.length)];
+  const chosen = picked.seats;
+  const chosenRow = picked.row;
     
     if (!chosen) {
       return { success: false, message: '指定枚数の連続席が見つかりませんでした。' };

@@ -149,8 +149,15 @@ class SupabaseIntegration {
       return { success: false, error: '利用可能な座席が不足しています' };
     }
     
-    // 指定された数の座席を選択
-    const selectedSeats = availableSeatsResult.data.slice(0, count);
+    // ランダムに指定数の座席を選択（Fisher-Yatesでシャッフル）
+    const pool = availableSeatsResult.data.slice();
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = pool[i];
+      pool[i] = pool[j];
+      pool[j] = tmp;
+    }
+    const selectedSeats = pool.slice(0, count);
     const updates = selectedSeats.map(seat => ({
       seatId: seat.seat_id,
       data: {
