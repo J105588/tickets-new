@@ -609,6 +609,19 @@ function initializeCustomScrollbar() {
   let hideTimer = null;
   const HIDE_DELAY_MS = 800; // スクロール停止から非表示までの遅延
 
+  // スクロールバーの表示制御関数
+  function showScrollbar() {
+    customScrollbar.classList.add('visible');
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+      customScrollbar.classList.remove('visible');
+    }, HIDE_DELAY_MS);
+  }
+
+  function hideScrollbar() {
+    customScrollbar.classList.remove('visible');
+  }
+
   let isDragging = false;
   let startX = 0;
   let startScrollLeft = 0;
@@ -621,7 +634,7 @@ function initializeCustomScrollbar() {
     
     if (scrollWidth <= clientWidth) {
       // スクロール不要な場合は非表示
-      customScrollbar.style.display = 'none';
+      hideScrollbar();
       return;
     }
     
@@ -662,11 +675,7 @@ function initializeCustomScrollbar() {
     container.scrollLeft = Math.max(0, Math.min(maxScrollLeft, scrollLeft));
 
     // クリック操作時は表示を維持し、少し後に隠す
-    customScrollbar.style.display = 'block';
-    if (hideTimer) clearTimeout(hideTimer);
-    hideTimer = setTimeout(() => {
-      customScrollbar.style.display = 'none';
-    }, HIDE_DELAY_MS);
+    showScrollbar();
   });
   
   // スクロールバーのドラッグ開始
@@ -696,7 +705,7 @@ function initializeCustomScrollbar() {
     container.scrollLeft = Math.max(0, Math.min(maxScrollLeft, newScrollLeft));
 
     // ドラッグ中は表示
-    customScrollbar.style.display = 'block';
+    showScrollbar();
   });
   
   // ドラッグ終了
@@ -705,7 +714,7 @@ function initializeCustomScrollbar() {
     // 少し待って非表示
     if (hideTimer) clearTimeout(hideTimer);
     hideTimer = setTimeout(() => {
-      customScrollbar.style.display = 'none';
+      customScrollbar.classList.remove('visible');
     }, HIDE_DELAY_MS);
   });
   
@@ -716,7 +725,7 @@ function initializeCustomScrollbar() {
     startScrollLeft = container.scrollLeft;
     e.preventDefault();
     // タッチ開始で表示
-    customScrollbar.style.display = 'block';
+    showScrollbar();
   });
   
   document.addEventListener('touchmove', (e) => {
@@ -737,14 +746,14 @@ function initializeCustomScrollbar() {
     container.scrollLeft = Math.max(0, Math.min(maxScrollLeft, newScrollLeft));
     e.preventDefault();
     // タッチ移動中は表示
-    customScrollbar.style.display = 'block';
+    showScrollbar();
   });
   
   document.addEventListener('touchend', () => {
     isDragging = false;
     if (hideTimer) clearTimeout(hideTimer);
     hideTimer = setTimeout(() => {
-      customScrollbar.style.display = 'none';
+      customScrollbar.classList.remove('visible');
     }, HIDE_DELAY_MS);
   });
   
@@ -752,13 +761,9 @@ function initializeCustomScrollbar() {
   container.addEventListener('scroll', () => {
     // スクロール発生時は表示
     if (container.scrollWidth > container.clientWidth) {
-      customScrollbar.style.display = 'block';
-      if (hideTimer) clearTimeout(hideTimer);
-      hideTimer = setTimeout(() => {
-        customScrollbar.style.display = 'none';
-      }, HIDE_DELAY_MS);
+      showScrollbar();
     } else {
-      customScrollbar.style.display = 'none';
+      hideScrollbar();
     }
     updateScrollbar();
   });
@@ -777,7 +782,7 @@ function initializeCustomScrollbar() {
     centerSeatMap();
     updateScrollbar();
     // 初期表示では非表示
-    customScrollbar.style.display = 'none';
+    hideScrollbar();
   }, 100);
 }
 
