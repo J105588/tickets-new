@@ -11,7 +11,6 @@ class SupabaseAPI {
   constructor(config = SUPABASE_CONFIG) {
     this.url = config.url;
     this.anonKey = config.anonKey;
-    this.serviceRoleKey = config.serviceRoleKey;
     this.headers = {
       'Content-Type': 'application/json',
       'apikey': this.anonKey,
@@ -24,8 +23,8 @@ class SupabaseAPI {
     const url = `${this.url}/rest/v1/${endpoint}`;
     const method = (options.method || 'GET').toUpperCase();
     const isMutation = method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE';
-    // 変更系はサービスロールキーを使用（RLSを回避し確実に反映）
-    const authKey = isMutation && this.serviceRoleKey ? this.serviceRoleKey : this.anonKey;
+    // フロントエンドでは常に anonKey を使用（service role は使わない）
+    const authKey = this.anonKey;
     const headers = {
       'Content-Type': 'application/json',
       'apikey': authKey,
