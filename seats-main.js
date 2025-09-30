@@ -996,19 +996,19 @@ function createSeatElement(seatData) {
     seat.appendChild(nameEl);
   }
   
-  seat.addEventListener('click', () => handleSeatClick(seatData));
+  seat.addEventListener('click', (e) => handleSeatClick(seatData, e));
   return seat;
 }
 
 // 座席クリック時の処理
-function handleSeatClick(seatData) {
+function handleSeatClick(seatData, event) {
   const currentMode = localStorage.getItem('currentMode') || 'normal';
   const isAdminMode = currentMode === 'admin' || IS_ADMIN;
   const isSuperAdminMode = currentMode === 'superadmin';
   
   if (isSuperAdminMode) {
-    // 最高管理者モード：座席データ編集
-    handleSuperAdminSeatClick(seatData);
+    // 最高管理者モード：座席データ編集（マルチ選択対応）
+    handleSuperAdminSeatClick(seatData, event);
   } else if (isAdminMode) {
     // 管理者モード：チェックイン可能な座席を選択
     handleAdminSeatClick(seatData);
@@ -1019,7 +1019,7 @@ function handleSeatClick(seatData) {
 }
 
 // 最高管理者モードでの座席クリック処理
-function handleSuperAdminSeatClick(seatData) {
+function handleSuperAdminSeatClick(seatData, event) {
   console.log('[最高管理者] 座席クリック:', seatData);
   
   // 任意の座席を選択可能
@@ -1032,21 +1032,163 @@ function handleSuperAdminSeatClick(seatData) {
   // ユーザー操作開始
   startUserInteraction();
 
-  // 既存のモーダルがあれば閉じる
-  closeSeatEditModal();
+  // モーダルは座席クリックでは操作しない（選択を維持）
 
-  // 座席の選択状態を設定（編集用）
-  // 他の座席の選択をクリア
-  document.querySelectorAll('.seat.selected-for-edit').forEach(seat => {
-    seat.classList.remove('selected-for-edit');
+  const multiSelectKey = event && (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey);
+  if (multiSelectKey) {
+    // トグル選択のみ行い、モーダルは開かない
+    seatElement.classList.toggle('selected-for-edit');
+    updateBulkEditButtonVisibility();
+    return;
+  }
+
+  // 単独クリック時の挙動: 既に選択がある場合はトグル追加/削除、選択がない場合は単独選択
+  const clickedSelected = seatElement.classList.contains('selected-for-edit');
+  const currentSelected = Array.from(document.querySelectorAll('.seat.selected-for-edit'));
+  const hasSelection = currentSelected.length > 0;
+
+  if (!hasSelection) {
+    // 何も選ばれていない → 単独選択
+    document.querySelectorAll('.seat.selected-for-edit').forEach(seat => seat.classList.remove('selected-for-edit'));
+    seatElement.classList.add('selected-for-edit');
+    console.log('[最高管理者] 単独選択:', seatData.id);
+  } else {
+    // 既に選択がある → トグル追加/削除（モーダルは開かない）
+    seatElement.classList.toggle('selected-for-edit');
+    console.log('[最高管理者] トグル選択:', seatData.id, '->', !clickedSelected);
+  }
+  updateBulkEditButtonVisibility();
+}
+
+// 一括編集ボタンの表示制御
+function updateBulkEditButtonVisibility() {
+  const selected = Array.from(document.querySelectorAll('.seat.selected-for-edit'));
+  // 既存のフローティングボタンがあれば隠す/削除（移行）
+  const legacy = document.getElementById('bulk-seat-edit-btn');
+  if (legacy) { legacy.style.display = 'none'; }
+  // ヘッダーの編集ボタンを書き換え
+  const headerBtn = document.getElementById('walkin-button');
+  if (!headerBtn) return;
+  if (selected.length >= 2) {
+    headerBtn.textContent = '選択座席を一括編集';
+  } else {
+    headerBtn.textContent = '編集';
+  }
+}
+
+// 一括編集モーダル
+function showBulkSeatEditModal(seatIds) {
+  if (!seatIds || seatIds.length < 2) return;
+  const modalHTML = `
+    <div id="bulk-seat-edit-modal" class="modal">
+      <div class="modal-content" style="max-width: 520px;">
+        <h3>一括編集（${seatIds.length}席）</h3>
+        <div class="seat-edit-form">
+          <div class="form-group">
+            <label for="bulk-column-c">C列: ステータス（空、確保、予約済など）</label>
+            <input type="text" id="bulk-column-c" value="" placeholder="例: 予約済">
+          </div>
+          <div class="form-group">
+            <label for="bulk-column-d">D列: 予約名・備考（全席に同じ内容）</label>
+            <input type="text" id="bulk-column-d" value="" placeholder="例: 田中太郎">
+          </div>
+          <div class="form-group">
+            <label for="bulk-column-e">E列: チェックイン状態・その他</label>
+            <input type="text" id="bulk-column-e" value="" placeholder="例: 済">
+          </div>
+        </div>
+        <div style="font-size:12px;color:#666;margin-top:-8px;">入力した内容が選択された全ての座席に適用されます。</div>
+        <div class="modal-buttons">
+          <button class="btn-primary" onclick="window.applyBulkSeatEdit()">一括適用</button>
+          <button class="btn-secondary" onclick="window.closeBulkSeatEditModal()">キャンセル</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', modalHTML);
+  // アニメーション開始
+  requestAnimationFrame(() => {
+    const modalEl = document.getElementById('bulk-seat-edit-modal');
+    if (modalEl) modalEl.classList.add('show');
   });
-  
-  // 現在の座席を選択状態にする
-  seatElement.classList.add('selected-for-edit');
-  console.log('[最高管理者] 座席選択状態を設定:', seatData.id);
+  // 外側クリックで閉じる
+  const modal = document.getElementById('bulk-seat-edit-modal');
+  if (modal) {
+    modal.addEventListener('click', (e) => { if (e.target === modal) { closeBulkSeatEditModal(); } });
+  }
+  // 一括適用関数を束縛
+  window.applyBulkSeatEdit = async function() {
+    const columnC = document.getElementById('bulk-column-c').value;
+    const columnD = document.getElementById('bulk-column-d').value;
+    const columnE = document.getElementById('bulk-column-e').value;
+    if (!confirm(`以下の内容を${seatIds.length}席に一括適用しますか？\n\nC列: ${columnC}\nD列: ${columnD}\nE列: ${columnE}`)) return;
+    closeBulkSeatEditModal();
+    showLoader(true);
+    try {
+      // リトライ付き更新ヘルパー
+      const applySeatUpdateWithRetry = async (seatId, c, d, e, retries = 2) => {
+        let lastErr = null;
+        for (let i = 0; i <= retries; i++) {
+          try {
+            await GasAPI.updateSeatData(GROUP, DAY, ACTUAL_TIMESLOT, seatId, c, d, e);
+            return true;
+          } catch (err) {
+            lastErr = err;
+          }
+        }
+        console.warn('一括編集: リトライ失敗', seatId, lastErr);
+        return false;
+      };
 
-  // 編集モーダルを表示
-  showSeatEditModal(seatData);
+      // 逐次で安定適用（Apps Script 呼び出し負荷軽減）
+      let successCount = 0;
+      let failCount = 0;
+      for (const id of seatIds) {
+        // 空欄は現状値を維持（意図せぬクリア防止）
+        const el = document.querySelector(`.seat[data-id="${id}"]`);
+        const cVal = columnC !== '' ? columnC : (el ? (el.dataset.columnC || '') : '');
+        const dVal = columnD !== '' ? columnD : (el ? (el.dataset.columnD || '') : '');
+        const eVal = columnE !== '' ? columnE : (el ? (el.dataset.columnE || '') : '');
+        const ok = await applySeatUpdateWithRetry(id, cVal, dVal, eVal);
+        if (ok) successCount++; else failCount++;
+      }
+      // 結果通知
+      if (failCount === 0) {
+        showSuccessNotification(`${successCount}席を更新しました。`);
+      } else {
+        showErrorNotification(`更新完了: 成功 ${successCount} / 失敗 ${failCount}`);
+      }
+      // 最新データで再描画
+      try {
+        const currentMode = localStorage.getItem('currentMode') || 'normal';
+        const isAdminMode = currentMode === 'admin' || IS_ADMIN;
+        const isSuperAdminMode = currentMode === 'superadmin';
+        const seatData = await GasAPI.getSeatData(GROUP, DAY, ACTUAL_TIMESLOT, isAdminMode, isSuperAdminMode);
+        if (seatData.success) {
+          drawSeatMap(seatData.seatMap);
+          updateLastUpdateTime();
+        }
+      } catch (_) {}
+    } catch (error) {
+      console.error('一括編集エラー:', error);
+      showErrorNotification('一括編集でエラーが発生しました。');
+    } finally {
+      showLoader(false);
+      // 選択状態クリア
+      document.querySelectorAll('.seat.selected-for-edit').forEach(seat => seat.classList.remove('selected-for-edit'));
+      updateBulkEditButtonVisibility();
+    }
+  };
+  window.closeBulkSeatEditModal = function() {
+    const modal = document.getElementById('bulk-seat-edit-modal');
+    if (!modal) return;
+    try {
+      modal.classList.add('closing');
+      setTimeout(() => { try { modal.remove(); } catch(_) {} }, 250);
+    } catch(_) {
+      try { modal.remove(); } catch(_) {}
+    }
+  };
 }
 
 // 管理者モードでの座席クリック処理
@@ -1684,7 +1826,12 @@ async function updateSeatData(seatId) {
   showLoader(true);
   
   try {
-    const response = await GasAPI.updateSeatData(GROUP, DAY, ACTUAL_TIMESLOT, seatId, columnC, columnD, columnE);
+    // 空欄は現状値を維持
+    const el = document.querySelector(`.seat[data-id="${seatId}"]`);
+    const cVal = columnC !== '' ? columnC : (el ? (el.dataset.columnC || '') : '');
+    const dVal = columnD !== '' ? columnD : (el ? (el.dataset.columnD || '') : '');
+    const eVal = columnE !== '' ? columnE : (el ? (el.dataset.columnE || '') : '');
+    const response = await GasAPI.updateSeatData(GROUP, DAY, ACTUAL_TIMESLOT, seatId, cVal, dVal, eVal);
     
     if (response.success) {
       alert('座席データを更新しました！');
@@ -1747,6 +1894,26 @@ function navigateToWalkin() {
 
 // グローバル関数として登録
 window.navigateToWalkin = navigateToWalkin;
+
+// 選択座席の一括編集を起動（ヘッダーボタンから）
+window.editSelectedSeats = function() {
+  const selected = Array.from(document.querySelectorAll('.seat.selected-for-edit')).map(el => el.dataset.id);
+  if (selected.length < 1) {
+    alert('編集する座席を選択してください。\nCtrl/Shift キーを押しながらクリックで複数選択できます。');
+    return;
+  }
+  if (selected.length === 1) {
+    // 1席のみなら従来の単体編集モーダルへ
+    const el = document.querySelector(`.seat.selected-for-edit`);
+    if (!el) return;
+    const seatId = el.dataset.id;
+    // 簡易データを組み立てて既存モーダルを開く
+    showSeatEditModal({ id: seatId, columnC: el.dataset.columnC || '', columnD: el.dataset.columnD || '', columnE: el.dataset.columnE || '' });
+    return;
+  }
+  // 2席以上なら一括編集モーダル
+  showBulkSeatEditModal(selected);
+};
 
 // 座席要素を更新する関数（楽観的更新用）
 function updateSeatElement(seatEl, seatData) {
