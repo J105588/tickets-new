@@ -31,6 +31,11 @@ class PWAInstallHandler {
     window.addEventListener('load', () => {
       this.createInstallButton();
       this.maybeShowOSSpecificBanner();
+      // Windows ではプロンプト未発火時でもボタンを表示して手動導線を用意
+      const { isWindows } = this.detectPlatform();
+      if (!this.isInstalled && isWindows) {
+        this.showInstallButton();
+      }
     });
   }
 
@@ -109,7 +114,9 @@ class PWAInstallHandler {
     // シンプルなインストールボタンを作成
     this.installButton = document.createElement('button');
     this.installButton.id = 'pwa-install-btn';
-    this.installButton.innerHTML = 'インストール';
+    // OSに応じて表記を最適化（Windowsではダウンロード表記）
+    const { isWindows } = this.detectPlatform();
+    this.installButton.innerHTML = isWindows ? 'ダウンロード' : 'インストール';
     this.installButton.className = 'pwa-install-btn';
     this.installButton.style.cssText = `
       position: fixed;
