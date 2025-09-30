@@ -1126,8 +1126,16 @@
                     
                     const response = await GasAPI.getDetailedCapacityAnalysis();
                     if (response.success) {
-                        this.currentData = response.analysis;
-                        this.mergeTimeslots(this.currentData.timeslots || []);
+                        this.currentData = response.analysis || {};
+                        const list = Array.isArray(this.currentData.timeslots) ? this.currentData.timeslots : [];
+                        if (list.length === 0) {
+                            // 詳細データに timeslots が無い/空の場合はフォールバックへ
+                            await this.loadWithFallback('詳細データが空のためフォールバックを使用');
+                            // クラス別分析の初期化も継続
+                            await this.initializeClassAnalysis();
+                            return;
+                        }
+                        this.mergeTimeslots(list);
                         this.notifyNewClasses(this.currentData);
                         this.updateDashboard();
                         this.updateQuickButtonStates();
@@ -1630,12 +1638,16 @@
 
             notifyNewClasses(data) {
                 try {
-                    const timeslots = (data && data.timeslots) ? data.timeslots : [];
-                    const groups = Array.from(new Set(timeslots.map(t => t.group))).filter(Boolean);
+                    const timeslots = (data && Array.isArray(data.timeslots)) ? data.timeslots : [];
+                    let groups = Array.from(new Set(timeslots.map(t => t && t.group).filter(Boolean)));
+                    // フォールバック: 直近のマップから抽出
+                    if (groups.length === 0 && this.latestTimeslotMap && this.latestTimeslotMap.size > 0) {
+                        groups = Array.from(new Set(Array.from(this.latestTimeslotMap.values()).map(t => t && t.group).filter(Boolean)));
+                    }
                     if (groups.length > 0) {
                         groups.forEach(g => console.log(`[Class Arrival] 受信: ${g}`));
                     } else {
-                        console.log('[Class Arrival] 受信データにクラス情報がありません');
+                        // データが空の場合は静かにスキップ
                     }
                 } catch (_) {
                     // noop
