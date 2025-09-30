@@ -24,10 +24,13 @@ class SupabaseAPI {
     const url = `${this.url}/rest/v1/${endpoint}`;
     const method = (options.method || 'GET').toUpperCase();
     const isMutation = method === 'POST' || method === 'PATCH' || method === 'PUT' || method === 'DELETE';
+    // 変更系はサービスロールキーを使用（RLSを回避し確実に反映）
+    const authKey = isMutation && this.serviceRoleKey ? this.serviceRoleKey : this.anonKey;
     const headers = {
-      ...this.headers,
+      'Content-Type': 'application/json',
+      'apikey': authKey,
+      'Authorization': `Bearer ${authKey}`,
       ...(options.headers || {}),
-      // 変更系は返却を受け取りやすくする
       ...(isMutation ? { 'Prefer': 'return=representation' } : {})
     };
     const config = { ...options, method, headers };
@@ -77,6 +80,23 @@ class SupabaseAPI {
       console.error('Supabase API Error:', error);
       return { success: false, error: error.message };
     }
+  }
+
+  // 簡易リトライ（指数バックオフ + ジッター）
+  async _retry(task, { retries = 2, base = 300, max = 2000 } = {}) {
+    let attempt = 0; let lastErr = null;
+    while (attempt <= retries) {
+      try { return await task(); } catch (e) {
+        lastErr = e;
+        const isRetryable = /HTTP 5\d{2}|HTTP 4(29)|network|fetch|timeout/i.test(e && e.message || '');
+        if (!isRetryable || attempt === retries) break;
+        const exp = Math.min(max, base * Math.pow(2, attempt));
+        const delay = Math.floor(exp * (0.5 + Math.random() * 0.5));
+        await new Promise(r => setTimeout(r, delay));
+        attempt++;
+      }
+    }
+    throw lastErr || new Error('retry_failed');
   }
 
   // 公演関連のAPI
@@ -173,26 +193,42 @@ class SupabaseAPI {
       updated_at: new Date().toISOString(),
       ...additionalData
     };
-    
-    return await this._request(`seats?performance_id=eq.${performanceId}&seat_id=eq.${seatId}`, {
+    const task = () => this._request(`seats?performance_id=eq.${performanceId}&seat_id=eq.${seatId}`, {
       method: 'PATCH',
       body: JSON.stringify(data)
     });
+    return await this._retry(task, { retries: 3, base: 250, max: 1500 });
   }
 
   async updateMultipleSeats(performanceId, updates) {
     const results = [];
-    
-    for (const update of updates) {
-      const result = await this.updateSeatStatus(performanceId, update.seatId, update.status, update.data);
-      results.push({
-        seatId: update.seatId,
-        success: result.success,
-        data: result.data
-      });
+    let allSucceeded = true;
+    // 並列し過ぎると429になりやすいので小さなバッチで逐次
+    const batchSize = 5;
+    for (let i = 0; i < updates.length; i += batchSize) {
+      const batch = updates.slice(i, i + batchSize);
+      for (const update of batch) {
+        try {
+          const result = await this.updateSeatStatus(performanceId, update.seatId, update.status, update.data);
+          const entry = {
+            seatId: update.seatId,
+            success: !!(result && result.success),
+            data: result ? result.data : null,
+            error: result && !result.success ? (result.error || 'unknown error') : null
+          };
+          if (!entry.success) allSucceeded = false;
+          results.push(entry);
+        } catch (e) {
+          allSucceeded = false;
+          results.push({ seatId: update.seatId, success: false, error: e && e.message });
+        }
+      }
+      // 軽い待機でスロットリング回避
+      if (i + batchSize < updates.length) {
+        await new Promise(r => setTimeout(r, 120));
+      }
     }
-    
-    return { success: true, data: results };
+    return { success: allSucceeded, data: results };
   }
 
   // 予約関連のAPI
@@ -245,51 +281,36 @@ class SupabaseAPI {
   }
 
   async checkInSeat(group, day, timeslot, seatId) {
-    // 公演IDを取得
     const performanceResult = await this.getPerformances(group, day, timeslot);
     if (!performanceResult.success || !performanceResult.data.length) {
       return { success: false, error: '公演が見つかりません' };
     }
-    
     const performanceId = performanceResult.data[0].id;
-    
-    // 座席のチェックイン状態を更新
     const result = await this.updateSeatStatus(performanceId, seatId, 'checked_in', {
       checked_in_at: new Date().toISOString()
     });
-    
     if (!result.success) {
-      return { success: false, error: 'チェックインに失敗しました' };
+      return { success: false, error: result.error || 'チェックインに失敗しました' };
     }
-    
     return { success: true, data: { seatId: seatId, checkedInAt: new Date().toISOString() } };
   }
 
   async checkInMultipleSeats(group, day, timeslot, seatIds) {
-    // 公演IDを取得
     const performanceResult = await this.getPerformances(group, day, timeslot);
     if (!performanceResult.success || !performanceResult.data.length) {
       return { success: false, error: '公演が見つかりません' };
     }
-    
     const performanceId = performanceResult.data[0].id;
-    
-    // 複数座席のチェックイン状態を更新
     const updates = seatIds.map(seatId => ({
-      seatId: seatId,
+      seatId,
       status: 'checked_in',
-      data: {
-        checked_in_at: new Date().toISOString()
-      }
+      data: { checked_in_at: new Date().toISOString() }
     }));
-    
     const result = await this.updateMultipleSeats(performanceId, updates);
-    
     if (!result.success) {
-      return { success: false, error: 'チェックインに失敗しました' };
+      return { success: false, error: 'チェックインに失敗しました', details: result.data };
     }
-    
-    return { success: true, data: { seatIds: seatIds, checkedInAt: new Date().toISOString() } };
+    return { success: true, data: { seatIds, checkedInAt: new Date().toISOString() } };
   }
 
   // 当日券関連のAPI

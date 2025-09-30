@@ -354,6 +354,7 @@ class GasAPI {
 
   static async checkInSeat(group, day, timeslot, seatId) {
     if (this.useSupabase) {
+      // Supabaseモードでは直接Supabaseに反映（大規模座席IDにも対応）
       return await this.supabaseAPI.checkInSeat(group, day, timeslot, seatId);
     }
     const response = await this._callApi('checkInSeat', [group, day, timeslot, seatId]);
@@ -362,6 +363,7 @@ class GasAPI {
 
   static async checkInMultipleSeats(group, day, timeslot, seatIds) {
     if (this.useSupabase) {
+      // Supabaseモードでは直接Supabaseに反映（大規模座席IDにも対応）
       return await this.supabaseAPI.checkInMultipleSeats(group, day, timeslot, seatIds);
     }
     const response = await this._callApi('checkInMultipleSeats', [group, day, timeslot, seatIds]);
