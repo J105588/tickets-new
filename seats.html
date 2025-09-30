@@ -69,8 +69,12 @@
                 <div class="screen">舞台</div>
                 <div id="seat-map-container" class="seat-map-container"></div>
                 
-                <!-- カスタムスクロールバー（非表示化） -->
-                <div class="custom-scrollbar" id="custom-scrollbar" style="display:none;"></div>
+                <!-- カスタムスクロールバー（スクロール時のみ表示） -->
+                <div class="custom-scrollbar" id="custom-scrollbar" style="display:none;">
+                  <div class="custom-scrollbar-track" id="scrollbar-track">
+                    <div class="custom-scrollbar-thumb" id="scrollbar-thumb"></div>
+                  </div>
+                </div>
                 
                 <!-- ズームコントロール -->
                 <div class="zoom-controls">

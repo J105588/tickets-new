@@ -605,6 +605,10 @@ function initializeCustomScrollbar() {
     return;
   }
   
+  // スクロール中のみ表示するためのタイマー管理
+  let hideTimer = null;
+  const HIDE_DELAY_MS = 800; // スクロール停止から非表示までの遅延
+
   let isDragging = false;
   let startX = 0;
   let startScrollLeft = 0;
@@ -621,6 +625,7 @@ function initializeCustomScrollbar() {
       return;
     }
     
+    // スクロール発生時は一旦表示
     customScrollbar.style.display = 'block';
     
     // スクロールバーの幅を計算
@@ -655,6 +660,13 @@ function initializeCustomScrollbar() {
     const scrollLeft = (normalizedClick / 100) * maxScrollLeft;
     
     container.scrollLeft = Math.max(0, Math.min(maxScrollLeft, scrollLeft));
+
+    // クリック操作時は表示を維持し、少し後に隠す
+    customScrollbar.style.display = 'block';
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+      customScrollbar.style.display = 'none';
+    }, HIDE_DELAY_MS);
   });
   
   // スクロールバーのドラッグ開始
@@ -682,11 +694,19 @@ function initializeCustomScrollbar() {
     const newScrollLeft = startScrollLeft + scrollDelta;
     
     container.scrollLeft = Math.max(0, Math.min(maxScrollLeft, newScrollLeft));
+
+    // ドラッグ中は表示
+    customScrollbar.style.display = 'block';
   });
   
   // ドラッグ終了
   document.addEventListener('mouseup', () => {
     isDragging = false;
+    // 少し待って非表示
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+      customScrollbar.style.display = 'none';
+    }, HIDE_DELAY_MS);
   });
   
   // タッチイベント（モバイル対応）
@@ -695,6 +715,8 @@ function initializeCustomScrollbar() {
     startX = e.touches[0].clientX;
     startScrollLeft = container.scrollLeft;
     e.preventDefault();
+    // タッチ開始で表示
+    customScrollbar.style.display = 'block';
   });
   
   document.addEventListener('touchmove', (e) => {
@@ -714,14 +736,32 @@ function initializeCustomScrollbar() {
     
     container.scrollLeft = Math.max(0, Math.min(maxScrollLeft, newScrollLeft));
     e.preventDefault();
+    // タッチ移動中は表示
+    customScrollbar.style.display = 'block';
   });
   
   document.addEventListener('touchend', () => {
     isDragging = false;
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+      customScrollbar.style.display = 'none';
+    }, HIDE_DELAY_MS);
   });
   
   // 座席図のスクロールイベント
-  container.addEventListener('scroll', updateScrollbar);
+  container.addEventListener('scroll', () => {
+    // スクロール発生時は表示
+    if (container.scrollWidth > container.clientWidth) {
+      customScrollbar.style.display = 'block';
+      if (hideTimer) clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => {
+        customScrollbar.style.display = 'none';
+      }, HIDE_DELAY_MS);
+    } else {
+      customScrollbar.style.display = 'none';
+    }
+    updateScrollbar();
+  });
   
   // ウィンドウリサイズイベント
   window.addEventListener('resize', () => {
@@ -736,6 +776,8 @@ function initializeCustomScrollbar() {
   setTimeout(() => {
     centerSeatMap();
     updateScrollbar();
+    // 初期表示では非表示
+    customScrollbar.style.display = 'none';
   }, 100);
 }
 
