@@ -1124,28 +1124,59 @@
                         return;
                     }
                     
-                    const response = await GasAPI.getDetailedCapacityAnalysis();
-                    if (response.success) {
-                        this.currentData = response.analysis || {};
-                        const list = Array.isArray(this.currentData.timeslots) ? this.currentData.timeslots : [];
-                        if (list.length === 0) {
-                            // 詳細データに timeslots が無い/空の場合はフォールバックへ
-                            await this.loadWithFallback('詳細データが空のためフォールバックを使用');
-                            // クラス別分析の初期化も継続
-                            await this.initializeClassAnalysis();
-                            return;
+                    // まずグループ一覧を取得し、グループ単位で詳細分析を集約
+                    let allTimeslots = [];
+                    let summaryAgg = { totalTimeslots: 0, fullCapacity: 0, warningCapacity: 0, criticalCapacity: 0, normalCapacity: 0, totalSeats: 0, totalOccupied: 0, totalEmpty: 0 };
+                    const groups = await GasAPI.getGroups();
+                    if (Array.isArray(groups) && groups.length > 0) {
+                        for (let i = 0; i < groups.length; i++) {
+                            const g = groups[i];
+                            // 過度な並列を避ける（API負荷とURL長対策）
+                            if (i > 0) { await new Promise(r => setTimeout(r, 150)); }
+                            const resp = await GasAPI.getDetailedCapacityAnalysis(g, null, null);
+                            if (resp && resp.success && resp.analysis) {
+                                const t = Array.isArray(resp.analysis.timeslots) ? resp.analysis.timeslots : [];
+                                allTimeslots = allTimeslots.concat(t);
+                                const s = resp.analysis.summary || {};
+                                summaryAgg.totalTimeslots += s.totalTimeslots || 0;
+                                summaryAgg.fullCapacity += s.fullCapacity || 0;
+                                summaryAgg.warningCapacity += s.warningCapacity || 0;
+                                summaryAgg.criticalCapacity += s.criticalCapacity || 0;
+                                summaryAgg.normalCapacity += s.normalCapacity || 0;
+                                summaryAgg.totalSeats += s.totalSeats || 0;
+                                summaryAgg.totalOccupied += s.totalOccupied || 0;
+                                summaryAgg.totalEmpty += s.totalEmpty || 0;
+                            }
                         }
-                        this.mergeTimeslots(list);
+                        this.currentData = { summary: summaryAgg, timeslots: allTimeslots, capacityDistribution: {}, trends: [] };
+                        this.mergeTimeslots(allTimeslots);
                         this.notifyNewClasses(this.currentData);
                         this.updateDashboard();
                         this.updateQuickButtonStates();
                         this.updateStatusIndicator();
-                        // 初回取得直後は即時判定・送信、その後5分間隔
                         this.nextEmailCheckAt = Date.now();
                         this.maybeTriggerScheduledEmail();
                     } else {
-                        // フォールバック: 簡易データで表示を継続
-                        await this.loadWithFallback('データの読み込みに失敗しました: ' + (response.message || '')); 
+                        // グループ取得に失敗/空 → 既存の一括取得へフォールバック
+                        const response = await GasAPI.getDetailedCapacityAnalysis();
+                        if (response.success) {
+                            this.currentData = response.analysis || {};
+                            const list = Array.isArray(this.currentData.timeslots) ? this.currentData.timeslots : [];
+                            if (list.length === 0) {
+                                await this.loadWithFallback('詳細データが空のためフォールバックを使用');
+                                await this.initializeClassAnalysis();
+                                return;
+                            }
+                            this.mergeTimeslots(list);
+                            this.notifyNewClasses(this.currentData);
+                            this.updateDashboard();
+                            this.updateQuickButtonStates();
+                            this.updateStatusIndicator();
+                            this.nextEmailCheckAt = Date.now();
+                            this.maybeTriggerScheduledEmail();
+                        } else {
+                            await this.loadWithFallback('データの読み込みに失敗しました: ' + (response.message || ''));
+                        }
                     }
                     
                     // クラス別分析の初期化

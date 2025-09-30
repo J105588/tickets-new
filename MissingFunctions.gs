@@ -260,12 +260,63 @@ function getLogStatistics() {
 // ===============================================================
 
 /**
+ * Supabaseへの同期HTTPリクエスト（GET専用）
+ */
+function _spRequest(endpoint) {
+  var props = PropertiesService.getScriptProperties();
+  var url = props.getProperty('SUPABASE_URL');
+  var anon = props.getProperty('SUPABASE_ANON_KEY');
+  if (!url || !anon) {
+    throw new Error('Supabase設定が不足しています (SUPABASE_URL / SUPABASE_ANON_KEY)');
+  }
+  var full = url.replace(/\/$/, '') + '/rest/v1/' + endpoint;
+  var headers = {
+    'Content-Type': 'application/json',
+    'apikey': anon,
+    'Authorization': 'Bearer ' + anon
+  };
+  var resp = UrlFetchApp.fetch(full, { method: 'get', headers: headers, muteHttpExceptions: true });
+  var code = resp.getResponseCode();
+  var text = resp.getContentText();
+  if (String(code)[0] !== '2') {
+    throw new Error('HTTP ' + code + ': ' + text);
+  }
+  if (!text || !text.trim()) return [];
+  try { return JSON.parse(text); } catch (_) { return []; }
+}
+
+/**
  * 満席公演を取得する
  */
 function getFullTimeslotsSupabase() {
   try {
-    // Supabase版の満席公演取得（簡易実装）
-    return { success: true, full: [] };
+    // 1 全公演取得
+    var perfs = _spRequest('performances?select=id,group_name,day,timeslot');
+    if (!Array.isArray(perfs)) perfs = [];
+    // 除外: 見本演劇
+    perfs = perfs.filter(function(p){ return String(p.group_name) !== '見本演劇'; });
+    if (perfs.length === 0) return { success: true, full: [] };
+
+    // 2 全座席の status を取得し、公演別に集計
+    var seats = _spRequest('seats?select=performance_id,status');
+    if (!Array.isArray(seats)) seats = [];
+
+    var byPerf = {};
+    seats.forEach(function(s) {
+      var pid = s.performance_id;
+      if (!byPerf[pid]) byPerf[pid] = { total: 0, available: 0 };
+      byPerf[pid].total++;
+      if (String(s.status) === 'available') byPerf[pid].available++;
+    });
+
+    var full = [];
+    perfs.forEach(function(p) {
+      var agg = byPerf[p.id] || { total: 0, available: 0 };
+      if (agg.total > 0 && agg.available === 0) {
+        full.push({ group: p.group_name, day: String(p.day), timeslot: p.timeslot });
+      }
+    });
+    return { success: true, full: full };
   } catch (e) {
     Logger.log('getFullTimeslotsSupabase failed: ' + e.message);
     return { success: false, message: e.message };
@@ -277,19 +328,55 @@ function getFullTimeslotsSupabase() {
  */
 function getFullCapacityTimeslotsSupabase() {
   try {
-    // Supabase版の満席容量取得（簡易実装）
-    return { 
-      success: true, 
-      fullTimeslots: [],
-      allTimeslots: [],
-      summary: {
-        totalChecked: 0,
-        fullCapacity: 0,
-        totalSeats: 0,
-        totalOccupied: 0,
-        totalEmpty: 0
-      }
+    // 1) 全公演取得
+    var perfs = _spRequest('performances?select=id,group_name,day,timeslot');
+    if (!Array.isArray(perfs)) perfs = [];
+    // 除外: 見本演劇
+    perfs = perfs.filter(function(p){ return String(p.group_name) !== '見本演劇'; });
+
+    // 2) 全座席の status を取得
+    var seats = _spRequest('seats?select=performance_id,status');
+    if (!Array.isArray(seats)) seats = [];
+
+    // 3) 公演別に集計
+    var byPerf = {};
+    seats.forEach(function(s) {
+      var pid = s.performance_id;
+      if (!byPerf[pid]) byPerf[pid] = { total: 0, available: 0 };
+      byPerf[pid].total++;
+      if (String(s.status) === 'available') byPerf[pid].available++;
+    });
+
+    var fullTimeslots = [];
+    var allTimeslots = [];
+    perfs.forEach(function(p) {
+      var agg = byPerf[p.id] || { total: 0, available: 0 };
+      var total = agg.total;
+      var empty = agg.available;
+      var occupied = total > 0 ? Math.max(0, total - empty) : 0;
+      var info = {
+        group: p.group_name,
+        day: String(p.day),
+        timeslot: p.timeslot,
+        totalSeats: total,
+        occupiedSeats: occupied,
+        emptySeats: empty,
+        isFull: total > 0 && empty === 0,
+        lastChecked: new Date()
+      };
+      if (info.isFull) fullTimeslots.push(info);
+      allTimeslots.push(info);
+    });
+
+    var summary = {
+      totalChecked: allTimeslots.length,
+      fullCapacity: fullTimeslots.length,
+      totalSeats: allTimeslots.reduce(function(s, t){ return s + (t.totalSeats||0); }, 0),
+      totalOccupied: allTimeslots.reduce(function(s, t){ return s + (t.occupiedSeats||0); }, 0),
+      totalEmpty: allTimeslots.reduce(function(s, t){ return s + (t.emptySeats||0); }, 0)
     };
+
+    return { success: true, fullTimeslots: fullTimeslots, allTimeslots: allTimeslots, summary: summary };
   } catch (e) {
     Logger.log('getFullCapacityTimeslotsSupabase failed: ' + e.message);
     return { success: false, message: e.message };
@@ -339,20 +426,60 @@ function getFullCapacityNotificationSettings() {
  */
 function sendFullCapacityEmail(emailData) {
   try {
-    const { emails, fullTimeslots, timestamp, isTest = false } = emailData;
-    
+    const { emails, fullTimeslots, timestamp, isTest = false } = emailData || {};
+    const emailList = Array.isArray(emails) ? emails : [emails];
+    if (!emailList.length || !emailList.some(email => email && email.indexOf('@') !== -1)) {
+      return { success: false, message: '有効なメールアドレスが指定されていません' };
+    }
     if (!Array.isArray(fullTimeslots) || fullTimeslots.length === 0) {
       return { success: false, message: '満席データが指定されていません' };
     }
-    
-    // メール送信の実装（簡易版）
-    Logger.log(`満席通知メール送信: ${fullTimeslots.length}件の満席公演`);
-    
-    return { 
-      success: true, 
-      message: 'メールを送信しました',
-      sentTo: emails,
-      timeslotsCount: fullTimeslots.length
+
+    const subject = isTest ? '[テスト配信] 満席通知 - 座席管理システム' : '🚨 満席になりました - 座席管理システム';
+    let body = isTest ? 'これはテスト配信です。実際の座席状況ではありません。\n\n' : '以下の公演が満席になりました。\n\n';
+    body += '満席公演一覧:\n';
+    body += Array(51).join('=') + '\n';
+    fullTimeslots.forEach(timeslot => {
+      body += `・${timeslot.group} ${timeslot.day}日目 ${timeslot.timeslot}\n`;
+      if (timeslot.totalSeats) {
+        body += `  残り: 0席 / 全${timeslot.totalSeats}席 (満席)\n`;
+      }
+    });
+    body += '\n' + Array(51).join('=') + '\n';
+    body += `通知時刻: ${new Date(timestamp || new Date()).toLocaleString('ja-JP')}\n`;
+    body += 'システム: 座席管理システム\n';
+    if (isTest) {
+      body += '\n※ これはテスト配信です。実際の座席状況ではありません。\n';
+    }
+
+    const results = [];
+    let successCount = 0;
+    let failureCount = 0;
+    emailList.forEach(email => {
+      if (!email || email.indexOf('@') === -1) {
+        results.push({ email, success: false, message: '無効なメールアドレス' });
+        failureCount++;
+        return;
+      }
+      try {
+        MailApp.sendEmail({ to: email, subject, body });
+        results.push({ email, success: true, message: '送信成功' });
+        successCount++;
+      } catch (emailError) {
+        Logger.log(`メール送信エラー (${email}): ${emailError.message}`);
+        results.push({ email, success: false, message: emailError.message });
+        failureCount++;
+      }
+    });
+
+    return {
+      success: successCount > 0,
+      message: `${successCount}件のメールを送信しました${failureCount > 0 ? ` (${failureCount}件失敗)` : ''}`,
+      sentTo: emailList,
+      results,
+      timeslotsCount: fullTimeslots.length,
+      successCount,
+      failureCount
     };
   } catch (e) {
     Logger.log('sendFullCapacityEmail failed: ' + e.message);
@@ -365,20 +492,99 @@ function sendFullCapacityEmail(emailData) {
  */
 function sendStatusNotificationEmail(emailData) {
   try {
-    const { emails, notifications, statistics, timestamp } = emailData;
-    
+    const { emails, notifications, statistics, timestamp } = emailData || {};
+    let emailList = Array.isArray(emails) ? emails : [emails];
+    emailList = emailList.filter(e => e && e.indexOf('@') !== -1);
+    if (!emailList.length) {
+      return { success: false, message: '有効なメールアドレスが指定されていません' };
+    }
     if (!Array.isArray(notifications) || notifications.length === 0) {
       return { success: false, message: '通知データが指定されていません' };
     }
-    
-    // メール送信の実装（簡易版）
-    Logger.log(`ステータス通知メール送信: ${notifications.length}件の通知`);
-    
-    return { 
-      success: true, 
-      message: 'メールを送信しました',
-      sentTo: emails,
-      notificationCount: notifications.length
+
+    const highPriority = notifications.filter(n => n.priority === 'high');
+    const mediumPriority = notifications.filter(n => n.priority === 'medium');
+    const lowPriority = notifications.filter(n => n.priority === 'low');
+
+    let subject = '座席状況通知 - 座席管理システム';
+    if (highPriority.length > 0) {
+      const minSeats = Math.min.apply(null, highPriority.map(n => n.timeslot && n.timeslot.emptySeats).filter(Number.isFinite));
+      subject = `🚨 残り${Number.isFinite(minSeats) ? minSeats : 'わずか'}席以下 - 座席管理システム`;
+    } else if (mediumPriority.length > 0) {
+      const minSeats = Math.min.apply(null, mediumPriority.map(n => n.timeslot && n.timeslot.emptySeats).filter(Number.isFinite));
+      subject = `⚠️ 残り${Number.isFinite(minSeats) ? minSeats : '少数'}席 - 座席管理システム`;
+    } else if (lowPriority.length > 0) {
+      const minSeats = Math.min.apply(null, lowPriority.map(n => n.timeslot && n.timeslot.emptySeats).filter(Number.isFinite));
+      subject = `📊 残り${Number.isFinite(minSeats) ? minSeats : ''}席 - 座席管理システム`;
+    }
+
+    let body = '座席状況の変化をお知らせします。\n\n';
+    if (highPriority.length > 0) {
+      body += '🚨 残り席数が少なくなっています 🚨\n';
+      body += Array(51).join('=') + '\n';
+      highPriority.forEach(notification => {
+        const t = notification.timeslot || {};
+        body += `・${t.group} ${t.day}日目 ${t.timeslot}\n`;
+        body += `  残り: ${t.emptySeats}席 / 全${t.totalSeats}席\n`;
+        body += `  状況: ${t.isFull ? '満席' : '残りわずか'}\n\n`;
+      });
+    }
+    if (mediumPriority.length > 0) {
+      body += '⚠️ 残り席数にご注意ください ⚠️\n';
+      body += Array(51).join('=') + '\n';
+      mediumPriority.forEach(notification => {
+        const t = notification.timeslot || {};
+        body += `・${t.group} ${t.day}日目 ${t.timeslot}\n`;
+        body += `  残り: ${t.emptySeats}席 / 全${t.totalSeats}席\n\n`;
+      });
+    }
+    if (lowPriority.length > 0) {
+      body += '📊 座席状況の変化 📊\n';
+      body += Array(51).join('=') + '\n';
+      lowPriority.forEach(notification => {
+        const t = notification.timeslot || {};
+        body += `・${t.group} ${t.day}日目 ${t.timeslot}: 残り${t.emptySeats}席\n`;
+      });
+    }
+
+    if (statistics) {
+      body += '\n📈 システム統計 📈\n';
+      body += Array(51).join('=') + '\n';
+      body += `総チェック回数: ${statistics.totalChecks || 0}回\n`;
+      body += `総通知回数: ${statistics.totalNotifications || 0}回\n`;
+      if (typeof statistics.averageEmptySeats === 'number') {
+        body += `平均空席数: ${statistics.averageEmptySeats.toFixed(1)}席\n`;
+      }
+      body += `最終チェック: ${statistics.lastCheckTime ? new Date(statistics.lastCheckTime).toLocaleString('ja-JP') : '不明'}\n`;
+    }
+
+    body += '\n' + Array(51).join('=') + '\n';
+    body += `通知時刻: ${new Date(timestamp || new Date()).toLocaleString('ja-JP')}\n`;
+    body += 'システム: 強化座席監視システム\n';
+
+    const results = [];
+    let successCount = 0;
+    let failureCount = 0;
+    emailList.forEach(email => {
+      try {
+        MailApp.sendEmail({ to: email, subject, body });
+        results.push({ email, success: true, message: '送信成功' });
+        successCount++;
+      } catch (emailError) {
+        Logger.log(`ステータス通知メール送信エラー (${email}): ${emailError.message}`);
+        results.push({ email, success: false, message: emailError.message });
+        failureCount++;
+      }
+    });
+
+    return {
+      success: successCount > 0,
+      message: `${successCount}件のメールを送信しました${failureCount > 0 ? ` (${failureCount}件失敗)` : ''}`,
+      sentTo: emailList,
+      results,
+      notificationCount: notifications.length,
+      successCount,
+      failureCount
     };
   } catch (e) {
     Logger.log('sendStatusNotificationEmail failed: ' + e.message);
@@ -391,24 +597,103 @@ function sendStatusNotificationEmail(emailData) {
  */
 function getDetailedCapacityAnalysisSupabase(group = null, day = null, timeslot = null) {
   try {
-    // Supabase版の詳細容量分析（簡易実装）
-    return { 
-      success: true, 
-      analysis: {
-        summary: {
-          totalTimeslots: 0,
-          fullCapacity: 0,
-          warningCapacity: 0,
-          criticalCapacity: 0,
-          normalCapacity: 0,
-          totalSeats: 0,
-          totalOccupied: 0,
-          totalEmpty: 0
+    // 1) 公演取得（フィルタ対応）
+    var perfQuery = 'performances?select=id,group_name,day,timeslot';
+    var qs = [];
+    if (group) qs.push('group_name=eq.' + encodeURIComponent(group));
+    if (day) qs.push('day=eq.' + encodeURIComponent(day));
+    if (timeslot) qs.push('timeslot=eq.' + encodeURIComponent(timeslot));
+    if (qs.length) perfQuery += '&' + qs.join('&');
+    var perfs = _spRequest(perfQuery);
+    if (!Array.isArray(perfs)) perfs = [];
+    // 除外: 見本演劇
+    perfs = perfs.filter(function(p){ return String(p.group_name) !== '見本演劇'; });
+
+    if (perfs.length === 0) {
+      return {
+        success: true,
+        analysis: {
+          summary: { totalTimeslots: 0, fullCapacity: 0, warningCapacity: 0, criticalCapacity: 0, normalCapacity: 0, totalSeats: 0, totalOccupied: 0, totalEmpty: 0 },
+          timeslots: [],
+          capacityDistribution: {},
+          trends: []
         },
-        timeslots: [],
-        capacityDistribution: {},
-        trends: []
-      },
+        timestamp: new Date().toISOString()
+      };
+    }
+
+    // 2) 対象公演の座席をまとめて取得（in クエリを使用）
+    var idList = perfs.map(function(p){ return p.id; }).filter(function(x){ return x !== null && x !== undefined; });
+    if (idList.length === 0) {
+      return {
+        success: true,
+        analysis: {
+          summary: { totalTimeslots: 0, fullCapacity: 0, warningCapacity: 0, criticalCapacity: 0, normalCapacity: 0, totalSeats: 0, totalOccupied: 0, totalEmpty: 0 },
+          timeslots: [],
+          capacityDistribution: {},
+          trends: []
+        },
+        timestamp: new Date().toISOString()
+      };
+    }
+    var seats = _spRequest('seats?select=performance_id,status&performance_id=in.(' + idList.join(',') + ')');
+    if (!Array.isArray(seats)) seats = [];
+
+    // 3) 公演別に集計
+    var byPerf = {};
+    seats.forEach(function(s){
+      var pid = s.performance_id;
+      if (!byPerf[pid]) byPerf[pid] = { total: 0, available: 0 };
+      byPerf[pid].total++;
+      if (String(s.status) === 'available') byPerf[pid].available++;
+    });
+
+    var timeslotsArr = [];
+    var summary = { totalTimeslots: 0, fullCapacity: 0, warningCapacity: 0, criticalCapacity: 0, normalCapacity: 0, totalSeats: 0, totalOccupied: 0, totalEmpty: 0 };
+
+    perfs.forEach(function(p){
+      var agg = byPerf[p.id] || { total: 0, available: 0 };
+      var total = agg.total;
+      var empty = agg.available;
+      var occupied = total > 0 ? Math.max(0, total - empty) : 0;
+      var level = 'normal';
+      if (empty === 0 && total > 0) level = 'full';
+      else if (empty <= 2) level = 'critical';
+      else if (empty <= 5) level = 'warning';
+
+      var info = {
+        group: p.group_name,
+        day: String(p.day),
+        timeslot: p.timeslot,
+        totalSeats: total,
+        occupiedSeats: occupied,
+        emptySeats: empty,
+        isFull: (total > 0 && empty === 0),
+        capacityLevel: level,
+        lastChecked: new Date()
+      };
+      timeslotsArr.push(info);
+
+      summary.totalTimeslots++;
+      summary.totalSeats += total;
+      summary.totalOccupied += occupied;
+      summary.totalEmpty += empty;
+      if (level === 'full') summary.fullCapacity++;
+      else if (level === 'critical') summary.criticalCapacity++;
+      else if (level === 'warning') summary.warningCapacity++;
+      else summary.normalCapacity++;
+    });
+
+    var capacityDistribution = {
+      full: summary.fullCapacity,
+      critical: summary.criticalCapacity,
+      warning: summary.warningCapacity,
+      normal: summary.normalCapacity
+    };
+
+    return {
+      success: true,
+      analysis: { summary: summary, timeslots: timeslotsArr, capacityDistribution: capacityDistribution, trends: [] },
       timestamp: new Date().toISOString()
     };
   } catch (e) {
@@ -422,23 +707,42 @@ function getDetailedCapacityAnalysisSupabase(group = null, day = null, timeslot 
  */
 function getCapacityStatisticsSupabase() {
   try {
-    const props = PropertiesService.getScriptProperties();
-    
-    return { 
-      success: true, 
-      statistics: {
-        totalChecks: parseInt(props.getProperty('CAPACITY_TOTAL_CHECKS') || '0'),
-        totalNotifications: parseInt(props.getProperty('CAPACITY_TOTAL_NOTIFICATIONS') || '0'),
-        lastCheckTime: props.getProperty('CAPACITY_LAST_CHECK_TIME'),
-        averageEmptySeats: parseFloat(props.getProperty('CAPACITY_AVERAGE_EMPTY') || '0'),
-        systemStatus: {
-          isMonitoring: props.getProperty('CAPACITY_MONITORING_ENABLED') === 'true',
-          checkInterval: parseInt(props.getProperty('CAPACITY_CHECK_INTERVAL') || '15000'),
-          notificationCooldown: parseInt(props.getProperty('CAPACITY_NOTIFICATION_COOLDOWN') || '300000')
-        }
+    // 全座席を集計して全体統計を返す
+    var seats = _spRequest('seats?select=status');
+    if (!Array.isArray(seats)) seats = [];
+    var total = seats.length;
+    var available = 0, reserved = 0, checked_in = 0, walkin = 0, blocked = 0;
+    seats.forEach(function(s){
+      var st = String(s.status);
+      if (st === 'available') available++;
+      else if (st === 'reserved') reserved++;
+      else if (st === 'checked_in') checked_in++;
+      else if (st === 'walkin') walkin++;
+      else if (st === 'blocked') blocked++;
+    });
+
+    var props = PropertiesService.getScriptProperties();
+    var statistics = {
+      totalChecks: parseInt(props.getProperty('CAPACITY_TOTAL_CHECKS') || '0', 10),
+      totalNotifications: parseInt(props.getProperty('CAPACITY_TOTAL_NOTIFICATIONS') || '0', 10),
+      lastCheckTime: (function(){ var v = props.getProperty('CAPACITY_LAST_CHECK_TIME'); return v ? new Date(v) : null; })(),
+      averageEmptySeats: parseFloat(props.getProperty('CAPACITY_AVERAGE_EMPTY') || '0'),
+      currentSummary: {
+        totalSeats: total,
+        totalAvailable: available,
+        totalReserved: reserved,
+        totalCheckedIn: checked_in,
+        totalWalkin: walkin,
+        totalBlocked: blocked
       },
-      timestamp: new Date().toISOString()
+      systemStatus: {
+        isMonitoring: props.getProperty('CAPACITY_MONITORING_ENABLED') === 'true',
+        checkInterval: parseInt(props.getProperty('CAPACITY_CHECK_INTERVAL') || '15000', 10),
+        notificationCooldown: parseInt(props.getProperty('CAPACITY_NOTIFICATION_COOLDOWN') || '300000', 10)
+      }
     };
+
+    return { success: true, statistics: statistics, timestamp: new Date().toISOString() };
   } catch (e) {
     Logger.log('getCapacityStatisticsSupabase failed: ' + e.message);
     return { success: false, message: e.message };
@@ -716,6 +1020,25 @@ function appendClientAuditEntries(entries) {
 // ===============================================================
 // === 時間帯管理機能 ===
 // ===============================================================
+
+/**
+ * 公演グループ一覧を取得（重複除去）
+ */
+function getGroupsSupabase() {
+  try {
+    var list = _spRequest('performances?select=group_name');
+    if (!Array.isArray(list)) list = [];
+    var set = {};
+    list.forEach(function(r){
+      var g = r && r.group_name;
+      if (g && String(g) !== '見本演劇') set[String(g)] = true;
+    });
+    return { success: true, groups: Object.keys(set).sort() };
+  } catch (e) {
+    Logger.log('getGroupsSupabase Error: ' + e.message);
+    return { success: false, message: e.message };
+  }
+}
 
 /**
  * グループの全時間帯を取得する

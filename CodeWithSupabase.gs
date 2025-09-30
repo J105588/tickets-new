@@ -76,6 +76,7 @@ function doPost(e) {
       'sendStatusNotificationEmail': sendStatusNotificationEmail,
       'getDetailedCapacityAnalysis': getDetailedCapacityAnalysisSupabase,
       'getCapacityStatistics': getCapacityStatisticsSupabase,
+      'getGroupsSupabase': getGroupsSupabase,
       'isValidSeatId': isValidSeatId,
       'safeLogOperation': safeLogOperation
     };
@@ -185,6 +186,7 @@ function doGet(e) {
         'sendStatusNotificationEmail': sendStatusNotificationEmail,
         'getDetailedCapacityAnalysis': getDetailedCapacityAnalysisSupabase,
         'getCapacityStatistics': getCapacityStatisticsSupabase,
+        'getGroupsSupabase': getGroupsSupabase,
         'isValidSeatId': isValidSeatId,
         'safeLogOperation': safeLogOperation
       };

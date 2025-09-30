@@ -1,7 +1,7 @@
 // config.js
 // 複数のAPI URL（使用数上限回避のため分散）
 const GAS_API_URLS = [
-  "https://script.google.com/macros/s/AKfycby2wkw-FdWZBemZluD4SouUMRzw3AZGSjVRxScI_EUDeKaaCYkUF4WBD8C94gktZIJi/exec"
+  "https://script.google.com/macros/s/AKfycbz1cis5lfLi7FDe8nWXiRTTAZsZ75zXYpmbH4W5eiFK_O-6RtpacIXPWoAvVxM5fz6Okg/exec"
   //jxjin2010@gmail.com
   //"https://script.google.com/macros/s/AKfycbwfHVEZwLbCs_sJ3ckyr6vdCLfI3twmiENbBuSOidMUOLAnGwfmGoyvGLcXihJMu8T1/exec",
   //jxjin.ig.school@gmail.com
@@ -27,10 +27,7 @@ const LOG_SHEET_NAME = 'OPERATION_LOGS'; // ログを記録するシート名
 // 満席通知用メールアドレス（ハードコーディング）
 const FULL_CAPACITY_NOTIFICATION_EMAILS = [
   'jxjin2010@gmail.com',
-  'nzn.engeki5@gmail.com',
-  'triathlon_makoto@icloud.com',
-  'ichikawagakuen20210109@gmail.com',
-  'ibas72211@gmail.com'
+  'nzn.engeki5@gmail.com'
 ];
 
 // 強化監視システム設定

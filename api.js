@@ -512,7 +512,38 @@ class GasAPI {
         const n = Number(v);
         return Number.isFinite(n) ? n : d;
       };
-      const payload = { ...(emailData || {}), emails: merged };
+      // Slim payload to keep JSONP URL short
+      const toSlimNumber = (v, d = 0) => {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : d;
+      };
+      const notifications = Array.isArray(emailData && emailData.notifications) ? emailData.notifications : [];
+      const notificationsSlim = notifications.slice(0, 40).map(n => {
+        const t = n && n.timeslot ? n.timeslot : {};
+        return {
+          priority: n && n.priority || 'low',
+          timeslot: {
+            group: String(t.group || ''),
+            day: String(t.day || ''),
+            timeslot: String(t.timeslot || ''),
+            emptySeats: toSlimNumber(t.emptySeats, 0),
+            totalSeats: toSlimNumber(t.totalSeats, 0),
+            isFull: !!t.isFull,
+            lastChecked: t.lastChecked ? new Date(t.lastChecked).toISOString() : null
+          }
+        };
+      });
+      const payload = {
+        emails: merged,
+        notifications: notificationsSlim,
+        statistics: emailData && emailData.statistics ? {
+          totalChecks: toSlimNumber(emailData.statistics.totalChecks, 0),
+          totalNotifications: toSlimNumber(emailData.statistics.totalNotifications, 0),
+          averageEmptySeats: toSlimNumber(emailData.statistics.averageEmptySeats, 0),
+          lastCheckTime: emailData.statistics.lastCheckTime || null
+        } : undefined,
+        timestamp: emailData && emailData.timestamp ? emailData.timestamp : Date.now()
+      };
       // 統計/サマリーの安全化
       if (payload.statistics && typeof payload.statistics === 'object') {
         payload.statistics = {
@@ -542,6 +573,7 @@ class GasAPI {
       };
 
       const task = async () => {
+        // Use JSONP with slim payload to avoid CORS while keeping URL short
         const resp = await this._callApi('sendStatusNotificationEmail', [payload], { timeoutMs: null });
         if (!resp || resp.success === false) {
           const errMsg = (resp && (resp.error || resp.message)) || 'メール送信に失敗しました';
@@ -615,6 +647,12 @@ class GasAPI {
   static async getCapacityStatistics() {
     const response = await this._callApi('getCapacityStatistics', [], { timeoutMs: null });
     return response;
+  }
+
+  // グループ一覧（Supabase経由エンドポイント）
+  static async getGroups() {
+    const response = await this._callApi('getGroupsSupabase', [], { timeoutMs: null });
+    return response && response.groups ? response.groups : [];
   }
 
 
