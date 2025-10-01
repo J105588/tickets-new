@@ -72,8 +72,8 @@ function startInactivityWatcher() {
   ['click','keydown','scroll','mousemove','touchstart','visibilitychange'].forEach(evt => {
     try { window.addEventListener(evt, reset, { passive: true }); } catch (_) {}
   });
-  setInterval(() => {
-    if (!isSessionActive()) {
+  setInterval(async () => {
+    if (!(await isSessionActive())) {
       clearAuthSession();
       location.replace('index.html');
     }
@@ -84,10 +84,10 @@ function startInactivityWatcher() {
   if (document.getElementById('auth-login-modal')) return;
   const wrapper = document.createElement('div');
   wrapper.id = 'auth-login-modal';
-  wrapper.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:20000;';
+  wrapper.style.cssText = 'position:fixed;inset:0;background:#fff;display:flex;align-items:center;justify-content:center;z-index:20000;';
   wrapper.innerHTML = `
     <div style="background:#fff;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.25);max-width:360px;width:92%;padding:24px 20px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;">
-      <div style="font-size:18px;font-weight:600;margin-bottom:14px;text-align:center;">ログイン</div>
+      <div style="font-size:18px;font-weight:600;margin-bottom:14px;text-align:center;">座席管理システム-國枝版 へようこそ</div>
       <div style="display:flex;flex-direction:column;gap:10px;">
         <label style="font-size:13px;color:#555;">ユーザーID</label>
         <input id="auth-user-id" type="text" autocomplete="username" inputmode="text" style="padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none;" />
@@ -100,33 +100,45 @@ function startInactivityWatcher() {
   `;
   document.body.appendChild(wrapper);
 
-   const onSubmit = async () => {
+  let isSubmitting = false;
+  const onSubmit = async () => {
+    if (isSubmitting) return;
     const user = document.getElementById('auth-user-id');
     const pass = document.getElementById('auth-password');
     const err = document.getElementById('auth-error');
+    const btn = document.getElementById('auth-login-btn');
     const uid = (user && user.value || '').trim();
     const pwd = (pass && pass.value || '').trim();
+    // 直前のエラーをクリア
+    if (err) { err.style.display = 'none'; err.textContent = ''; }
     if (!uid || !pwd) {
       if (err) { err.style.display = 'block'; err.textContent = 'ユーザーIDとパスワードを入力してください'; }
       return;
     }
-     // サーバ側ログイン
-     try {
-       if (window.GasAPI && typeof GasAPI.login === 'function') {
-         const res = await GasAPI.login(uid, pwd);
-         if (!res || !res.success || !res.token) {
-           if (err) { err.style.display = 'block'; err.textContent = '認証に失敗しました'; }
-           return;
-         }
-         setAuthSessionToken(res.token, uid);
-       } else {
-         if (err) { err.style.display = 'block'; err.textContent = '認証サービスが利用できません'; }
-         return;
-       }
-     } catch (_) {
-       if (err) { err.style.display = 'block'; err.textContent = '通信エラーが発生しました'; }
-       return;
-     }
+    // ローディング状態に
+    try { if (btn) { btn.disabled = true; btn.textContent = 'ログイン中...'; btn.style.opacity = '0.7'; btn.style.cursor = 'not-allowed'; } } catch (_) {}
+    isSubmitting = true;
+    // サーバ側ログイン
+    try {
+      if (window.GasAPI && typeof GasAPI.login === 'function') {
+        const res = await GasAPI.login(uid, pwd);
+        if (!res || !res.success || !res.token) {
+          if (err) { err.style.display = 'block'; err.textContent = 'ユーザーIDまたはパスワードが正しくありません'; }
+          return;
+        }
+        setAuthSessionToken(res.token, uid);
+      } else {
+        if (err) { err.style.display = 'block'; err.textContent = '認証サービスが利用できません'; }
+        return;
+      }
+    } catch (_) {
+      if (err) { err.style.display = 'block'; err.textContent = '通信エラーが発生しました。接続を確認して再試行してください'; }
+      return;
+    } finally {
+      // 成否にかかわらずボタンの状態を戻す（成功時は直後に閉じる）
+      try { if (btn) { btn.disabled = false; btn.textContent = 'ログイン'; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; } } catch (_) {}
+      isSubmitting = false;
+    }
     // ログインUIを閉じる
     try { document.getElementById('auth-login-modal')?.remove(); } catch (_) {}
     recordActivity();
@@ -141,8 +153,8 @@ function startInactivityWatcher() {
   } catch (_) {}
 }
 
-function ensureAuthenticatedOnIndex() {
-  if (isSessionActive()) {
+async function ensureAuthenticatedOnIndex() {
+  if (await isSessionActive()) {
     recordActivity();
     startInactivityWatcher();
     return;
@@ -157,7 +169,7 @@ function ensureAuthenticatedOnIndex() {
     const isIndex = path.endsWith('index.html') || path === '/' || path === '';
     if (isIndex) {
       // index はログインUIを表示してから進ませる
-      ensureAuthenticatedOnIndex();
+      await ensureAuthenticatedOnIndex();
     } else {
       // 他ページは認証なければリダイレクト、あればウォッチ
       if (await enforceAuthOrRedirect()) {
