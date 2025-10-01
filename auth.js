@@ -1,4 +1,4 @@
-// auth.js - シンプルなフロントエンド認証とアイドルタイムアウト
+// auth.js
 
 const AUTH_STORAGE_KEY = 'app_auth_session_v1';
 const AUTH_LAST_ACTIVITY_KEY = 'app_auth_last_activity_v1';
