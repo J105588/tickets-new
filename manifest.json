@@ -2,7 +2,7 @@
   "name": "座席管理システム-國枝版",
   "short_name": "座席管理-國枝版",
   "description": "國枝ホール向けの座席予約・チェックイン・当日券発行システム",
-  "version": "16.0.0",
+  "version": "17.0.0",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#ffffff",
