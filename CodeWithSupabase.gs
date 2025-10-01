@@ -78,7 +78,9 @@ function doPost(e) {
       'getCapacityStatistics': getCapacityStatisticsSupabase,
       'getGroupsSupabase': getGroupsSupabase,
       'isValidSeatId': isValidSeatId,
-      'safeLogOperation': safeLogOperation
+      'safeLogOperation': safeLogOperation,
+      'login': login,
+      'validateSession': validateSession
     };
 
     if (functionMap[funcName]) {
@@ -188,7 +190,9 @@ function doGet(e) {
         'getCapacityStatistics': getCapacityStatisticsSupabase,
         'getGroupsSupabase': getGroupsSupabase,
         'isValidSeatId': isValidSeatId,
-        'safeLogOperation': safeLogOperation
+        'safeLogOperation': safeLogOperation,
+        'login': login,
+        'validateSession': validateSession
       };
 
       if (functionMap[funcName]) {
@@ -826,4 +830,80 @@ function testApiSupabase() {
   }
   
   return { success: true, data: results };
+}
+
+/**
+ * サーバ側ログイン: Script Properties に保存した認証情報と照合し、署名付きトークンを返す
+ */
+function login(userId, password) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const allowUsers = (props.getProperty('AUTH_USERS') || '').split(',').map(function(s){return s.trim();}).filter(function(s){return s;});
+    const userSecretsJson = props.getProperty('AUTH_SECRETS_JSON') || '{}';
+    var userSecrets = {};
+    try { userSecrets = JSON.parse(userSecretsJson); } catch (e) { userSecrets = {}; }
+    const hmacSecret = props.getProperty('AUTH_HMAC_SECRET') || '';
+
+    if (!userId || !password) {
+      return { success: false, error: 'missing_credentials' };
+    }
+    if (allowUsers.length && allowUsers.indexOf(userId) === -1) {
+      return { success: false, error: 'invalid_user' };
+    }
+    var expected = userSecrets[userId];
+    if (!expected) {
+      return { success: false, error: 'invalid_user' };
+    }
+    if (expected !== password) {
+      return { success: false, error: 'invalid_password' };
+    }
+    if (!hmacSecret) {
+      return { success: false, error: 'server_not_configured' };
+    }
+
+    // トークン生成: userId + issuedAt を HMAC 署名
+    var issuedAt = Date.now();
+    var payload = userId + '|' + issuedAt;
+    var signature = Utilities.computeHmacSha256Signature(payload, hmacSecret);
+    var sigB64 = Utilities.base64Encode(signature);
+    var token = payload + '.' + sigB64;
+
+    return { success: true, token: token, userId: userId, issuedAt: issuedAt };
+  } catch (e) {
+    Logger.log('login error: ' + e.message);
+    return { success: false, error: 'server_error' };
+  }
+}
+
+/**
+ * トークン検証
+ */
+function validateSession(token, maxAgeMs) {
+  try {
+    if (!token) return { success: false, error: 'missing_token' };
+    var parts = String(token).split('.');
+    if (parts.length !== 2) return { success: false, error: 'invalid_token' };
+    var payload = parts[0];
+    var sig = parts[1];
+    var p = payload.split('|');
+    if (p.length !== 2) return { success: false, error: 'invalid_payload' };
+    var userId = p[0];
+    var issuedAt = parseInt(p[1], 10);
+
+    var props = PropertiesService.getScriptProperties();
+    var hmacSecret = props.getProperty('AUTH_HMAC_SECRET') || '';
+    if (!hmacSecret) return { success: false, error: 'server_not_configured' };
+
+    var expectedSig = Utilities.base64Encode(Utilities.computeHmacSha256Signature(payload, hmacSecret));
+    if (expectedSig !== sig) return { success: false, error: 'bad_signature' };
+
+    if (maxAgeMs && (Date.now() - issuedAt) > maxAgeMs) {
+      return { success: false, error: 'expired' };
+    }
+
+    return { success: true, userId: userId, issuedAt: issuedAt };
+  } catch (e) {
+    Logger.log('validateSession error: ' + e.message);
+    return { success: false, error: 'server_error' };
+  }
 }

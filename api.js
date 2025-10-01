@@ -14,6 +14,15 @@ class GasAPI {
     this.useSupabase = useSupabase;
     debugLog(`データベースモード切り替え: ${useSupabase ? 'Supabase' : 'GAS API'}`);
   }
+
+  // 認証API
+  static async login(userId, password) {
+    return this._callApi('login', [userId, password]);
+  }
+
+  static async validateSession(token, maxAgeMs = 30 * 60 * 1000) {
+    return this._callApi('validateSession', [token, maxAgeMs]);
+  }
   
   static async _retryWithBackoff(task, shouldRetry, opts = {}) {
     const {
