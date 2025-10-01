@@ -87,7 +87,7 @@ function startInactivityWatcher() {
   wrapper.style.cssText = 'position:fixed;inset:0;background:#fff;display:flex;align-items:center;justify-content:center;z-index:20000;';
   wrapper.innerHTML = `
     <div style="background:#fff;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.25);max-width:360px;width:92%;padding:24px 20px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;">
-      <div style="font-size:18px;font-weight:600;margin-bottom:14px;text-align:center;">座席管理システム-國枝版 へようこそ</div>
+      <div style="font-size:18px;font-weight:600;margin-bottom:14px;text-align:center;">座席管理システム - 國枝版  へようこそ</div>
       <div style="display:flex;flex-direction:column;gap:10px;">
         <label style="font-size:13px;color:#555;">ユーザーID</label>
         <input id="auth-user-id" type="text" autocomplete="username" inputmode="text" style="padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none;" />
@@ -172,7 +172,11 @@ async function ensureAuthenticatedOnIndex() {
     startInactivityWatcher();
     return;
   }
+  // 先にログインモーダルを表示し、その上にオープニング層を被せる
   mountLoginUI();
+  try {
+    await showOpeningCeremony();
+  } catch (_) {}
 }
 
 // ページ読み込み時に適用
@@ -202,4 +206,131 @@ window.AppAuth = {
   ensureAuthenticatedOnIndex
 };
 
+
+// 厳かなオープニングアニメーション（未認証時のみ）
+async function showOpeningCeremony() {
+  return new Promise((resolve) => {
+    try {
+      const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      const overlay = document.createElement('div');
+      overlay.id = 'opening-ceremony-overlay';
+      overlay.setAttribute('aria-hidden', 'true');
+      overlay.style.cssText = [
+        'position:fixed',
+        'inset:0',
+        'z-index:30002',
+        'background:	#EEEEEE',
+        'display:flex',
+        'align-items:center',
+        'justify-content:center',
+        'opacity:0',
+        'pointer-events:none'
+      ].join(';') + ';';
+
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = [
+        'display:flex',
+        'flex-direction:column',
+        'align-items:center',
+        'justify-content:center',
+        'gap:20px',
+        'color:#333',
+        'text-align:center'
+      ].join(';') + ';';
+
+      const crest = document.createElement('img');
+      crest.src = 'https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg';
+      crest.alt = '';
+      crest.decoding = 'async';
+      crest.style.cssText = [
+        'width:clamp(160px, 32vw, 300px)',
+        'height:auto',
+        'opacity:0',
+        'transform: scale(0.98) translateY(4px)'
+      ].join(';') + ';';
+
+      const title = document.createElement('div');
+      title.textContent = '座席管理-國枝版';
+      title.style.cssText = [
+        'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif',
+        'letter-spacing:0.35em',
+        'text-indent:0.35em',
+        'font-weight:600',
+        'font-size:clamp(14px, 1.8vw, 18px)',
+        'opacity:0',
+        'color:#333'
+      ].join(';') + ';';
+
+      wrapper.appendChild(crest);
+      wrapper.appendChild(title);
+      overlay.appendChild(wrapper);
+      document.body.appendChild(overlay);
+
+      // 禁止: スクロール
+      const prevHtmlOverflow = document.documentElement.style.overflow;
+      const prevBodyOverflow = document.body.style.overflow;
+      try {
+        document.documentElement.style.overflow = 'hidden';
+        document.body.style.overflow = 'hidden';
+      } catch (_) {}
+
+      const runNoMotion = () => {
+        overlay.style.opacity = '1';
+        crest.style.opacity = '1';
+        crest.style.transform = 'none';
+        title.style.opacity = '1';
+        setTimeout(finish, 600);
+      };
+
+      const finish = () => {
+        try {
+          overlay.style.transition = 'opacity 800ms ease';
+          overlay.style.opacity = '0';
+          setTimeout(() => {
+            try { overlay.remove(); } catch (_) {}
+            try {
+              document.documentElement.style.overflow = prevHtmlOverflow || '';
+              document.body.style.overflow = prevBodyOverflow || '';
+            } catch (_) {}
+            resolve();
+          }, 820);
+        } catch (_) {
+          resolve();
+        }
+      };
+
+      if (reduced) {
+        // 低モーション: 簡易表示
+        requestAnimationFrame(runNoMotion);
+        return;
+      }
+
+      // まず画面を即時覆う（モーダルを隠す）
+      overlay.style.opacity = '1';
+      overlay.style.pointerEvents = 'auto';
+
+      // 少し遅延してからコンテンツのみゆっくりフェードイン
+      setTimeout(() => {
+        requestAnimationFrame(() => {
+          // 紋章のゆっくりフェードイン
+          crest.style.transition = 'transform 1200ms cubic-bezier(0.22, 1, 0.36, 1), opacity 1200ms ease';
+          crest.style.opacity = '1';
+          crest.style.transform = 'scale(1) translateY(0)';
+
+          // タイトルの遅延淡入
+          setTimeout(() => {
+            title.style.transition = 'opacity 900ms ease';
+            title.style.opacity = '1';
+          }, 350);
+
+          // 合計約3.5秒後にフェードアウト
+          setTimeout(finish, 3500);
+        });
+      }, 350); // リロード完了後、少し間を空ける
+    } catch (_) {
+      resolve();
+    }
+  });
+}
 
