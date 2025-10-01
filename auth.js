@@ -100,8 +100,16 @@ function startInactivityWatcher() {
   `;
   document.body.appendChild(wrapper);
 
+  // スクロールを禁止（既存値を保持して後で戻す）
+  const prevHtmlOverflow = document.documentElement.style.overflow;
+  const prevBodyOverflow = document.body.style.overflow;
+  try {
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+  } catch (_) {}
+
   let isSubmitting = false;
-  const onSubmit = async () => {
+   const onSubmit = async () => {
     if (isSubmitting) return;
     const user = document.getElementById('auth-user-id');
     const pass = document.getElementById('auth-password');
@@ -139,6 +147,11 @@ function startInactivityWatcher() {
       try { if (btn) { btn.disabled = false; btn.textContent = 'ログイン'; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; } } catch (_) {}
       isSubmitting = false;
     }
+    // ログインUIを閉じる（スクロールを元に戻す）
+    try {
+      document.documentElement.style.overflow = prevHtmlOverflow || '';
+      document.body.style.overflow = prevBodyOverflow || '';
+    } catch (_) {}
     // ログインUIを閉じる
     try { document.getElementById('auth-login-modal')?.remove(); } catch (_) {}
     recordActivity();
