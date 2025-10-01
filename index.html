@@ -36,6 +36,9 @@
         const manifest = await res.json();
         const bg = (manifest && (manifest.background_color || manifest.theme_color)) || null;
         if (!bg) return;
+        const theme = bg;
+        const isWhite = (typeof bg === 'string') && (/^#?([fF]{3}|[fF]{6})$/.test(bg) || bg.toLowerCase() === 'white');
+        const pageBg = isWhite ? '#f5f6f8' : bg;
 
         let themeMeta = document.querySelector('meta[name="theme-color"]');
         if (!themeMeta) {
@@ -43,10 +46,10 @@
           themeMeta.setAttribute('name', 'theme-color');
           document.head.appendChild(themeMeta);
         }
-        themeMeta.setAttribute('content', bg);
+        themeMeta.setAttribute('content', theme);
 
-        try { document.documentElement.style.backgroundColor = bg; } catch (_) {}
-        try { document.body && (document.body.style.backgroundColor = bg); } catch (_) {}
+        try { document.documentElement.style.backgroundColor = pageBg; } catch (_) {}
+        try { document.body && (document.body.style.backgroundColor = pageBg); } catch (_) {}
 
         const toRgb = (hex) => {
           const h = hex.replace('#','').trim();
@@ -63,7 +66,7 @@
           }
           return null;
         };
-        const rgb = /^#?[0-9a-fA-F]{3,6}$/.test(bg) ? toRgb(bg) : null;
+        const rgb = /^#?[0-9a-fA-F]{3,6}$/.test(theme) ? toRgb(theme) : null;
         if (rgb) {
           const [r,g,b] = rgb.map(v => v / 255);
           const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
