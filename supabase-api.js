@@ -16,6 +16,59 @@ class SupabaseAPI {
       'apikey': this.anonKey,
       'Authorization': `Bearer ${this.anonKey}`
     };
+    this.isOnline = true;
+    this.lastConnectivityCheck = 0;
+    this.connectivityCheckInterval = 30000; // 30秒間隔でチェック
+    
+    // ネットワーク状態の監視
+    this._setupNetworkMonitoring();
+  }
+
+  // ネットワーク監視の設定
+  _setupNetworkMonitoring() {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => {
+        console.log('ネットワーク接続が復旧しました');
+        this.isOnline = true;
+      });
+      
+      window.addEventListener('offline', () => {
+        console.log('ネットワーク接続が切断されました');
+        this.isOnline = false;
+      });
+      
+      // 初期状態の設定
+      this.isOnline = navigator.onLine !== false;
+    }
+  }
+
+  // Supabase接続テスト
+  async _testConnection() {
+    const now = Date.now();
+    if (now - this.lastConnectivityCheck < this.connectivityCheckInterval) {
+      return this.isOnline;
+    }
+    
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      
+      const response = await fetch(`${this.url}/rest/v1/`, {
+        method: 'HEAD',
+        headers: { 'apikey': this.anonKey },
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      this.isOnline = response.ok;
+      this.lastConnectivityCheck = now;
+      return this.isOnline;
+    } catch (error) {
+      console.warn('Supabase接続テストに失敗:', error.message);
+      this.isOnline = false;
+      this.lastConnectivityCheck = now;
+      return false;
+    }
   }
 
   // 基本的なHTTPリクエスト関数
@@ -32,9 +85,26 @@ class SupabaseAPI {
       ...(options.headers || {}),
       ...(isMutation ? { 'Prefer': 'return=representation' } : {})
     };
-    const config = { ...options, method, headers };
+    const config = { 
+      ...options, 
+      method, 
+      headers,
+      // ネットワークエラー対策
+      signal: AbortSignal.timeout(30000) // 30秒タイムアウト
+    };
 
     try {
+      // ネットワーク接続チェック
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        throw new Error('ネットワーク接続がありません');
+      }
+
+      // Supabase接続テスト（必要に応じて）
+      const isConnected = await this._testConnection();
+      if (!isConnected) {
+        throw new Error('Supabaseサーバーに接続できません。サーバーの状態を確認してください。');
+      }
+
       const response = await fetch(url, config);
       
       if (!response.ok) {
@@ -77,7 +147,40 @@ class SupabaseAPI {
       return { success: true, data: raw };
     } catch (error) {
       console.error('Supabase API Error:', error);
-      return { success: false, error: error.message };
+      
+      // エラータイプ別の詳細な処理
+      let errorMessage = error.message;
+      let errorType = 'unknown';
+      
+      if (error.name === 'TypeError' && error.message.includes('Load failed')) {
+        errorType = 'network_error';
+        errorMessage = 'ネットワーク接続エラーが発生しました。インターネット接続を確認してください。';
+      } else if (error.name === 'AbortError') {
+        errorType = 'timeout';
+        errorMessage = 'リクエストがタイムアウトしました。しばらく時間をおいて再試行してください。';
+      } else if (error.message.includes('Failed to fetch')) {
+        errorType = 'fetch_error';
+        errorMessage = 'サーバーとの通信に失敗しました。ネットワーク接続またはサーバーの状態を確認してください。';
+      } else if (error.message.includes('CORS')) {
+        errorType = 'cors_error';
+        errorMessage = 'クロスオリジンリクエストエラーが発生しました。';
+      }
+      
+      // 詳細なエラー情報をログに記録
+      console.error('Supabase API Error Details:', {
+        type: errorType,
+        originalMessage: error.message,
+        url: `${this.url}/rest/v1/${endpoint}`,
+        method: options.method || 'GET',
+        timestamp: new Date().toISOString()
+      });
+      
+      return { 
+        success: false, 
+        error: errorMessage,
+        errorType: errorType,
+        originalError: error.message 
+      };
     }
   }
 

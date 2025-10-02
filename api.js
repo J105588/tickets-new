@@ -2,6 +2,7 @@
 import { GAS_API_URLS, DEBUG_MODE, debugLog, apiUrlManager, FEATURE_FLAGS, FULL_CAPACITY_NOTIFICATION_EMAILS } from './config.js';
 import audit from './audit-logger.js';
 import { SupabaseAPI } from './supabase-api.js';
+import errorNotification from './error-notification.js';
 
 class GasAPI {
   // Supabase API インスタンス
@@ -13,6 +14,39 @@ class GasAPI {
   static setDatabaseMode(useSupabase) {
     this.useSupabase = useSupabase;
     debugLog(`データベースモード切り替え: ${useSupabase ? 'Supabase' : 'GAS API'}`);
+  }
+
+  // Supabase API呼び出しのラッパー（エラーハンドリング付き）
+  static async _callSupabaseAPI(method, ...args) {
+    try {
+      const result = await this.supabaseAPI[method](...args);
+      
+      if (!result.success) {
+        // エラー通知を表示
+        if (typeof window !== 'undefined' && window.ErrorNotification) {
+          window.ErrorNotification.showSupabaseError(result);
+        }
+        console.error(`Supabase API Error (${method}):`, result);
+      }
+      
+      return result;
+    } catch (error) {
+      console.error(`Supabase API Exception (${method}):`, error);
+      
+      // エラー通知を表示
+      if (typeof window !== 'undefined' && window.ErrorNotification) {
+        window.ErrorNotification.showSupabaseError({
+          error: error.message,
+          errorType: 'unknown'
+        });
+      }
+      
+      return {
+        success: false,
+        error: error.message,
+        errorType: 'exception'
+      };
+    }
   }
 
   // 認証API
