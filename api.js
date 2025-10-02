@@ -22,6 +22,33 @@ class GasAPI {
       const result = await this.supabaseAPI[method](...args);
       
       if (!result.success) {
+        // 特定のエラーでGASフォールバックを強制的に有効化
+        if (this._shouldForceGasFallback(result)) {
+          console.log(`[API] Forcing GAS fallback due to error: ${result.error}`);
+          this.supabaseAPI.fallbackToGas = true;
+          
+          // GASフォールバックで再試行
+          try {
+            const fallbackResult = await this.supabaseAPI[method](...args);
+            if (fallbackResult.success) {
+              // 成功通知
+              if (typeof window !== 'undefined' && window.ErrorNotification) {
+                window.ErrorNotification.show('GAS経由で処理を完了しました', {
+                  title: 'フォールバック成功',
+                  type: 'info',
+                  duration: 3000
+                });
+              }
+              return fallbackResult;
+            }
+          } catch (fallbackError) {
+            console.error(`[API] GAS fallback also failed:`, fallbackError);
+          } finally {
+            // フォールバック設定をリセット
+            this.supabaseAPI.fallbackToGas = false;
+          }
+        }
+        
         // エラー通知を表示
         if (typeof window !== 'undefined' && window.ErrorNotification) {
           window.ErrorNotification.showSupabaseError(result);
@@ -32,6 +59,31 @@ class GasAPI {
       return result;
     } catch (error) {
       console.error(`Supabase API Exception (${method}):`, error);
+      
+      // 重大なエラーの場合はGASフォールバックを試行
+      if (this._isCriticalError(error)) {
+        try {
+          console.log(`[API] Attempting GAS fallback for critical error: ${error.message}`);
+          this.supabaseAPI.fallbackToGas = true;
+          const fallbackResult = await this.supabaseAPI[method](...args);
+          
+          if (fallbackResult.success) {
+            // 成功通知
+            if (typeof window !== 'undefined' && window.ErrorNotification) {
+              window.ErrorNotification.show('GAS経由で処理を完了しました', {
+                title: 'フォールバック成功',
+                type: 'info',
+                duration: 3000
+              });
+            }
+            return fallbackResult;
+          }
+        } catch (fallbackError) {
+          console.error(`[API] GAS fallback failed:`, fallbackError);
+        } finally {
+          this.supabaseAPI.fallbackToGas = false;
+        }
+      }
       
       // エラー通知を表示
       if (typeof window !== 'undefined' && window.ErrorNotification) {
@@ -47,6 +99,27 @@ class GasAPI {
         errorType: 'exception'
       };
     }
+  }
+
+  // GASフォールバックを強制すべきエラーかどうかを判定
+  static _shouldForceGasFallback(result) {
+    if (!result || !result.error) return false;
+    
+    const error = result.error.toLowerCase();
+    const errorType = result.errorType || '';
+    
+    // ネットワークエラー、タイムアウト、Load failedなどの場合
+    return /load failed|network|timeout|fetch|connection|cors/i.test(error) ||
+           /network_error|timeout|fetch_error|cors_error/i.test(errorType);
+  }
+
+  // 重大なエラーかどうかを判定
+  static _isCriticalError(error) {
+    if (!error || !error.message) return false;
+    
+    const message = error.message.toLowerCase();
+    return /load failed|network|timeout|fetch|connection|cors|abort/i.test(message) ||
+           error.name === 'TypeError' || error.name === 'NetworkError' || error.name === 'AbortError';
   }
 
   // 認証API

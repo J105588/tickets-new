@@ -1831,10 +1831,65 @@ async function updateSeatData(seatId) {
     const cVal = columnC !== '' ? columnC : (el ? (el.dataset.columnC || '') : '');
     const dVal = columnD !== '' ? columnD : (el ? (el.dataset.columnD || '') : '');
     const eVal = columnE !== '' ? columnE : (el ? (el.dataset.columnE || '') : '');
-    const response = await GasAPI.updateSeatData(GROUP, DAY, ACTUAL_TIMESLOT, seatId, cVal, dVal, eVal);
+    
+    // 楽観的更新（即座にUIを更新）
+    let originalData = null;
+    if (el) {
+      originalData = {
+        columnC: el.dataset.columnC,
+        columnD: el.dataset.columnD,
+        columnE: el.dataset.columnE,
+        status: el.dataset.status
+      };
+      
+      // 一時的にUIを更新
+      el.dataset.columnC = cVal;
+      el.dataset.columnD = dVal;
+      el.dataset.columnE = eVal;
+      updateSeatElement(el, { columnC: cVal, columnD: dVal, columnE: eVal });
+    }
+    
+    let response;
+    
+    // オフライン時は操作をキューに追加
+    if (window.ConnectionRecovery && !window.ConnectionRecovery.getConnectionStatus().isOnline) {
+      window.ConnectionRecovery.queueOperation({
+        type: 'updateSeat',
+        group: GROUP,
+        day: DAY,
+        timeslot: ACTUAL_TIMESLOT,
+        seatId: seatId,
+        columnC: cVal,
+        columnD: dVal,
+        columnE: eVal
+      });
+      
+      // オフライン通知
+      if (window.ErrorNotification) {
+        window.ErrorNotification.show('オフラインのため、操作をキューに保存しました。接続復旧時に自動実行されます。', {
+          title: 'オフライン操作',
+          type: 'info',
+          duration: 5000
+        });
+      }
+      
+      return; // 処理を終了
+    }
+    
+    response = await GasAPI.updateSeatData(GROUP, DAY, ACTUAL_TIMESLOT, seatId, cVal, dVal, eVal);
     
     if (response.success) {
-      alert('座席データを更新しました！');
+      // 成功通知
+      if (window.ErrorNotification) {
+        window.ErrorNotification.show('座席データを更新しました！', {
+          title: '更新完了',
+          type: 'success',
+          duration: 3000
+        });
+      } else {
+        alert('座席データを更新しました！');
+      }
+      
       closeSeatEditModal();
       
       // 最高管理者モードの座席選択状態をクリア
@@ -1842,22 +1897,76 @@ async function updateSeatData(seatId) {
         seat.classList.remove('selected-for-edit');
       });
       
-      // 座席データを再読み込み
+      // 座席データを再読み込み（確認のため）
       const currentMode = localStorage.getItem('currentMode') || 'normal';
       const isAdminMode = currentMode === 'admin' || IS_ADMIN;
       const isSuperAdminMode = currentMode === 'superadmin';
-      const seatData = await GasAPI.getSeatData(GROUP, DAY, ACTUAL_TIMESLOT, isAdminMode, isSuperAdminMode);
       
-      if (seatData.success) {
-        drawSeatMap(seatData.seatMap);
-        updateLastUpdateTime();
+      try {
+        const seatData = await GasAPI.getSeatData(GROUP, DAY, ACTUAL_TIMESLOT, isAdminMode, isSuperAdminMode);
+        
+        if (seatData.success) {
+          drawSeatMap(seatData.seatMap);
+          updateLastUpdateTime();
+        }
+      } catch (refreshError) {
+        console.warn('座席データの再読み込みに失敗しましたが、更新は成功しました:', refreshError);
       }
+      
     } else {
-      alert(`更新エラー：\n${response.message}`);
+      // 失敗時は元の状態に戻す
+      if (el && originalData) {
+        el.dataset.columnC = originalData.columnC;
+        el.dataset.columnD = originalData.columnD;
+        el.dataset.columnE = originalData.columnE;
+        updateSeatElement(el, originalData);
+      }
+      
+      // エラー通知
+      const errorMessage = response.error || response.message || '不明なエラーが発生しました';
+      
+      if (window.ErrorNotification) {
+        window.ErrorNotification.show(errorMessage, {
+          title: '更新エラー',
+          type: 'error',
+          duration: 8000
+        });
+      } else {
+        alert(`更新エラー：\n${errorMessage}`);
+      }
     }
   } catch (error) {
     console.error('座席データ更新エラー:', error);
-    alert(`更新エラー：\n${error.message}`);
+    
+    // 楽観的更新を元に戻す
+    if (el && originalData) {
+      el.dataset.columnC = originalData.columnC;
+      el.dataset.columnD = originalData.columnD;
+      el.dataset.columnE = originalData.columnE;
+      updateSeatElement(el, originalData);
+    }
+    
+    // ネットワークエラーの詳細な処理
+    let errorMessage = error.message || '不明なエラーが発生しました';
+    let errorType = 'error';
+    
+    if (error.message && error.message.includes('Load failed')) {
+      errorMessage = 'ネットワーク接続エラーが発生しました。インターネット接続を確認して再試行してください。';
+      errorType = 'warning';
+    } else if (error.message && error.message.includes('timeout')) {
+      errorMessage = 'リクエストがタイムアウトしました。しばらく時間をおいて再試行してください。';
+      errorType = 'warning';
+    }
+    
+    if (window.ErrorNotification) {
+      window.ErrorNotification.show(errorMessage, {
+        title: '通信エラー',
+        type: errorType,
+        duration: 10000
+      });
+    } else {
+      alert(`更新中にエラーが発生しました：\n${errorMessage}`);
+    }
   } finally {
     showLoader(false);
   }
