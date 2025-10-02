@@ -377,6 +377,86 @@ class SupabaseAPI {
     this.lastGasFailure = 0;
   }
 
+  // 複数座席の安全な逐次処理（ネットワークエラー対策）
+  async _processSeatsSequentially(performanceId, seatIds, status, additionalData = {}) {
+    const results = [];
+    const successfulSeats = [];
+    const failedSeats = [];
+    
+    console.log(`[Supabase] Starting sequential processing of ${seatIds.length} seats`);
+    
+    for (let i = 0; i < seatIds.length; i++) {
+      const seatId = seatIds[i];
+      
+      try {
+        // 各座席を個別に処理（リトライ付き）
+        const data = {
+          status: status,
+          updated_at: new Date().toISOString(),
+          ...(status === 'checked_in' && { checked_in_at: new Date().toISOString() }),
+          ...(status === 'walkin' && { walkin_at: new Date().toISOString() }),
+          ...additionalData
+        };
+        
+        const result = await this.updateSeatStatus(performanceId, seatId, status, data);
+        
+        if (result.success) {
+          successfulSeats.push(seatId);
+          results.push({ seatId, success: true, data: result.data });
+          console.log(`[Supabase] Successfully processed seat ${seatId} (${i + 1}/${seatIds.length})`);
+        } else {
+          failedSeats.push(seatId);
+          results.push({ seatId, success: false, error: result.error });
+          console.warn(`[Supabase] Failed to process seat ${seatId}: ${result.error}`);
+        }
+        
+        // 座席間に短い間隔を設ける（ネットワーク負荷軽減）
+        if (i < seatIds.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        
+      } catch (error) {
+        failedSeats.push(seatId);
+        results.push({ seatId, success: false, error: error.message });
+        console.error(`[Supabase] Exception processing seat ${seatId}:`, error);
+      }
+    }
+    
+    const allSucceeded = failedSeats.length === 0;
+    
+    console.log(`[Supabase] Sequential processing completed: ${successfulSeats.length} succeeded, ${failedSeats.length} failed`);
+    
+    if (allSucceeded) {
+      return { 
+        success: true, 
+        data: { 
+          seatIds: successfulSeats, 
+          processedAt: new Date().toISOString(),
+          method: 'sequential'
+        } 
+      };
+    } else if (successfulSeats.length > 0) {
+      // 部分的成功
+      return { 
+        success: false, 
+        error: `${failedSeats.length}件の座席処理に失敗しました`,
+        data: {
+          successfulSeats,
+          failedSeats,
+          results,
+          method: 'sequential'
+        }
+      };
+    } else {
+      // 全て失敗
+      return { 
+        success: false, 
+        error: '全ての座席処理に失敗しました',
+        data: { failedSeats, results, method: 'sequential' }
+      };
+    }
+  }
+
   // GAS経由でのSupabase操作
   async _callViaGas(operation, params) {
     if (!window.GasAPI) {
@@ -398,7 +478,12 @@ class SupabaseAPI {
           result = await window.GasAPI.reserveSeats(...params);
           break;
         case 'checkInSeats':
-          result = await window.GasAPI.checkInSeats(...params);
+          // パラメータ形式を調整（複数座席対応）
+          if (params.length === 4 && Array.isArray(params[3])) {
+            result = await window.GasAPI.checkInMultipleSeats(...params);
+          } else {
+            result = await window.GasAPI.checkInSeat(...params);
+          }
           break;
         case 'assignWalkInSeats':
           result = await window.GasAPI.assignWalkInSeats(...params);
@@ -725,36 +810,110 @@ class SupabaseAPI {
   }
 
   async checkInSeat(group, day, timeslot, seatId) {
-    const performanceResult = await this.getPerformances(group, day, timeslot);
-    if (!performanceResult.success || !performanceResult.data.length) {
-      return { success: false, error: '公演が見つかりません' };
+    // GASフォールバックが必要かチェック
+    if (this._shouldUseGasFallback()) {
+      try {
+        console.log('[Supabase] Using GAS fallback for checkInSeat');
+        return await this._callViaGas('checkInSeats', [group, day, timeslot, [seatId]]);
+      } catch (gasError) {
+        console.warn('[Supabase] GAS fallback failed, attempting direct Supabase:', gasError.message);
+      }
     }
-    const performanceId = performanceResult.data[0].id;
-    const result = await this.updateSeatStatus(performanceId, seatId, 'checked_in', {
-      checked_in_at: new Date().toISOString()
-    });
-    if (!result.success) {
-      return { success: false, error: result.error || 'チェックインに失敗しました' };
+
+    try {
+      const performanceResult = await this.getPerformances(group, day, timeslot);
+      if (!performanceResult.success || !performanceResult.data.length) {
+        return { success: false, error: '公演が見つかりません' };
+      }
+      const performanceId = performanceResult.data[0].id;
+      
+      const result = await this.updateSeatStatus(performanceId, seatId, 'checked_in', {
+        checked_in_at: new Date().toISOString()
+      });
+      
+      if (!result.success) {
+        return { success: false, error: result.error || 'チェックインに失敗しました' };
+      }
+      
+      return { success: true, data: { seatId: seatId, checkedInAt: new Date().toISOString() } };
+    } catch (error) {
+      console.error('[Supabase] checkInSeat failed:', error);
+      
+      // Supabaseが失敗した場合、GASフォールバックを試行
+      if (this.gasEnabled && !this._shouldUseGasFallback()) {
+        try {
+          console.log('[Supabase] Attempting GAS fallback after Supabase failure');
+          return await this._callViaGas('checkInSeats', [group, day, timeslot, [seatId]]);
+        } catch (gasError) {
+          console.error('[Supabase] Both Supabase and GAS failed:', gasError);
+        }
+      }
+      
+      return { 
+        success: false, 
+        error: 'チェックインに失敗しました。ネットワーク接続を確認してください。',
+        originalError: error.message 
+      };
     }
-    return { success: true, data: { seatId: seatId, checkedInAt: new Date().toISOString() } };
   }
 
   async checkInMultipleSeats(group, day, timeslot, seatIds) {
-    const performanceResult = await this.getPerformances(group, day, timeslot);
-    if (!performanceResult.success || !performanceResult.data.length) {
-      return { success: false, error: '公演が見つかりません' };
+    // GASフォールバックが必要かチェック
+    if (this._shouldUseGasFallback()) {
+      try {
+        console.log('[Supabase] Using GAS fallback for checkInMultipleSeats');
+        return await this._callViaGas('checkInSeats', [group, day, timeslot, seatIds]);
+      } catch (gasError) {
+        console.warn('[Supabase] GAS fallback failed, attempting direct Supabase:', gasError.message);
+      }
     }
-    const performanceId = performanceResult.data[0].id;
-    const updates = seatIds.map(seatId => ({
-      seatId,
-      status: 'checked_in',
-      data: { checked_in_at: new Date().toISOString() }
-    }));
-    const result = await this.updateMultipleSeats(performanceId, updates);
-    if (!result.success) {
-      return { success: false, error: 'チェックインに失敗しました', details: result.data };
+
+    try {
+      const performanceResult = await this.getPerformances(group, day, timeslot);
+      if (!performanceResult.success || !performanceResult.data.length) {
+        return { success: false, error: '公演が見つかりません' };
+      }
+      
+      const performanceId = performanceResult.data[0].id;
+      
+      // 複数座席の場合は、より安全な逐次処理を使用
+      if (seatIds.length > 3) {
+        console.log(`[Supabase] Processing ${seatIds.length} seats sequentially to avoid network issues`);
+        return await this._processSeatsSequentially(performanceId, seatIds, 'checked_in');
+      }
+      
+      // 少数の座席は従来通り並行処理
+      const updates = seatIds.map(seatId => ({
+        seatId,
+        status: 'checked_in',
+        data: { checked_in_at: new Date().toISOString() }
+      }));
+      
+      const result = await this.updateMultipleSeats(performanceId, updates);
+      if (!result.success) {
+        return { success: false, error: 'チェックインに失敗しました', details: result.data };
+      }
+      
+      return { success: true, data: { seatIds, checkedInAt: new Date().toISOString() } };
+    } catch (error) {
+      console.error('[Supabase] checkInMultipleSeats failed:', error);
+      
+      // Supabaseが失敗した場合、GASフォールバックを試行
+      if (this.gasEnabled && !this._shouldUseGasFallback()) {
+        try {
+          console.log('[Supabase] Attempting GAS fallback after Supabase failure');
+          return await this._callViaGas('checkInSeats', [group, day, timeslot, seatIds]);
+        } catch (gasError) {
+          console.error('[Supabase] Both Supabase and GAS failed:', gasError);
+        }
+      }
+      
+      return { 
+        success: false, 
+        error: 'チェックインに失敗しました。ネットワーク接続を確認してください。',
+        originalError: error.message 
+      };
     }
-    return { success: true, data: { seatIds, checkedInAt: new Date().toISOString() } };
   }
 
   // 当日券関連のAPI
@@ -797,129 +956,232 @@ class SupabaseAPI {
   }
 
   async assignWalkInSeats(group, day, timeslot, count) {
-    // 公演IDを取得
-    const performanceResult = await this.getPerformances(group, day, timeslot);
-    if (!performanceResult.success || !performanceResult.data.length) {
-      return { success: false, error: '公演が見つかりません' };
-    }
-    
-    const performanceId = performanceResult.data[0].id;
-    
-    // 利用可能な座席を検索
-    const seatsResult = await this.getSeats(performanceId, 'available');
-    if (!seatsResult.success || !seatsResult.data.length) {
-      return { success: false, error: '利用可能な座席がありません' };
-    }
-    
-    // ランダムに指定数の座席を選択（Fisher-Yatesでシャッフル）
-    const pool = seatsResult.data.slice();
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      const t = pool[i];
-      pool[i] = pool[j];
-      pool[j] = t;
-    }
-    const selectedSeats = pool.slice(0, count);
-    const now = new Date();
-    const iso = now.toISOString();
-    const fmt = this._formatYmdHms(now);
-    const reservedBy = `当日券_${fmt}`;
-    
-    // 座席を当日券として予約
-    const updates = selectedSeats.map(seat => ({
-      seatId: seat.seat_id,
-      status: 'walkin',
-      data: {
-        walkin_at: iso,
-        reserved_at: iso,
-        reserved_by: reservedBy
+    // GASフォールバックが必要かチェック
+    if (this._shouldUseGasFallback()) {
+      try {
+        console.log('[Supabase] Using GAS fallback for assignWalkInSeats');
+        return await this._callViaGas('assignWalkInSeats', [group, day, timeslot, count]);
+      } catch (gasError) {
+        console.warn('[Supabase] GAS fallback failed, attempting direct Supabase:', gasError.message);
       }
-    }));
-    
-    const result = await this.updateMultipleSeats(performanceId, updates);
-    
-    if (!result.success) {
-      return { success: false, error: '当日券の割り当てに失敗しました' };
     }
-    
-    return { success: true, data: { seatIds: selectedSeats.map(s => s.seat_id), walkinAt: iso, reservedBy } };
+
+    try {
+      // 公演IDを取得
+      const performanceResult = await this.getPerformances(group, day, timeslot);
+      if (!performanceResult.success || !performanceResult.data.length) {
+        return { success: false, error: '公演が見つかりません' };
+      }
+      
+      const performanceId = performanceResult.data[0].id;
+      
+      // 利用可能な座席を検索
+      const seatsResult = await this.getSeats(performanceId, 'available');
+      if (!seatsResult.success || !seatsResult.data.length) {
+        return { success: false, error: '利用可能な座席がありません' };
+      }
+      
+      if (seatsResult.data.length < count) {
+        return { success: false, error: `利用可能な座席が不足しています（必要: ${count}席、利用可能: ${seatsResult.data.length}席）` };
+      }
+      
+      // ランダムに指定数の座席を選択（Fisher-Yatesでシャッフル）
+      const pool = seatsResult.data.slice();
+      for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const t = pool[i];
+        pool[i] = pool[j];
+        pool[j] = t;
+      }
+      const selectedSeats = pool.slice(0, count);
+      const now = new Date();
+      const iso = now.toISOString();
+      const fmt = this._formatYmdHms(now);
+      const reservedBy = `当日券_${fmt}`;
+      
+      const seatIds = selectedSeats.map(s => s.seat_id);
+      
+      // 複数座席の場合は逐次処理を使用
+      if (count > 3) {
+        console.log(`[Supabase] Processing ${count} walkin seats sequentially`);
+        const result = await this._processSeatsSequentially(performanceId, seatIds, 'walkin', {
+          walkin_at: iso,
+          reserved_at: iso,
+          reserved_by: reservedBy
+        });
+        
+        if (result.success) {
+          return { success: true, data: { seatIds: result.data.seatIds, walkinAt: iso, reservedBy } };
+        } else {
+          return { success: false, error: result.error, details: result.data };
+        }
+      }
+      
+      // 少数の座席は並行処理
+      const updates = selectedSeats.map(seat => ({
+        seatId: seat.seat_id,
+        status: 'walkin',
+        data: {
+          walkin_at: iso,
+          reserved_at: iso,
+          reserved_by: reservedBy
+        }
+      }));
+      
+      const result = await this.updateMultipleSeats(performanceId, updates);
+      
+      if (!result.success) {
+        return { success: false, error: '当日券の割り当てに失敗しました' };
+      }
+      
+      return { success: true, data: { seatIds: selectedSeats.map(s => s.seat_id), walkinAt: iso, reservedBy } };
+    } catch (error) {
+      console.error('[Supabase] assignWalkInSeats failed:', error);
+      
+      // Supabaseが失敗した場合、GASフォールバックを試行
+      if (this.gasEnabled && !this._shouldUseGasFallback()) {
+        try {
+          console.log('[Supabase] Attempting GAS fallback after Supabase failure');
+          return await this._callViaGas('assignWalkInSeats', [group, day, timeslot, count]);
+        } catch (gasError) {
+          console.error('[Supabase] Both Supabase and GAS failed:', gasError);
+        }
+      }
+      
+      return { 
+        success: false, 
+        error: '当日券の割り当てに失敗しました。ネットワーク接続を確認してください。',
+        originalError: error.message 
+      };
+    }
   }
 
   // 連続席の当日券割り当て（同一行、連番で count 席）
   async assignWalkInConsecutiveSeats(group, day, timeslot, count) {
-    // 公演IDを取得
-    const performanceResult = await this.getPerformances(group, day, timeslot);
-    if (!performanceResult.success || !performanceResult.data.length) {
-      return { success: false, error: '公演が見つかりません' };
-    }
-    const performanceId = performanceResult.data[0].id;
-
-    // 利用可能な座席（必要な列情報付き）を取得
-    const seatsResult = await this._request(`seats?performance_id=eq.${performanceId}&status=eq.available&select=seat_id,row_letter,seat_number`);
-    if (!seatsResult.success) {
-      return { success: false, error: '座席データの取得に失敗しました' };
-    }
-    const available = Array.isArray(seatsResult.data) ? seatsResult.data : [];
-    if (available.length < count) {
-      return { success: false, error: '利用可能な座席が不足しています' };
-    }
-
-    // 行ごとに seat_number をソートし連続ブロックを探索
-    const byRow = new Map();
-    for (const s of available) {
-      const row = s.row_letter;
-      if (!byRow.has(row)) byRow.set(row, []);
-      byRow.get(row).push({ id: s.seat_id, num: Number(s.seat_number) });
-    }
-    // 全ての行で連続ブロックを列挙し、候補からランダムに選ぶ
-    const candidates = [];
-    for (const [row, arr] of byRow.entries()) {
-      arr.sort((a, b) => a.num - b.num);
-      // スライディングウィンドウで連続 count を探す
-      for (let i = 0; i + count - 1 < arr.length; i++) {
-        const start = arr[i].num;
-        const end = arr[i + count - 1].num;
-        if (end - start + 1 === count) {
-          // 途中に欠番がないか確認
-          let ok = true;
-          for (let k = 0; k < count; k++) {
-            if (arr[i + k].num !== start + k) { ok = false; break; }
-          }
-          // 通路を跨がない（C列の13-14間、25-26間を跨がない）
-          if (ok && row === 'C') {
-            const crossesFirstAisle = (start <= 13 && end >= 14);
-            const crossesSecondAisle = (start <= 25 && end >= 26);
-            if (crossesFirstAisle || crossesSecondAisle) {
-              ok = false;
-            }
-          }
-          if (ok) {
-            candidates.push(arr.slice(i, i + count).map(x => x.id));
-          }
-        }
+    // GASフォールバックが必要かチェック
+    if (this._shouldUseGasFallback()) {
+      try {
+        console.log('[Supabase] Using GAS fallback for assignWalkInConsecutiveSeats');
+        return await this._callViaGas('assignWalkInConsecutiveSeats', [group, day, timeslot, count]);
+      } catch (gasError) {
+        console.warn('[Supabase] GAS fallback failed, attempting direct Supabase:', gasError.message);
       }
     }
 
-    if (!candidates.length) {
-      return { success: false, error: '指定枚数の連続席が見つかりませんでした' };
-    }
-    const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+    try {
+      // 公演IDを取得
+      const performanceResult = await this.getPerformances(group, day, timeslot);
+      if (!performanceResult.success || !performanceResult.data.length) {
+        return { success: false, error: '公演が見つかりません' };
+      }
+      const performanceId = performanceResult.data[0].id;
 
-    // 選択した席を walkin に更新
-    const now = new Date();
-    const iso = now.toISOString();
-    const fmt = this._formatYmdHms(now);
-    const reservedBy = `当日券_${fmt}`;
-    const updates = chosen.map(seatId => ({
-      seatId,
-      status: 'walkin',
-      data: { walkin_at: iso, reserved_at: iso, reserved_by: reservedBy }
-    }));
-    const result = await this.updateMultipleSeats(performanceId, updates);
-    if (!result.success) {
-      return { success: false, error: '当日券の割り当てに失敗しました' };
+      // 利用可能な座席（必要な列情報付き）を取得
+      const seatsResult = await this._request(`seats?performance_id=eq.${performanceId}&status=eq.available&select=seat_id,row_letter,seat_number`);
+      if (!seatsResult.success) {
+        return { success: false, error: '座席データの取得に失敗しました' };
+      }
+      const available = Array.isArray(seatsResult.data) ? seatsResult.data : [];
+      if (available.length < count) {
+        return { success: false, error: `利用可能な座席が不足しています（必要: ${count}席、利用可能: ${available.length}席）` };
+      }
+
+      // 行ごとに seat_number をソートし連続ブロックを探索
+      const byRow = new Map();
+      for (const s of available) {
+        const row = s.row_letter;
+        if (!byRow.has(row)) byRow.set(row, []);
+        byRow.get(row).push({ id: s.seat_id, num: Number(s.seat_number) });
+      }
+      
+      // 全ての行で連続ブロックを列挙し、候補からランダムに選ぶ
+      const candidates = [];
+      for (const [row, arr] of byRow.entries()) {
+        arr.sort((a, b) => a.num - b.num);
+        // スライディングウィンドウで連続 count を探す
+        for (let i = 0; i + count - 1 < arr.length; i++) {
+          const start = arr[i].num;
+          const end = arr[i + count - 1].num;
+          if (end - start + 1 === count) {
+            // 途中に欠番がないか確認
+            let ok = true;
+            for (let k = 0; k < count; k++) {
+              if (arr[i + k].num !== start + k) { ok = false; break; }
+            }
+            // 通路を跨がない（C列の13-14間、25-26間を跨がない）
+            if (ok && row === 'C') {
+              const crossesFirstAisle = (start <= 13 && end >= 14);
+              const crossesSecondAisle = (start <= 25 && end >= 26);
+              if (crossesFirstAisle || crossesSecondAisle) {
+                ok = false;
+              }
+            }
+            if (ok) {
+              candidates.push(arr.slice(i, i + count).map(x => x.id));
+            }
+          }
+        }
+      }
+
+      if (!candidates.length) {
+        return { success: false, error: '指定枚数の連続席が見つかりませんでした' };
+      }
+      const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+
+      // 選択した席を walkin に更新
+      const now = new Date();
+      const iso = now.toISOString();
+      const fmt = this._formatYmdHms(now);
+      const reservedBy = `当日券_${fmt}`;
+      
+      // 複数座席の場合は逐次処理を使用
+      if (count > 3) {
+        console.log(`[Supabase] Processing ${count} consecutive walkin seats sequentially`);
+        const result = await this._processSeatsSequentially(performanceId, chosen, 'walkin', {
+          walkin_at: iso,
+          reserved_at: iso,
+          reserved_by: reservedBy
+        });
+        
+        if (result.success) {
+          return { success: true, data: { seatIds: result.data.seatIds, walkinAt: iso, reservedBy } };
+        } else {
+          return { success: false, error: result.error, details: result.data };
+        }
+      }
+      
+      // 少数の座席は並行処理
+      const updates = chosen.map(seatId => ({
+        seatId,
+        status: 'walkin',
+        data: { walkin_at: iso, reserved_at: iso, reserved_by: reservedBy }
+      }));
+      
+      const result = await this.updateMultipleSeats(performanceId, updates);
+      if (!result.success) {
+        return { success: false, error: '当日券の割り当てに失敗しました' };
+      }
+      
+      return { success: true, data: { seatIds: chosen, walkinAt: iso, reservedBy } };
+    } catch (error) {
+      console.error('[Supabase] assignWalkInConsecutiveSeats failed:', error);
+      
+      // Supabaseが失敗した場合、GASフォールバックを試行
+      if (this.gasEnabled && !this._shouldUseGasFallback()) {
+        try {
+          console.log('[Supabase] Attempting GAS fallback after Supabase failure');
+          return await this._callViaGas('assignWalkInConsecutiveSeats', [group, day, timeslot, count]);
+        } catch (gasError) {
+          console.error('[Supabase] Both Supabase and GAS failed:', gasError);
+        }
+      }
+      
+      return { 
+        success: false, 
+        error: '連続席当日券の割り当てに失敗しました。ネットワーク接続を確認してください。',
+        originalError: error.message 
+      };
     }
-    return { success: true, data: { seatIds: chosen, walkinAt: iso, reservedBy } };
   }
 
   // "YYYY/MM/DD HH:mm:ss" に整形（ローカルタイム）
@@ -1226,6 +1488,30 @@ if (typeof window !== 'undefined') {
     testUpdateSeat: async (group = 'テストグループ', day = 1, timeslot = 'A', seatId = 'A1') => {
       console.log('[Test] Testing updateSeatData with current configuration...');
       const result = await supabaseAPI.updateSeatData(group, day, timeslot, seatId, '予約済', 'テストユーザー', '');
+      console.log('[Test] Result:', result);
+      return result;
+    },
+    
+    // テスト用のチェックイン
+    testCheckIn: async (group = 'テストグループ', day = 1, timeslot = 'A', seatIds = ['A1', 'A2']) => {
+      console.log('[Test] Testing checkInMultipleSeats with current configuration...');
+      const result = await supabaseAPI.checkInMultipleSeats(group, day, timeslot, seatIds);
+      console.log('[Test] Result:', result);
+      return result;
+    },
+    
+    // テスト用の当日券発行
+    testWalkIn: async (group = 'テストグループ', day = 1, timeslot = 'A', count = 2) => {
+      console.log('[Test] Testing assignWalkInSeats with current configuration...');
+      const result = await supabaseAPI.assignWalkInSeats(group, day, timeslot, count);
+      console.log('[Test] Result:', result);
+      return result;
+    },
+    
+    // テスト用の連続席当日券発行
+    testConsecutiveWalkIn: async (group = 'テストグループ', day = 1, timeslot = 'A', count = 3) => {
+      console.log('[Test] Testing assignWalkInConsecutiveSeats with current configuration...');
+      const result = await supabaseAPI.assignWalkInConsecutiveSeats(group, day, timeslot, count);
       console.log('[Test] Result:', result);
       return result;
     }
