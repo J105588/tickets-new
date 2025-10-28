@@ -4,7 +4,7 @@
 // 座席配置設定
 const SEAT_CONFIG = {
   // 総座席数
-  totalSeats: 680,
+  totalSeats: 692,
   
   // 列ごとの座席数設定
   rows: {
