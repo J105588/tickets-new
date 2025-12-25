@@ -1,7 +1,7 @@
 // config.js
 // 複数のAPI URL（使用数上限回避のため分散）
 const GAS_API_URLS = [
-  "https://script.google.com/macros/s/AKfycbwH4gGtVcao3Nd6tP_1f0X-zh6xxMv09dRYdGmNFcMlStYyRmqio3Mfi4RaEIxA6CgHrw/exec"
+  "https://script.google.com/macros/s/AKfycbyLx2Xev6Z4U0gCkhTrP_9n3Wn66hgxSuduzgtD4dKNe95pYSKM4osi5YBnDNb1KMR8Nw/exec"
   //jxjin2010@gmail.com
   //"https://script.google.com/macros/s/AKfycbwfHVEZwLbCs_sJ3ckyr6vdCLfI3twmiENbBuSOidMUOLAnGwfmGoyvGLcXihJMu8T1/exec",
   //jxjin.ig.school@gmail.com
@@ -77,15 +77,15 @@ class APIUrlManager {
   // URLを次のものにローテーション（現在のURLとは異なるものを必ず選択）
   rotateUrl() {
     const oldIndex = this.currentIndex;
-    
+
     // 次のURLを選択（配列の最後の場合は最初に戻る）
     this.currentIndex = (this.currentIndex + 1) % this.urls.length;
-    
+
     // もしURLが1つしかない場合は何もしない
     if (this.urls.length <= 1) {
       return;
     }
-    
+
     this.lastRotationTime = Date.now();
     console.log(`[API URL Manager] URLローテーション: ${oldIndex + 1} → ${this.currentIndex + 1}`, this.urls[this.currentIndex]);
   }
@@ -93,12 +93,12 @@ class APIUrlManager {
   // 手動でランダムURL選択（現在のURLとは異なるものを必ず選択）
   selectRandomUrl() {
     console.log(`[API URL Manager] selectRandomUrl開始: 現在のインデックス=${this.currentIndex}, URL数=${this.urls.length}`);
-    
+
     if (this.urls.length > 1) {
       const oldIndex = this.currentIndex;
       const oldUrl = this.urls[oldIndex];
       console.log(`[API URL Manager] 現在のURL: ${oldUrl}`);
-      
+
       // 現在のURLとは異なるURLを選択
       let newIndex;
       let attempts = 0;
@@ -107,12 +107,12 @@ class APIUrlManager {
         attempts++;
         console.log(`[API URL Manager] 選択試行${attempts}: インデックス=${newIndex}, URL=${this.urls[newIndex]}`);
       } while (newIndex === oldIndex && this.urls.length > 1 && attempts < 10);
-      
+
       if (attempts >= 10) {
         console.warn('[API URL Manager] 10回試行しても異なるURLが見つかりません');
         return;
       }
-      
+
       this.currentIndex = newIndex;
       this.lastRotationTime = Date.now();
       console.log(`[API URL Manager] ランダム選択完了: ${oldIndex + 1} → ${this.currentIndex + 1}`, this.urls[this.currentIndex]);
@@ -174,7 +174,7 @@ class DemoModeManager {
         getGeneproInfo: () => this.getGeneproInfo()
       };
       debugLog('[DemoMode] console command ready: DemoMode.disable(), DemoMode.enableGenepro()');
-    } catch (_) {}
+    } catch (_) { }
 
     // 状態をログ出力
     this.logStatus();
@@ -199,7 +199,7 @@ class DemoModeManager {
         // DEMO解除時はURLからパラメーターを削除
         this._removeDemoParamFromUrl();
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   // URLからdemoパラメーターを削除
@@ -212,7 +212,7 @@ class DemoModeManager {
       const newUrl = `${origin}${pathname}${newSearch ? '?' + newSearch : ''}${hash || ''}`;
       window.history.replaceState(null, '', newUrl);
       debugLog('[DemoMode] Removed demo parameter from URL');
-    } catch (_) {}
+    } catch (_) { }
   }
 
   isActive() {
@@ -220,11 +220,11 @@ class DemoModeManager {
   }
 
   enable() {
-    try { localStorage.setItem(this.storageKey, 'true'); } catch (_) {}
+    try { localStorage.setItem(this.storageKey, 'true'); } catch (_) { }
   }
 
   disable() {
-    try { localStorage.removeItem(this.storageKey); debugLog('[DemoMode] Disabled'); } catch (_) {}
+    try { localStorage.removeItem(this.storageKey); debugLog('[DemoMode] Disabled'); } catch (_) { }
   }
 
   // ゲネプロモード用メソッド
@@ -233,18 +233,18 @@ class DemoModeManager {
   }
 
   enableGenepro() {
-    try { 
+    try {
       localStorage.setItem(this.geneproStorageKey, 'true');
       localStorage.removeItem(this.storageKey); // 通常デモモードを無効化
       debugLog('[GeneproMode] Enabled');
-    } catch (_) {}
+    } catch (_) { }
   }
 
   disableGenepro() {
-    try { 
-      localStorage.removeItem(this.geneproStorageKey); 
-      debugLog('[GeneproMode] Disabled'); 
-    } catch (_) {}
+    try {
+      localStorage.removeItem(this.geneproStorageKey);
+      debugLog('[GeneproMode] Disabled');
+    } catch (_) { }
   }
 
   getGeneproInfo() {
@@ -299,7 +299,7 @@ class DemoModeManager {
         debugLog(`[${modeName}] Append ${demoParam} to URL`, { from: href, to: next });
         window.history.replaceState(null, '', next);
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   // 状態ログを出力
@@ -312,7 +312,7 @@ class DemoModeManager {
       } else {
         console.log('[DemoMode] Inactive');
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   // DEMOモード通知モジュール（オーバーレイ＋モーダル）。外側タップで閉じる。
@@ -328,10 +328,10 @@ class DemoModeManager {
       modal.style.cssText = 'background:#fff;border-radius:12px;max-width:480px;width:100%;box-shadow:0 12px 32px rgba(0,0,0,.25);overflow:hidden;';
       const header = document.createElement('div');
       header.style.cssText = 'background:#6f42c1;color:#fff;padding:14px 16px;font-weight:600;';
-      
+
       const body = document.createElement('div');
       body.style.cssText = 'padding:16px;color:#333;line-height:1.6;';
-      
+
       if (this.isGeneproActive()) {
         header.textContent = 'ゲネプロモード';
         body.innerHTML = `現在「<b>${this.geneproGroup}</b>」のゲネプロモードです。`;
@@ -339,7 +339,7 @@ class DemoModeManager {
         header.textContent = 'DEMOモード';
         body.innerHTML = `現在「<b>${this.demoGroup}</b>」のみ操作可能です。<br>モードや予約、チェックイン、当日券発行の操作は見本データにのみ反映されます。`;
       }
-      
+
       const footer = document.createElement('div');
       footer.style.cssText = 'padding:12px 16px;display:flex;gap:8px;justify-content:flex-end;background:#f8f9fa;';
       const ok = document.createElement('button');
@@ -358,7 +358,7 @@ class DemoModeManager {
       // フォールバック
       const modeName = this.isGeneproActive() ? 'ゲネプロモード' : 'DEMOモード';
       const groupName = this.isGeneproActive() ? this.geneproGroup : this.demoGroup;
-      try { alert(`${modeName}：現在「${groupName}」のみ操作可能です`); } catch (__) {}
+      try { alert(`${modeName}：現在「${groupName}」のみ操作可能です`); } catch (__) { }
     }
   }
 }

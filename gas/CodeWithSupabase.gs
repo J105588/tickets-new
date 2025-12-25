@@ -745,7 +745,7 @@ async function generateSeatsForPerformance(performanceId) {
 function mapSupabaseStatusToLegacy(supabaseStatus) {
   switch (supabaseStatus) {
     case 'available': return 'available';
-    case 'reserved': return 'to-be-checked-in';
+    case 'reserved': return 'reserved';
     case 'checked_in': return 'checked-in';
     case 'walkin': return 'walkin';
     case 'blocked': return 'unavailable';
@@ -760,8 +760,8 @@ function mapStatusToColumnC(status) {
   switch (status) {
     case 'available': return '空';
     case 'reserved': return '予約済';
-    case 'checked_in': return '予約済';
-    case 'walkin': return '予約済';
+    case 'checked_in': return 'チェックイン済';
+    case 'walkin': return '当日券';
     case 'blocked': return '使用不可';
     default: return '空';
   }
@@ -776,6 +776,8 @@ function mapColumnCToSupabaseStatus(columnC) {
     case '予約済': return 'reserved';
     case '確保': return 'reserved';
     case '使用不可': return 'blocked';
+    case 'チェックイン済': return 'checked_in';
+    case '当日券': return 'walkin';
     default: return 'available';
   }
 }
