@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -26,14 +27,14 @@
   <link rel="apple-touch-icon" sizes="57x57" href="https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg">
   <meta name="msapplication-TileColor" content="#007bff">
   <meta name="msapplication-config" content="browserconfig.xml">
-  <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="sidebar.css">
-  <link rel="stylesheet" href="walkin.css">
-  <link rel="stylesheet" href="offline-sync-v2.css">
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <link rel="stylesheet" href="../assets/css/sidebar.css">
+  <link rel="stylesheet" href="../assets/css/walkin.css">
+  <link rel="stylesheet" href="../assets/css/offline-sync-v2.css">
   <script>
     (async () => {
       try {
-        const res = await fetch('manifest.json', { cache: 'no-store' });
+        const res = await fetch('../manifest.json', { cache: 'no-store' });
         const manifest = await res.json();
         const bg = (manifest && (manifest.background_color || manifest.theme_color)) || null;
         if (!bg) return;
@@ -47,25 +48,26 @@
           document.head.appendChild(themeMeta);
         }
         themeMeta.setAttribute('content', theme);
-        try { document.documentElement.style.backgroundColor = pageBg; } catch (_) {}
-        try { document.body && (document.body.style.backgroundColor = pageBg); } catch (_) {}
+        try { document.documentElement.style.backgroundColor = pageBg; } catch (_) { }
+        try { document.body && (document.body.style.backgroundColor = pageBg); } catch (_) { }
         const toRgb = (hex) => {
-          const h = hex.replace('#','').trim();
-          if (h.length === 3) return [h[0]+h[0], h[1]+h[1], h[2]+h[2]].map(v=>parseInt(v,16));
-          if (h.length === 6) return [h.substring(0,2),h.substring(2,4),h.substring(4,6)].map(v=>parseInt(v,16));
+          const h = hex.replace('#', '').trim();
+          if (h.length === 3) return [h[0] + h[0], h[1] + h[1], h[2] + h[2]].map(v => parseInt(v, 16));
+          if (h.length === 6) return [h.substring(0, 2), h.substring(2, 4), h.substring(4, 6)].map(v => parseInt(v, 16));
           return null;
         };
         const rgb = /^#?[0-9a-fA-F]{3,6}$/.test(theme) ? toRgb(theme) : null;
         if (rgb) {
-          const [r,g,b] = rgb.map(v => v / 255);
+          const [r, g, b] = rgb.map(v => v / 255);
           const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
           const appleMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
           if (appleMeta) appleMeta.setAttribute('content', luminance < 0.5 ? 'black' : 'default');
         }
-      } catch (_) {}
+      } catch (_) { }
     })();
   </script>
 </head>
+
 <body>
 
   <div id="sidebar-container"></div>
@@ -88,12 +90,12 @@
 
   <div id="main-content">
     <div class="page-header">
-      <span class="menu-btn" onclick="toggleSidebar()">&#9776;</span >
+      <span class="menu-btn" onclick="toggleSidebar()">&#9776;</span>
       <div class="header-title-container">
         <h1>当日券 発行</h1>
       </div>
     </div>
-    
+
     <div class="container">
       <div class="card walkin-card">
         <p>公演：<span id="performance-info"></span></p>
@@ -107,10 +109,11 @@
           </div>
         </div>
         <div class="walkin-actions">
-          <button id="walkin-open-modal-btn" class="walkin-button primary disabled-mode" onclick="openWalkinOptionModal()" disabled>当日券モードでログインしてください</button>
+          <button id="walkin-open-modal-btn" class="walkin-button primary disabled-mode"
+            onclick="openWalkinOptionModal()" disabled>当日券モードでログインしてください</button>
         </div>
       </div>
-      
+
       <div id="reservation-result" class="reservation-result">
         <div class="reservation-title">当日券発行完了</div>
         <div id="reserved-seat" class="reserved-seat"></div>
@@ -160,25 +163,25 @@
   </div>
 
   <!-- 最適化されたスクリプトローダー -->
-  <script type="module" src="optimized-loader.js"></script>
-  <script type="module" src="auth.js"></script>
-  <script type="module" src="api-cache.js"></script>
-  <script type="module" src="optimized-api.js"></script>
-  <script type="module" src="ui-optimizer.js"></script>
-  
+  <script type="module" src="../assets/js/optimized-loader.js"></script>
+  <script type="module" src="../assets/js/auth.js"></script>
+  <script type="module" src="../assets/js/api-cache.js"></script>
+  <script type="module" src="../assets/js/optimized-api.js"></script>
+  <script type="module" src="../assets/js/ui-optimizer.js"></script>
+
   <!-- 既存のスクリプト（最適化されたローダーが管理） -->
-  <script type="module" src="walkin-main.js"></script>
-  <script type="module" src="pwa-install.js"></script>
-  <script type="module" src="pwa-update.js"></script>
-  
+  <script type="module" src="../assets/js/walkin-main.js"></script>
+  <script type="module" src="../assets/js/pwa-install.js"></script>
+  <script type="module" src="../assets/js/pwa-update.js"></script>
+
   <!-- PWA Service Worker Registration -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
+        navigator.serviceWorker.register('../sw.js')
           .then((registration) => {
             console.log('SW registered: ', registration);
-            
+
             // 更新チェック
             registration.addEventListener('updatefound', () => {
               const newWorker = registration.installing;
@@ -226,18 +229,18 @@
         // 現在のURL情報を取得
         const oldInfo = window.GasAPI.getUrlManagerInfo();
         console.log('[URL Refresh] 更新前URL情報:', oldInfo);
-        
+
         // ランダムURL選択を実行
         if (window.GasAPI.selectRandomUrl) {
           const newInfo = window.GasAPI.selectRandomUrl();
           console.log('[URL Refresh] 更新後URL情報:', newInfo);
-          
+
           // URL情報表示を更新
           const urlInfoText = document.getElementById('url-info-text');
           if (urlInfoText) {
             urlInfoText.textContent = `API URL: ${newInfo.index}/${newInfo.total}`;
           }
-          
+
           // URL変更アニメーションを表示
           if (window.showUrlChangeAnimation) {
             console.log('[Walkin HTML] アニメーション表示実行');
@@ -262,7 +265,7 @@
     // フォールバック用のアニメーション関数
     function showUrlChangeAnimationFallback(oldUrl, newUrl, changeType = 'rotation') {
       console.log('[Fallback Animation] アニメーション表示開始:', { oldUrl, newUrl, changeType });
-      
+
       // 通知要素を作成
       const notification = document.createElement('div');
       notification.className = 'url-change-notification';
@@ -292,11 +295,11 @@
       // アイコンとメッセージを設定
       const icon = changeType === 'rotation' ? '↻' : '⚡';
       const message = changeType === 'rotation' ? 'API URL ローテーション' : 'API URL ランダム選択';
-      
+
       // スクリプトIDを抽出（/macros/s/以降の部分）
       const scriptId = newUrl.split('/macros/s/')[1]?.split('/')[0] || 'unknown';
       const displayId = scriptId.substring(0, 8) + '...';
-      
+
       notification.innerHTML = `
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 16px; font-weight: bold;">${icon}</span>
@@ -380,7 +383,7 @@
           const info = window.GasAPI.getUrlManagerInfo();
           const urlInfo = document.getElementById('url-info');
           const urlInfoText = document.getElementById('url-info-text');
-          
+
           if (urlInfo && urlInfoText) {
             urlInfoText.textContent = `API URL: ${info.index}/${info.total}`;
             urlInfo.style.display = 'block';
@@ -390,4 +393,5 @@
     });
   </script>
 </body>
+
 </html>

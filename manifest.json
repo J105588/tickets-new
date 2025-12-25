@@ -39,7 +39,7 @@
       "name": "座席選択",
       "short_name": "座席",
       "description": "座席の選択と予約を行います",
-      "url": "./seats.html",
+      "url": "./pages/seats.html",
       "icons": [
         {
           "src": "https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg",
@@ -51,7 +51,7 @@
       "name": "時間帯選択",
       "short_name": "時間帯",
       "description": "公演の時間帯を選択します",
-      "url": "./timeslot.html",
+      "url": "./pages/timeslot.html",
       "icons": [
         {
           "src": "https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg",
@@ -63,7 +63,7 @@
       "name": "当日券発行",
       "short_name": "当日券",
       "description": "当日券の発行を行います",
-      "url": "./walkin.html",
+      "url": "./pages/walkin.html",
       "icons": [
         {
           "src": "https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg",

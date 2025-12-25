@@ -4,43 +4,53 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>座席管理システム - 公演選択</title>
-  <meta name="description" content="文化祭やイベント向けの座席予約・チェックイン・当日券発行システム">
+  <title>座席管理システム - 公演日時選択</title>
+  <meta name="description" content="公演の日時を選択します（2日間、各日1公演）">
   <meta name="theme-color" content="#007bff">
   <link rel="preconnect" href="https://script.google.com" crossorigin>
   <link rel="dns-prefetch" href="https://script.google.com">
-  <link rel="icon" type="image/png" href="https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg">
+  <link rel="icon" type="image/png"
+    href="https://lh3.googleusercontent.com/a/ACg8ocJIgKhq2qCWSld0Kx1pBDyJxosdON3XvHd2th1B4CrPkFRN82M=s360-c-no">
   <link rel="manifest" href="manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="座席管理システム">
-  <link rel="apple-touch-icon" href="https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg">
-  <link rel="apple-touch-icon" sizes="180x180" href="https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg">
-  <link rel="apple-touch-icon" sizes="152x152" href="https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg">
-  <link rel="apple-touch-icon" sizes="144x144" href="https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg">
-  <link rel="apple-touch-icon" sizes="120x120" href="https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg">
-  <link rel="apple-touch-icon" sizes="114x114" href="https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg">
-  <link rel="apple-touch-icon" sizes="76x76" href="https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg">
-  <link rel="apple-touch-icon" sizes="72x72" href="https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg">
-  <link rel="apple-touch-icon" sizes="60x60" href="https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg">
-  <link rel="apple-touch-icon" sizes="57x57" href="https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg">
+  <link rel="apple-touch-icon"
+    href="https://lh3.googleusercontent.com/a/ACg8ocJIgKhq2qCWSld0Kx1pBDyJxosdON3XvHd2th1B4CrPkFRN82M=s360-c-no">
+  <link rel="apple-touch-icon" sizes="180x180"
+    href="https://lh3.googleusercontent.com/a/ACg8ocJIgKhq2qCWSld0Kx1pBDyJxosdON3XvHd2th1B4CrPkFRN82M=s360-c-no">
+  <link rel="apple-touch-icon" sizes="152x152"
+    href="https://lh3.googleusercontent.com/a/ACg8ocJIgKhq2qCWSld0Kx1pBDyJxosdON3XvHd2th1B4CrPkFRN82M=s360-c-no">
+  <link rel="apple-touch-icon" sizes="144x144"
+    href="https://lh3.googleusercontent.com/a/ACg8ocJIgKhq2qCWSld0Kx1pBDyJxosdON3XvHd2th1B4CrPkFRN82M=s360-c-no">
+  <link rel="apple-touch-icon" sizes="120x120"
+    href="https://lh3.googleusercontent.com/a/ACg8ocJIgKhq2qCWSld0Kx1pBDyJxosdON3XvHd2th1B4CrPkFRN82M=s360-c-no">
+  <link rel="apple-touch-icon" sizes="114x114"
+    href="https://lh3.googleusercontent.com/a/ACg8ocJIgKhq2qCWSld0Kx1pBDyJxosdON3XvHd2th1B4CrPkFRN82M=s360-c-no">
+  <link rel="apple-touch-icon" sizes="76x76"
+    href="https://lh3.googleusercontent.com/a/ACg8ocJIgKhq2qCWSld0Kx1pBDyJxosdON3XvHd2th1B4CrPkFRN82M=s360-c-no">
+  <link rel="apple-touch-icon" sizes="72x72"
+    href="https://lh3.googleusercontent.com/a/ACg8ocJIgKhq2qCWSld0Kx1pBDyJxosdON3XvHd2th1B4CrPkFRN82M=s360-c-no">
+  <link rel="apple-touch-icon" sizes="60x60"
+    href="https://lh3.googleusercontent.com/a/ACg8ocJIgKhq2qCWSld0Kx1pBDyJxosdON3XvHd2th1B4CrPkFRN82M=s360-c-no">
+  <link rel="apple-touch-icon" sizes="57x57"
+    href="https://lh3.googleusercontent.com/a/ACg8ocJIgKhq2qCWSld0Kx1pBDyJxosdON3XvHd2th1B4CrPkFRN82M=s360-c-no">
   <meta name="msapplication-TileColor" content="#007bff">
   <meta name="msapplication-config" content="browserconfig.xml">
-  <link rel="stylesheet" href="assets/css/styles.css">
-  <link rel="stylesheet" href="assets/css/sidebar.css">
-  <link rel="stylesheet" href="assets/css/offline-sync-v2.css">
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <link rel="stylesheet" href="../assets/css/sidebar.css">
+  <link rel="stylesheet" href="../assets/css/offline-sync-v2.css">
   <script>
     (async () => {
       try {
-        const res = await fetch('manifest.json', { cache: 'no-store' });
+        const res = await fetch('../manifest.json', { cache: 'no-store' });
         const manifest = await res.json();
         const bg = (manifest && (manifest.background_color || manifest.theme_color)) || null;
         if (!bg) return;
         const theme = bg;
         const isWhite = (typeof bg === 'string') && (/^#?([fF]{3}|[fF]{6})$/.test(bg) || bg.toLowerCase() === 'white');
         const pageBg = isWhite ? '#f5f6f8' : bg;
-
         let themeMeta = document.querySelector('meta[name="theme-color"]');
         if (!themeMeta) {
           themeMeta = document.createElement('meta');
@@ -48,23 +58,12 @@
           document.head.appendChild(themeMeta);
         }
         themeMeta.setAttribute('content', theme);
-
         try { document.documentElement.style.backgroundColor = pageBg; } catch (_) { }
         try { document.body && (document.body.style.backgroundColor = pageBg); } catch (_) { }
-
         const toRgb = (hex) => {
           const h = hex.replace('#', '').trim();
-          if (h.length === 3) {
-            const r = parseInt(h[0] + h[0], 16);
-            const g = parseInt(h[1] + h[1], 16);
-            const b = parseInt(h[2] + h[2], 16);
-            return [r, g, b];
-          } else if (h.length === 6) {
-            const r = parseInt(h.substring(0, 2), 16);
-            const g = parseInt(h.substring(2, 4), 16);
-            const b = parseInt(h.substring(4, 6), 16);
-            return [r, g, b];
-          }
+          if (h.length === 3) return [h[0] + h[0], h[1] + h[1], h[2] + h[2]].map(v => parseInt(v, 16));
+          if (h.length === 6) return [h.substring(0, 2), h.substring(2, 4), h.substring(4, 6)].map(v => parseInt(v, 16));
           return null;
         };
         const rgb = /^#?[0-9a-fA-F]{3,6}$/.test(theme) ? toRgb(theme) : null;
@@ -72,9 +71,7 @@
           const [r, g, b] = rgb.map(v => v / 255);
           const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
           const appleMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
-          if (appleMeta) {
-            appleMeta.setAttribute('content', luminance < 0.5 ? 'black' : 'default');
-          }
+          if (appleMeta) appleMeta.setAttribute('content', luminance < 0.5 ? 'black' : 'default');
         }
       } catch (_) { }
     })();
@@ -104,16 +101,12 @@
   <div id="main-content">
     <header class="page-header">
       <button class="menu-btn" onclick="toggleSidebar()">&#9776;</button>
-      <h1>公演選択</h1>
+      <h1><span id="group-name"></span> 公演日時選択</h1>
     </header>
+
     <main class="container">
-      <p class="description">管理する公演を選択してください。</p>
-      <div class="grid-container">
-        <a class="grid-item" href="pages/timeslot.html?group=オーケストラ部">オーケストラ部</a>
-        <a class="grid-item" href="pages/timeslot.html?group=吹奏楽部">吹奏楽部</a>
-        <a class="grid-item" href="pages/timeslot.html?group=マーチング">マーチング</a>
-        <a class="grid-item" href="pages/timeslot.html?group=音楽部">音楽部</a>
-        <a class="grid-item" href="pages/timeslot.html?group=演劇部">演劇部</a>
+      <div id="timeslot-container">
+        <div class="loading">公演日時データを読み込み中...</div>
       </div>
     </main>
   </div>
@@ -137,21 +130,23 @@
     </div>
   </div>
 
-  <!-- 最適化されたスクリプトローダー（統合版） -->
-  <script type="module" src="assets/js/error-notification.js"></script>
-  <script type="module" src="assets/js/optimized-loader.js"></script>
-  <script type="module" src="assets/js/auth.js"></script>
+  <!-- 最適化されたスクリプトローダー -->
+  <script type="module" src="../assets/js/optimized-loader.js"></script>
+  <script type="module" src="../assets/js/auth.js"></script>
+  <script type="module" src="../assets/js/api-cache.js"></script>
+  <script type="module" src="../assets/js/optimized-api.js"></script>
+  <script type="module" src="../assets/js/ui-optimizer.js"></script>
 
   <!-- 既存のスクリプト（最適化されたローダーが管理） -->
-  <script type="module" src="assets/js/index-main.js"></script>
-  <script type="module" src="assets/js/pwa-install.js"></script>
-  <script type="module" src="assets/js/pwa-update.js"></script>
+  <script type="module" src="../assets/js/timeslot-main.js"></script>
+  <script type="module" src="../assets/js/pwa-install.js"></script>
+  <script type="module" src="../assets/js/pwa-update.js"></script>
 
   <!-- PWA Service Worker Registration -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
+        navigator.serviceWorker.register('../sw.js')
           .then((registration) => {
             console.log('SW registered: ', registration);
 
@@ -181,7 +176,7 @@
       });
     }
 
-    // 更新通知（レガシーUI）は無効化（PWAUpdateManagerの通知に一本化）
+    // 更新通知（レガシーUI）は無効化
     function showUpdateNotification() { return; }
 
     // 更新を適用
@@ -195,9 +190,7 @@
         });
       }
     }
-  </script>
 
-  <script>
     // URL管理システムの情報表示機能
     function refreshUrlInfo() {
       if (window.GasAPI && window.GasAPI.getUrlManagerInfo) {
@@ -216,13 +209,12 @@
             urlInfoText.textContent = `API URL: ${newInfo.index}/${newInfo.total}`;
           }
 
-          // URL変更アニメーションを表示（seats-main.jsの関数を使用）
-          console.log('[Index HTML] showUrlChangeAnimation 関数の存在確認:', typeof window.showUrlChangeAnimation);
+          // URL変更アニメーションを表示
           if (window.showUrlChangeAnimation) {
-            console.log('[Index HTML] アニメーション表示実行');
+            console.log('[Timeslot HTML] アニメーション表示実行');
             window.showUrlChangeAnimation(oldInfo.url, newInfo.url, 'random');
           } else {
-            console.warn('[Index HTML] showUrlChangeAnimation 関数が見つかりません');
+            console.warn('[Timeslot HTML] showUrlChangeAnimation 関数が見つかりません');
             // フォールバック: 直接アニメーション関数を定義
             showUrlChangeAnimationFallback(oldInfo.url, newInfo.url, 'random');
           }
@@ -269,7 +261,7 @@
       `;
 
       // アイコンとメッセージを設定
-      const icon = changeType === 'rotation' ? '' : '';
+      const icon = changeType === 'rotation' ? '↻' : '⚡';
       const message = changeType === 'rotation' ? 'API URL ローテーション' : 'API URL ランダム選択';
 
       // スクリプトIDを抽出（/macros/s/以降の部分）

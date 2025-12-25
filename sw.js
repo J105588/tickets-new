@@ -8,37 +8,37 @@ const CRITICAL_ASSETS = [
 	'./',
 	'./index.html',
 	'./manifest.json',
-	'./styles.css',
-	'./config.js',
-	'./optimized-loader.js'
+	'./assets/css/styles.css',
+	'./assets/js/config.js',
+	'./assets/js/optimized-loader.js'
 ];
 
 const SECONDARY_ASSETS = [
-	'./timeslot.html',
-	'./seats.html',
-	'./walkin.html',
-	'./sidebar.css',
-	'./seats.css',
-	'./walkin.css',
-	'./index-main.js',
-	'./timeslot-main.js',
-	'./seats-main.js',
-	'./walkin-main.js',
-	'./sidebar.js',
-	'./timeslot-schedules.js',
-	'./system-lock.js',
-	'./offline-sync-v2.js',
-	'./offline-sync-v2.css',
-	'./pwa-install.js',
-	'./api-cache.js',
-	'./optimized-api.js',
-	'./ui-optimizer.js',
-	'./performance-monitor.js',
-	'./supabase-api.js',
-	'./connection-recovery.js',
-	'./fallback-manager.js',
-	'./error-notification.js',
-	'./system-diagnostics.js'
+	'./pages/timeslot.html',
+	'./pages/seats.html',
+	'./pages/walkin.html',
+	'./assets/css/sidebar.css',
+	'./assets/css/seats.css',
+	'./assets/css/walkin.css',
+	'./assets/js/index-main.js',
+	'./assets/js/timeslot-main.js',
+	'./assets/js/seats-main.js',
+	'./assets/js/walkin-main.js',
+	'./assets/js/sidebar.js',
+	'./assets/js/timeslot-schedules.js',
+	'./assets/js/system-lock.js',
+	'./assets/js/offline-sync-v2.js',
+	'./assets/css/offline-sync-v2.css',
+	'./assets/js/pwa-install.js',
+	'./assets/js/api-cache.js',
+	'./assets/js/optimized-api.js',
+	'./assets/js/ui-optimizer.js',
+	'./assets/js/performance-monitor.js',
+	'./assets/js/supabase-api.js',
+	'./assets/js/connection-recovery.js',
+	'./assets/js/fallback-manager.js',
+	'./assets/js/error-notification.js',
+	'./assets/js/system-diagnostics.js'
 ];
 
 self.addEventListener('install', (event) => {
@@ -46,21 +46,21 @@ self.addEventListener('install', (event) => {
 		caches.open(CACHE_NAME)
 			.then(async cache => {
 				// クリティカルアセットを優先的にキャッシュ
-				try { 
-					await cache.addAll(CRITICAL_ASSETS); 
+				try {
+					await cache.addAll(CRITICAL_ASSETS);
 					console.log('Critical assets cached successfully');
 				} catch (e) {
 					console.warn('Critical cache failed:', e);
 				}
-				
+
 				// セカンダリアセットはバックグラウンドでキャッシュ
 				setTimeout(async () => {
 					const batchSize = 3; // iOS対応: バッチサイズをさらに削減
 					for (let i = 0; i < SECONDARY_ASSETS.length; i += batchSize) {
 						const batch = SECONDARY_ASSETS.slice(i, i + batchSize);
-						try { 
-							await cache.addAll(batch); 
-							console.log(`Secondary batch ${Math.floor(i/batchSize) + 1} cached`);
+						try {
+							await cache.addAll(batch);
+							console.log(`Secondary batch ${Math.floor(i / batchSize) + 1} cached`);
 						} catch (e) {
 							console.warn('Secondary cache batch failed:', e);
 						}
@@ -69,7 +69,7 @@ self.addEventListener('install', (event) => {
 					}
 				}, 1000);
 			})
-			.catch(() => {})
+			.catch(() => { })
 	);
 	// 即時有効化
 	self.skipWaiting();
@@ -95,14 +95,14 @@ self.addEventListener('message', (event) => {
 	// ランタイムで自己修復を切り替え
 	if (event.data && event.data.type === 'SET_SELF_HEAL') {
 		SELF_HEAL_ENABLED = !!event.data.enabled;
-		try { console.log('[SW] SELF_HEAL_ENABLED =', SELF_HEAL_ENABLED); } catch(_) {}
+		try { console.log('[SW] SELF_HEAL_ENABLED =', SELF_HEAL_ENABLED); } catch (_) { }
 	}
 	// 最高管理者モード登録/解除
 	if (event.data && event.data.type === 'REGISTER_SUPERADMIN') {
-		try { const id = (event.source && event.source.id) || (event.clientId) || null; if (id) SUPERADMIN_CLIENT_IDS.add(id); } catch(_) {}
+		try { const id = (event.source && event.source.id) || (event.clientId) || null; if (id) SUPERADMIN_CLIENT_IDS.add(id); } catch (_) { }
 	}
 	if (event.data && event.data.type === 'UNREGISTER_SUPERADMIN') {
-		try { const id = (event.source && event.source.id) || (event.clientId) || null; if (id) SUPERADMIN_CLIENT_IDS.delete(id); } catch(_) {}
+		try { const id = (event.source && event.source.id) || (event.clientId) || null; if (id) SUPERADMIN_CLIENT_IDS.delete(id); } catch (_) { }
 	}
 	// FULLアラートを全クライアントへブロードキャスト
 	if (event.data && event.data.type === 'FULL_ALERT') {
@@ -110,13 +110,13 @@ self.addEventListener('message', (event) => {
 		event.waitUntil((async () => {
 			try {
 				const clients = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
-				clients.forEach(c => { try { if (SUPERADMIN_CLIENT_IDS.has(c.id)) { c.postMessage(payload); } } catch(_) {} });
+				clients.forEach(c => { try { if (SUPERADMIN_CLIENT_IDS.has(c.id)) { c.postMessage(payload); } } catch (_) { } });
 				if (self.registration.showNotification && Notification && Notification.permission === 'granted') {
 					const title = '満席になりました';
 					const body = `${payload.group} ${payload.day}-${payload.timeslot} が満席になりました`;
 					await self.registration.showNotification(title, { body, tag: 'full-alert', renotify: true });
 				}
-			} catch (_) {}
+			} catch (_) { }
 		})());
 	}
 });
@@ -127,7 +127,7 @@ self.addEventListener('message', (event) => {
 		// クライアントに更新通知を送信
 		self.clients.matchAll().then(clients => {
 			clients.forEach(client => {
-				client.postMessage({ 
+				client.postMessage({
 					type: 'UPDATE_AVAILABLE',
 					version: CACHE_NAME,
 					timestamp: Date.now()
@@ -179,7 +179,7 @@ self.addEventListener('fetch', (event) => {
 						const clone = response.clone();
 						const cache = await caches.open(CACHE_NAME);
 						await cache.put(req, clone);
-					} catch (_) {}
+					} catch (_) { }
 				})());
 
 				return response;
@@ -201,7 +201,7 @@ self.addEventListener('fetch', (event) => {
 		caches.match(req).then(cached => {
 			const fetchPromise = fetch(req)
 				.then(res => {
-					try { const clone = res.clone(); caches.open(CACHE_NAME).then(c => c.put(req, clone)).catch(() => {}); } catch (_) {}
+					try { const clone = res.clone(); caches.open(CACHE_NAME).then(c => c.put(req, clone)).catch(() => { }); } catch (_) { }
 					return res;
 				})
 				.catch(async (err) => {
@@ -211,8 +211,8 @@ self.addEventListener('fetch', (event) => {
 							const cache = await caches.open(CACHE_NAME);
 							await cache.delete(req);
 							// 削除後に再取得を試行（待たない）
-							event.waitUntil(fetch(req).then(r => cache.put(req, r.clone())).catch(() => {}));
-						} catch (_) {}
+							event.waitUntil(fetch(req).then(r => cache.put(req, r.clone())).catch(() => { }));
+						} catch (_) { }
 					}
 					return cached || new Response('', { status: 504 });
 				});

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,41 +9,41 @@
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="../assets/css/styles.css">
     <script>
-      (async () => {
-        try {
-          const res = await fetch('manifest.json', { cache: 'no-store' });
-          const manifest = await res.json();
-          const bg = (manifest && (manifest.background_color || manifest.theme_color)) || null;
-          if (!bg) return;
-          const theme = bg;
-          const isWhite = (typeof bg === 'string') && (/^#?([fF]{3}|[fF]{6})$/.test(bg) || bg.toLowerCase() === 'white');
-          const pageBg = isWhite ? '#f5f6f8' : bg;
-          let themeMeta = document.querySelector('meta[name="theme-color"]');
-          if (!themeMeta) {
-            themeMeta = document.createElement('meta');
-            themeMeta.setAttribute('name', 'theme-color');
-            document.head.appendChild(themeMeta);
-          }
-          themeMeta.setAttribute('content', theme);
-          try { document.documentElement.style.backgroundColor = pageBg; } catch (_) {}
-          try { document.body && (document.body.style.backgroundColor = pageBg); } catch (_) {}
-          const toRgb = (hex) => {
-            const h = hex.replace('#','').trim();
-            if (h.length === 3) return [h[0]+h[0], h[1]+h[1], h[2]+h[2]].map(v=>parseInt(v,16));
-            if (h.length === 6) return [h.substring(0,2),h.substring(2,4),h.substring(4,6)].map(v=>parseInt(v,16));
-            return null;
-          };
-          const rgb = /^#?[0-9a-fA-F]{3,6}$/.test(theme) ? toRgb(theme) : null;
-          if (rgb) {
-            const [r,g,b] = rgb.map(v => v / 255);
-            const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-            const appleMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
-            if (appleMeta) appleMeta.setAttribute('content', luminance < 0.5 ? 'black' : 'default');
-          }
-        } catch (_) {}
-      })();
+        (async () => {
+            try {
+                const res = await fetch('../manifest.json', { cache: 'no-store' });
+                const manifest = await res.json();
+                const bg = (manifest && (manifest.background_color || manifest.theme_color)) || null;
+                if (!bg) return;
+                const theme = bg;
+                const isWhite = (typeof bg === 'string') && (/^#?([fF]{3}|[fF]{6})$/.test(bg) || bg.toLowerCase() === 'white');
+                const pageBg = isWhite ? '#f5f6f8' : bg;
+                let themeMeta = document.querySelector('meta[name="theme-color"]');
+                if (!themeMeta) {
+                    themeMeta = document.createElement('meta');
+                    themeMeta.setAttribute('name', 'theme-color');
+                    document.head.appendChild(themeMeta);
+                }
+                themeMeta.setAttribute('content', theme);
+                try { document.documentElement.style.backgroundColor = pageBg; } catch (_) { }
+                try { document.body && (document.body.style.backgroundColor = pageBg); } catch (_) { }
+                const toRgb = (hex) => {
+                    const h = hex.replace('#', '').trim();
+                    if (h.length === 3) return [h[0] + h[0], h[1] + h[1], h[2] + h[2]].map(v => parseInt(v, 16));
+                    if (h.length === 6) return [h.substring(0, 2), h.substring(2, 4), h.substring(4, 6)].map(v => parseInt(v, 16));
+                    return null;
+                };
+                const rgb = /^#?[0-9a-fA-F]{3,6}$/.test(theme) ? toRgb(theme) : null;
+                if (rgb) {
+                    const [r, g, b] = rgb.map(v => v / 255);
+                    const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+                    const appleMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+                    if (appleMeta) appleMeta.setAttribute('content', luminance < 0.5 ? 'black' : 'default');
+                }
+            } catch (_) { }
+        })();
     </script>
     <style>
         .monitoring-dashboard {
@@ -58,7 +59,7 @@
             padding: 20px;
             border-radius: 12px;
             margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         }
 
         .dashboard-title {
@@ -84,7 +85,7 @@
             background: white;
             padding: 20px;
             border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             border-left: 4px solid;
             transition: transform 0.2s ease;
         }
@@ -93,10 +94,21 @@
             transform: translateY(-2px);
         }
 
-        .status-card.full { border-left-color: #e74c3c; }
-        .status-card.critical { border-left-color: #f39c12; }
-        .status-card.warning { border-left-color: #f1c40f; }
-        .status-card.normal { border-left-color: #27ae60; }
+        .status-card.full {
+            border-left-color: #e74c3c;
+        }
+
+        .status-card.critical {
+            border-left-color: #f39c12;
+        }
+
+        .status-card.warning {
+            border-left-color: #f1c40f;
+        }
+
+        .status-card.normal {
+            border-left-color: #27ae60;
+        }
 
         .status-card h3 {
             margin: 0 0 10px 0;
@@ -120,7 +132,7 @@
             background: white;
             padding: 20px;
             border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             margin-bottom: 30px;
         }
 
@@ -224,7 +236,8 @@
             color: #333;
         }
 
-        .control-group input, .control-group select {
+        .control-group input,
+        .control-group select {
             padding: 10px;
             border: 2px solid #e1e5e9;
             border-radius: 8px;
@@ -232,7 +245,8 @@
             transition: border-color 0.2s ease;
         }
 
-        .control-group input:focus, .control-group select:focus {
+        .control-group input:focus,
+        .control-group select:focus {
             outline: none;
             border-color: #667eea;
         }
@@ -303,21 +317,32 @@
             background: white;
             padding: 15px;
             border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             border-left: 4px solid;
             transition: all 0.2s ease;
         }
 
         .timeslot-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
             cursor: pointer;
         }
 
-        .timeslot-card.full { border-left-color: #e74c3c; }
-        .timeslot-card.critical { border-left-color: #f39c12; }
-        .timeslot-card.warning { border-left-color: #f1c40f; }
-        .timeslot-card.normal { border-left-color: #27ae60; }
+        .timeslot-card.full {
+            border-left-color: #e74c3c;
+        }
+
+        .timeslot-card.critical {
+            border-left-color: #f39c12;
+        }
+
+        .timeslot-card.warning {
+            border-left-color: #f1c40f;
+        }
+
+        .timeslot-card.normal {
+            border-left-color: #27ae60;
+        }
 
         .timeslot-header {
             display: flex;
@@ -340,10 +365,25 @@
             text-transform: uppercase;
         }
 
-        .capacity-badge.full { background: #e74c3c; color: white; }
-        .capacity-badge.critical { background: #f39c12; color: white; }
-        .capacity-badge.warning { background: #f1c40f; color: #333; }
-        .capacity-badge.normal { background: #27ae60; color: white; }
+        .capacity-badge.full {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .capacity-badge.critical {
+            background: #f39c12;
+            color: white;
+        }
+
+        .capacity-badge.warning {
+            background: #f1c40f;
+            color: #333;
+        }
+
+        .capacity-badge.normal {
+            background: #27ae60;
+            color: white;
+        }
 
         .timeslot-stats {
             display: grid;
@@ -382,10 +422,21 @@
             transition: width 0.3s ease;
         }
 
-        .progress-bar.full { background: #e74c3c; }
-        .progress-bar.critical { background: #f39c12; }
-        .progress-bar.warning { background: #f1c40f; }
-        .progress-bar.normal { background: #27ae60; }
+        .progress-bar.full {
+            background: #e74c3c;
+        }
+
+        .progress-bar.critical {
+            background: #f39c12;
+        }
+
+        .progress-bar.warning {
+            background: #f1c40f;
+        }
+
+        .progress-bar.normal {
+            background: #27ae60;
+        }
 
         .last-updated {
             font-size: 12px;
@@ -397,7 +448,7 @@
             background: white;
             padding: 20px;
             border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             margin-bottom: 30px;
         }
 
@@ -446,8 +497,13 @@
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         .error-message {
@@ -472,7 +528,7 @@
             background: white;
             padding: 20px;
             border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             margin-bottom: 30px;
         }
 
@@ -484,9 +540,17 @@
             border-radius: 0 8px 8px 0;
         }
 
-        .notification-item.high { border-left-color: #e74c3c; }
-        .notification-item.medium { border-left-color: #f39c12; }
-        .notification-item.low { border-left-color: #27ae60; }
+        .notification-item.high {
+            border-left-color: #e74c3c;
+        }
+
+        .notification-item.medium {
+            border-left-color: #f39c12;
+        }
+
+        .notification-item.low {
+            border-left-color: #27ae60;
+        }
 
         .notification-text {
             font-weight: 600;
@@ -504,7 +568,7 @@
             background: white;
             padding: 20px;
             border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             margin-bottom: 30px;
         }
 
@@ -549,7 +613,7 @@
             background: #95a5a6;
             cursor: not-allowed;
             transform: none;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
 
         .class-button.loading::after {
@@ -560,7 +624,7 @@
             width: 20px;
             height: 20px;
             margin: -10px 0 0 -10px;
-            border: 2px solid rgba(255,255,255,0.3);
+            border: 2px solid rgba(255, 255, 255, 0.3);
             border-top: 2px solid white;
             border-radius: 50%;
             animation: spin 1s linear infinite;
@@ -640,9 +704,17 @@
         }
 
         @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
+            0% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+
+            100% {
+                opacity: 1;
+            }
         }
 
         /* モーダルスタイル */
@@ -676,6 +748,7 @@
                 opacity: 0;
                 transform: translateY(-20px) scale(0.95);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0) scale(1);
@@ -822,71 +895,72 @@
             .monitoring-dashboard {
                 padding: 10px;
             }
-            
+
             .dashboard-title {
                 font-size: 24px;
             }
-            
+
             .status-indicators {
                 grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             }
-            
+
             .timeslots-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .controls-grid {
                 grid-template-columns: 1fr;
             }
-            
+
             .class-buttons-container {
                 grid-template-columns: 1fr;
             }
-            
+
             .class-button {
                 padding: 15px;
                 font-size: 14px;
             }
-            
+
             .class-button .class-name {
                 font-size: 16px;
             }
-            
+
             .class-button .class-stats {
                 font-size: 13px;
             }
-            
+
             .class-button .class-description {
                 font-size: 11px;
             }
-            
+
             .modal-content {
                 margin: 10px;
                 max-height: 95vh;
             }
-            
+
             .modal-header {
                 padding: 15px;
             }
-            
+
             .modal-title {
                 font-size: 18px;
             }
-            
+
             .modal-body {
                 padding: 20px;
             }
-            
+
             .performance-details {
                 grid-template-columns: 1fr;
             }
-            
+
             .detail-stats {
                 grid-template-columns: 1fr 1fr;
             }
         }
     </style>
 </head>
+
 <body>
     <div class="monitoring-dashboard">
         <div class="dashboard-header">
@@ -943,16 +1017,18 @@
                     <span class="status-indicator" id="monitoring-status-indicator">停止中</span>
                 </div>
             </div>
-            
+
             <!-- GAS URL 情報とローテーション操作 -->
-            <div id="api-url-panel" style="margin-bottom:12px;background:#f8f9fa;border:1px solid #e1e5e9;border-radius:8px;padding:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <div id="api-url-panel"
+                style="margin-bottom:12px;background:#f8f9fa;border:1px solid #e1e5e9;border-radius:8px;padding:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
                 <span style="font-weight:600;color:#333;">接続先GAS:</span>
-                <span id="api-url-label" style="font-family:monospace;font-size:12px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:540px;">--</span>
+                <span id="api-url-label"
+                    style="font-family:monospace;font-size:12px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:540px;">--</span>
                 <span id="api-url-meta" style="font-size:12px;color:#666;">(--)</span>
                 <button id="api-url-refresh" class="btn btn-secondary" style="padding:6px 10px;">更新</button>
                 <button id="api-url-random" class="btn btn-secondary" style="padding:6px 10px;">ランダム切替</button>
             </div>
-            
+
             <div class="controls-grid">
                 <div class="control-group">
                     <label for="check-interval">チェック間隔 (秒)</label>
@@ -975,7 +1051,7 @@
                     <small class="control-hint">同じ公演への重複通知を防ぐ</small>
                 </div>
             </div>
-            
+
             <div class="control-buttons">
                 <button class="btn btn-primary" id="start-monitoring">
                     <span class="btn-icon">▶</span>
@@ -1002,7 +1078,7 @@
                     テスト通知
                 </button>
             </div>
-            
+
             <div class="quick-settings">
                 <h4>クイック設定</h4>
                 <div class="quick-buttons">
@@ -1079,7 +1155,7 @@
                 this.latestTimeslotMap = new Map();
                 this.urlRotationInterval = null;
                 this.offlineCheckInterval = null;
-                
+
                 this.initializeElements();
                 this.bindEvents();
                 this.loadInitialData();
@@ -1121,12 +1197,12 @@
                 this.elements.updateSettings.addEventListener('click', () => this.updateSettings());
                 this.elements.clearHistory.addEventListener('click', () => this.clearHistory());
                 this.elements.testNotification.addEventListener('click', () => this.testNotification());
-                
+
                 // クイック設定ボタン
                 document.querySelectorAll('.btn-quick').forEach(btn => {
                     btn.addEventListener('click', (e) => this.handleQuickSetting(e.target));
                 });
-                
+
                 // 設定値の変更を監視
                 this.elements.checkInterval.addEventListener('change', () => this.updateStatusIndicator());
                 this.elements.warningThreshold.addEventListener('change', () => this.updateStatusIndicator());
@@ -1146,7 +1222,7 @@
                 // GAS URL 情報
                 this.elements.apiUrlRefresh.addEventListener('click', () => this.refreshUrlInfo());
                 this.elements.apiUrlRandom.addEventListener('click', async () => {
-                    try { await GasAPI.selectRandomUrl(); } catch (_) {}
+                    try { await GasAPI.selectRandomUrl(); } catch (_) { }
                     await this.refreshUrlInfo();
                 });
                 // 初期表示
@@ -1156,13 +1232,13 @@
             async loadInitialData() {
                 try {
                     this.showLoading();
-                    
+
                     // ネットワーク接続状態をチェック
                     if (!this.checkNetworkConnection()) {
                         await this.handleOfflineMode();
                         return;
                     }
-                    
+
                     // まずグループ一覧を取得し、グループ単位で詳細分析を集約
                     let allTimeslots = [];
                     let summaryAgg = { totalTimeslots: 0, fullCapacity: 0, warningCapacity: 0, criticalCapacity: 0, normalCapacity: 0, totalSeats: 0, totalOccupied: 0, totalEmpty: 0 };
@@ -1217,12 +1293,12 @@
                             await this.loadWithFallback('データの読み込みに失敗しました: ' + (response.message || ''));
                         }
                     }
-                    
+
                     // クラス別分析の初期化
                     await this.initializeClassAnalysis();
                 } catch (error) {
                     console.error('Initial data load error:', error);
-                    
+
                     // ネットワークエラーの場合は特別な処理
                     if (this.isNetworkError(error)) {
                         await this.handleNetworkError(error);
@@ -1230,7 +1306,7 @@
                         // フォールバック: タイムアウト/ネットワーク例外時
                         await this.loadWithFallback('データの読み込み中にエラーが発生しました: ' + error.message);
                     }
-                    
+
                     // エラー時もクラス別分析を試行
                     await this.initializeClassAnalysis();
                 }
@@ -1307,17 +1383,17 @@
                 try {
                     // 設定を更新
                     await this.updateSettings();
-                    
+
                     // 監視開始
                     enhancedStatusMonitor.start();
                     this.isMonitoring = true;
-                    
+
                     // 定期更新を開始
                     this.startPeriodicUpdate();
-                    
+
                     this.elements.startMonitoring.disabled = true;
                     this.elements.stopMonitoring.disabled = false;
-                    
+
                     this.updateStatusIndicator();
                     this.showSuccess('監視を開始しました');
                 } catch (error) {
@@ -1328,15 +1404,15 @@
             stopMonitoring() {
                 enhancedStatusMonitor.stop();
                 this.isMonitoring = false;
-                
+
                 if (this.updateInterval) {
                     clearInterval(this.updateInterval);
                     this.updateInterval = null;
                 }
-                
+
                 this.elements.startMonitoring.disabled = false;
                 this.elements.stopMonitoring.disabled = true;
-                
+
                 this.updateStatusIndicator();
                 this.showSuccess('監視を停止しました');
             }
@@ -1360,16 +1436,16 @@
                         criticalThreshold: parseInt(this.elements.criticalThreshold.value),
                         notificationCooldown: parseInt(this.elements.cooldownPeriod.value) * 60 * 1000
                     };
-                    
+
                     enhancedStatusMonitor.updateCapacityThresholds({
                         warning: settings.warningThreshold,
                         critical: settings.criticalThreshold,
                         full: 0
                     });
-                    
+
                     enhancedStatusMonitor.setCheckInterval(settings.checkInterval);
                     enhancedStatusMonitor.setNotificationCooldown(settings.notificationCooldown);
-                    
+
                     this.showSuccess('設定を更新しました');
                 } catch (error) {
                     this.showError('設定更新に失敗しました: ' + error.message);
@@ -1449,7 +1525,7 @@
                 // 現在の設定値に基づいてクイックボタンの状態を更新
                 document.querySelectorAll('.btn-quick').forEach(btn => {
                     btn.classList.remove('active');
-                    
+
                     const interval = btn.dataset.interval;
                     const warning = btn.dataset.warning;
                     const critical = btn.dataset.critical;
@@ -1481,7 +1557,7 @@
                 if (this.updateInterval) {
                     clearInterval(this.updateInterval);
                 }
-                
+
                 const interval = parseInt(this.elements.checkInterval.value) * 1000;
                 this.updateInterval = setInterval(() => {
                     this.refreshInBackground();
@@ -1531,7 +1607,7 @@
                         if (!normalized.lastChecked) normalized.lastChecked = new Date();
                         this.latestTimeslotMap.set(id, normalized);
                     }
-                } catch (_) {}
+                } catch (_) { }
             }
 
             getAbnormalTimeslots() {
@@ -1565,7 +1641,7 @@
                         this.lastEmailSignature = signature;
                         this.nextEmailCheckAt = Date.now() + 5 * 60 * 1000;
                     });
-                } catch (_) {}
+                } catch (_) { }
             }
 
             buildAbnormalSignature(abnormal) {
@@ -1670,7 +1746,7 @@
 
             updateDashboard() {
                 if (!this.currentData) return;
-                
+
                 this.updateStatusIndicators();
                 this.updateStatistics();
                 this.updateTimeslotsGrid();
@@ -1701,9 +1777,9 @@
                         try {
                             await GasAPI.selectRandomUrl();
                             await this.refreshUrlInfo(false);
-                        } catch (_) {}
+                        } catch (_) { }
                     }, ROTATE_MS);
-                } catch (_) {}
+                } catch (_) { }
             }
 
             notifyNewClasses(data) {
@@ -1726,7 +1802,7 @@
 
             updateStatusIndicators() {
                 const summary = this.currentData.summary;
-                
+
                 document.getElementById('full-count').textContent = summary.fullCapacity;
                 document.getElementById('critical-count').textContent = summary.criticalCapacity;
                 document.getElementById('warning-count').textContent = summary.warningCapacity;
@@ -1735,11 +1811,11 @@
 
             updateStatistics() {
                 const stats = enhancedStatusMonitor.getStatistics();
-                
+
                 document.getElementById('total-checks').textContent = stats.totalChecks;
                 document.getElementById('total-notifications').textContent = stats.totalNotifications;
                 document.getElementById('average-empty').textContent = stats.averageEmptySeats.toFixed(1);
-                
+
                 if (stats.lastCheckTime) {
                     const time = new Date(stats.lastCheckTime).toLocaleTimeString('ja-JP', {
                         hour: '2-digit',
@@ -1755,11 +1831,11 @@
                     // 初回のみ空表示に切り替え
                     const existingGrid = this.elements.timeslotsContainer.querySelector('#timeslots-grid');
                     if (!existingGrid) {
-                    this.elements.timeslotsContainer.innerHTML = '<div class="loading">公演データがありません</div>';
+                        this.elements.timeslotsContainer.innerHTML = '<div class="loading">公演データがありません</div>';
                     }
                     return;
                 }
-                
+
                 // グリッド要素を確保（無ければ一度だけ作成）
                 let gridEl = this.elements.timeslotsContainer.querySelector('#timeslots-grid');
                 if (!gridEl) {
@@ -1815,11 +1891,11 @@
                         body.innerHTML = '<p style="color:#666;text-align:center;padding:24px;">該当する公演はありません</p>';
                     } else {
                         const items = list
-                          .sort((a,b) => String(a.group).localeCompare(String(b.group)) || String(a.day).localeCompare(String(b.day)) || String(a.timeslot).localeCompare(String(b.timeslot)))
-                          .map(t => {
-                            const remain = `${Number.isFinite(t.emptySeats) ? t.emptySeats : 0}/${Number.isFinite(t.totalSeats) ? t.totalSeats : 0}`;
-                            const last = t.lastChecked ? new Date(t.lastChecked).toLocaleString('ja-JP') : '-';
-                            return `<div style="border:1px solid #e1e5e9;border-left:4px solid;${this.statusBorderColor(level)};border-radius:8px;padding:12px;margin:8px 0;background:#f8f9fa;">
+                            .sort((a, b) => String(a.group).localeCompare(String(b.group)) || String(a.day).localeCompare(String(b.day)) || String(a.timeslot).localeCompare(String(b.timeslot)))
+                            .map(t => {
+                                const remain = `${Number.isFinite(t.emptySeats) ? t.emptySeats : 0}/${Number.isFinite(t.totalSeats) ? t.totalSeats : 0}`;
+                                const last = t.lastChecked ? new Date(t.lastChecked).toLocaleString('ja-JP') : '-';
+                                return `<div style="border:1px solid #e1e5e9;border-left:4px solid;${this.statusBorderColor(level)};border-radius:8px;padding:12px;margin:8px 0;background:#f8f9fa;">
                                 <div style="display:flex;justify-content:space-between;align-items:center;">
                                     <div style="font-weight:600;">${t.group} ${String(t.day)}日目 ${t.timeslot}</div>
                                     <span style="font-size:12px;color:#666;">${last}</span>
@@ -1827,7 +1903,7 @@
                                 <div style="margin-top:8px;color:#333;">現在の状況：${this.getCapacityLevelText(level)}</div>
                                 <div style="margin-top:4px;color:#333;">残り：${remain} 席</div>
                             </div>`;
-                          }).join('');
+                            }).join('');
                         body.innerHTML = items;
                     }
 
@@ -1883,12 +1959,12 @@
                     <p class="last-updated"></p>
                     <p class="click-hint" style="font-size: 12px; color: #667eea; text-align: center; margin: 8px 0 0 0; font-weight: 500;">クリックで詳細表示</p>
                 `;
-                
+
                 // クリックイベントを追加
                 el.addEventListener('click', () => {
                     this.showPerformanceDetailsModal(timeslot);
                 });
-                
+
                 this.updateTimeslotCard(el, timeslot);
                 return el;
             }
@@ -1902,7 +1978,7 @@
                     const last = new Date(timeslot.lastChecked).getTime();
                     const intervalMs = (parseInt(this.elements.checkInterval.value) || 15) * 1000;
                     if (Date.now() - last > intervalMs * 2) isStale = true;
-                } catch (_) {}
+                } catch (_) { }
                 cardEl.className = `timeslot-card ${capacityLevel}${isStale ? ' stale' : ''}`;
 
                 const titleEl = cardEl.querySelector('.timeslot-title');
@@ -1944,14 +2020,14 @@
                     this.elements.notificationList.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">通知履歴がありません</p>';
                     return;
                 }
-                
+
                 const history = this.notificationHistory.map(notification => `
                     <div class="notification-item ${notification.priority}">
                         <p class="notification-text">${notification.message}</p>
                         <p class="notification-time">${new Date(notification.timestamp).toLocaleString('ja-JP')}</p>
                     </div>
                 `).join('');
-                
+
                 this.elements.notificationList.innerHTML = history;
             }
 
@@ -1963,7 +2039,7 @@
                 this.elements.errorMessage.textContent = message;
                 this.elements.errorContainer.style.display = 'block';
                 this.elements.successContainer.style.display = 'none';
-                
+
                 setTimeout(() => {
                     this.elements.errorContainer.style.display = 'none';
                 }, 5000);
@@ -1973,7 +2049,7 @@
                 this.elements.successMessage.textContent = message;
                 this.elements.successContainer.style.display = 'block';
                 this.elements.errorContainer.style.display = 'none';
-                
+
                 setTimeout(() => {
                     this.elements.successContainer.style.display = 'none';
                 }, 3000);
@@ -1984,11 +2060,11 @@
                     // モーダルオーバーレイを作成
                     const overlay = document.createElement('div');
                     overlay.className = 'modal-overlay';
-                    
+
                     // モーダルコンテンツを作成
                     const modal = document.createElement('div');
                     modal.className = 'modal-content';
-                    
+
                     // ヘッダー
                     const header = document.createElement('div');
                     header.className = 'modal-header';
@@ -1996,17 +2072,17 @@
                         <h2 class="modal-title">${timeslot.group} ${timeslot.day}日目 ${timeslot.timeslot} - 詳細データ</h2>
                         <button class="modal-close">&times;</button>
                     `;
-                    
+
                     // ボディ（ローディング状態）
                     const body = document.createElement('div');
                     body.className = 'modal-body';
                     body.innerHTML = '<div class="loading-modal">詳細データを読み込み中...</div>';
-                    
+
                     modal.appendChild(header);
                     modal.appendChild(body);
                     overlay.appendChild(modal);
                     document.body.appendChild(overlay);
-                    
+
                     // 閉じるボタンのイベント
                     const closeBtn = header.querySelector('.modal-close');
                     const closeModal = () => {
@@ -2016,7 +2092,7 @@
                     overlay.addEventListener('click', (e) => {
                         if (e.target === overlay) closeModal();
                     });
-                    
+
                     // 詳細データを取得
                     try {
                         const detailedData = await this.getDetailedSeatData(timeslot);
@@ -2033,7 +2109,7 @@
                             </div>
                         `;
                     }
-                    
+
                 } catch (error) {
                     console.error('Modal creation failed:', error);
                     this.showError('モーダルの表示に失敗しました: ' + error.message);
@@ -2042,24 +2118,24 @@
 
             async getDetailedSeatData(timeslot, retryCount = 0) {
                 const maxRetries = 2;
-                
+
                 try {
                     console.log(`Fetching detailed seat data for: ${timeslot.day}日目 ${timeslot.timeslot} (attempt ${retryCount + 1})`);
-                    
+
                     // タイムアウト付きでAPI呼び出し（クラス分析用に延長）
                     const timeoutPromise = new Promise((_, reject) => {
                         setTimeout(() => reject(new Error('API呼び出しがタイムアウトしました')), 8000);
                     });
-                    
+
                     const apiPromise = GasAPI.getSeatData(timeslot.group, timeslot.day, timeslot.timeslot, true, true);
                     const response = await Promise.race([apiPromise, timeoutPromise]);
-                    
+
                     console.log('API response:', response);
-                    
+
                     if (!response || !response.success) {
                         throw new Error(response?.message || response?.error || 'データ取得に失敗しました');
                     }
-                    
+
                     // seatMap形式のデータを配列形式に変換
                     let seatData = null;
                     if (response.seatMap && typeof response.seatMap === 'object') {
@@ -2072,50 +2148,50 @@
                     } else {
                         throw new Error('座席データの形式が正しくありません');
                     }
-                    
+
                     if (!seatData || seatData.length === 0) {
                         throw new Error('座席データが空です');
                     }
-                    
+
                     console.log('Converted seat data:', seatData);
                     return seatData;
                 } catch (error) {
                     console.error(`Detailed seat data fetch failed (attempt ${retryCount + 1}):`, error);
-                    
+
                     // リトライ可能な場合
                     if (retryCount < maxRetries) {
                         console.log(`Retrying in 1 second... (${retryCount + 1}/${maxRetries})`);
                         await new Promise(resolve => setTimeout(resolve, 1000));
                         return this.getDetailedSeatData(timeslot, retryCount + 1);
                     }
-                    
+
                     // フォールバック: 既存のデータから計算を試行
                     if (timeslot && timeslot.totalSeats > 0) {
                         console.log('Using fallback calculation with timeslot data');
                         return this.createFallbackSeatData(timeslot);
                     }
-                    
+
                     throw new Error(`座席データの取得に失敗しました: ${error.message}`);
                 }
             }
 
             convertSeatMapToArray(seatMap) {
                 const seatArray = [];
-                
+
                 console.log('Converting seatMap:', seatMap);
-                
+
                 for (const [seatId, seatInfo] of Object.entries(seatMap)) {
                     if (seatInfo && typeof seatInfo === 'object') {
                         console.log(`Processing seat ${seatId}:`, seatInfo);
-                        
+
                         // seatInfoから座席データを抽出（複数の可能性を試行）
                         const rowLabel = seatInfo.row || seatInfo.rowLabel || seatId.charAt(0);
                         const colLabel = seatInfo.col || seatInfo.colLabel || seatId.substring(1);
-                        
+
                         // ステータス値のマッピング（英語→日本語）
                         let statusC = seatInfo.statusC || seatInfo.status || seatInfo.c || '';
                         let statusE = seatInfo.statusE || seatInfo.checkIn || seatInfo.e || '';
-                        
+
                         // 英語のステータス値を日本語に変換
                         if (statusC === 'checked-in') {
                             statusC = '予約済';
@@ -2130,14 +2206,14 @@
                             statusC = '空';
                             statusE = '';
                         }
-                        
+
                         const nameD = seatInfo.nameD || seatInfo.name || seatInfo.d || '';
-                        
+
                         console.log(`Converted ${seatId}: C="${statusC}", E="${statusE}"`);
                         seatArray.push([rowLabel, colLabel, statusC, nameD, statusE]);
                     }
                 }
-                
+
                 console.log(`Converted ${seatArray.length} seats from seatMap`);
                 console.log('Sample converted data:', seatArray.slice(0, 5));
                 return seatArray;
@@ -2148,35 +2224,35 @@
                 const totalSeats = timeslot.totalSeats || 0;
                 const occupiedSeats = timeslot.occupiedSeats || 0;
                 const emptySeats = timeslot.emptySeats || 0;
-                
+
                 // 修正された推定ロジック（実際のデータがない場合のフォールバック）
                 const estimatedCheckedIn = Math.floor(occupiedSeats * 0.4); // 40%がチェックイン済みと仮定
                 const estimatedReservedWithoutCheckIn = occupiedSeats - estimatedCheckedIn; // 残りが未チェックイン
-                
+
                 const fallbackData = [];
-                
+
                 // 予約済み未チェックイン座席（C列が予約済かつE列が空）
                 const reservedWithoutCheckIn = Math.floor(estimatedReservedWithoutCheckIn * 0.7);
                 for (let i = 0; i < reservedWithoutCheckIn; i++) {
                     fallbackData.push(['A', i + 1, '予約済', '顧客名', '']);
                 }
-                
+
                 // 確保座席（C列が確保、E列の内容は関係なし）
                 const securedSeats = estimatedReservedWithoutCheckIn - reservedWithoutCheckIn;
                 for (let i = 0; i < securedSeats; i++) {
                     fallbackData.push(['B', i + 1, '確保', '顧客名', '']);
                 }
-                
+
                 // チェックイン済み座席（C列が予約済かつE列が済）
                 for (let i = 0; i < estimatedCheckedIn; i++) {
                     fallbackData.push(['C', i + 1, '予約済', '顧客名', '済']);
                 }
-                
+
                 // 空席
                 for (let i = 0; i < emptySeats; i++) {
                     fallbackData.push(['D', i + 1, '空', '', '']);
                 }
-                
+
                 console.log('Created fallback data:', fallbackData.length, 'seats');
                 console.log('Fallback breakdown:', {
                     reservedWithoutCheckIn: reservedWithoutCheckIn,
@@ -2191,10 +2267,10 @@
             renderPerformanceDetails(body, timeslot, detailedData) {
                 // 座席データを分析
                 const analysis = this.analyzeSeatData(detailedData);
-                
+
                 // データの整合性チェック
                 const dataConsistency = this.checkDataConsistency(timeslot, analysis);
-                
+
                 body.innerHTML = `
                     <div class="performance-details">
                         <div class="detail-card reserved">
@@ -2288,7 +2364,7 @@
 
             checkDataConsistency(timeslot, analysis) {
                 const warnings = [];
-                
+
                 console.log('Data consistency check:', {
                     dashboard: {
                         totalSeats: timeslot.totalSeats,
@@ -2303,39 +2379,39 @@
                         checkedInSeats: analysis.checkedInSeats
                     }
                 });
-                
+
                 // 総座席数の整合性チェック（ダッシュボードの総座席数と分析の総座席数を比較）
                 if (timeslot.totalSeats !== analysis.totalSeats) {
                     warnings.push(`総座席数が一致しません: ダッシュボード=${timeslot.totalSeats}, 詳細分析=${analysis.totalSeats}`);
                 }
-                
+
                 // 空席数の整合性チェック
                 if (timeslot.emptySeats !== analysis.emptySeats) {
                     warnings.push(`空席数が一致しません: ダッシュボード=${timeslot.emptySeats}, 詳細分析=${analysis.emptySeats}`);
                 }
-                
+
                 // 予約済み座席数の整合性チェック（ダッシュボードの占有席数と分析の予約済み座席数を比較）
                 const dashboardOccupied = timeslot.totalSeats - timeslot.emptySeats;
                 if (dashboardOccupied !== analysis.reservedSeats) {
                     warnings.push(`予約済み座席数が一致しません: ダッシュボード=${dashboardOccupied}, 詳細分析=${analysis.reservedSeats}`);
                 }
-                
+
                 // 処理済み座席数のチェック
                 if (analysis.processedSeats !== analysis.totalSeats) {
                     warnings.push(`処理済み座席数が総座席数と一致しません: 処理済み=${analysis.processedSeats}, 総数=${analysis.totalSeats}`);
                 }
-                
+
                 // チェックイン済み座席数の妥当性チェック
                 if (analysis.checkedInSeats > analysis.reservedSeats) {
                     warnings.push(`チェックイン済み座席数が予約済み座席数を超えています: チェックイン=${analysis.checkedInSeats}, 予約済み=${analysis.reservedSeats}`);
                 }
-                
+
                 return { warnings };
             }
 
             analyzeSeatData(seatData) {
                 console.log('Analyzing seat data:', seatData);
-                
+
                 if (!seatData || !Array.isArray(seatData)) {
                     console.warn('Invalid seat data provided');
                     return {
@@ -2360,41 +2436,41 @@
                     try {
                         // まず座席をカウント（無効なデータでもカウント）
                         totalSeats++;
-                        
+
                         if (!seat || !Array.isArray(seat)) {
                             validationErrors.push(`行${index + 1}: 無効な座席データ`);
                             return;
                         }
-                        
+
                         if (seat.length < 5) {
                             validationErrors.push(`行${index + 1}: データ列数不足 (${seat.length}列)`);
                             return;
                         }
-                        
+
                         const rowLabel = (seat[0] || '').toString().trim();
                         const colLabel = (seat[1] || '').toString().trim();
                         const statusC = (seat[2] || '').toString().trim();
                         const nameD = (seat[3] || '').toString().trim();
                         const statusE = (seat[4] || '').toString().trim();
-                        
+
                         // 有効な座席IDかチェック
                         if (!rowLabel || !colLabel) {
                             validationErrors.push(`行${index + 1}: 無効な座席ID (行: "${rowLabel}", 列: "${colLabel}")`);
                             return;
                         }
-                        
+
                         processedSeats++;
-                        
+
                         // 修正された分析ロジック（要求仕様に準拠）
                         // 1. 予約済み座席: C列が「予約済」または「確保」の座席数（E列は関係なし）
                         // 2. チェックイン済み座席: C列が「予約済」かつE列が「済」の座席数
                         // 3. 分母: 予約済み座席の計算は総座席数、チェックイン済み座席の計算は予約済み座席数
-                        
-                        if (statusC === '予約済' || statusC === '確保' || 
+
+                        if (statusC === '予約済' || statusC === '確保' ||
                             statusC === 'checked-in' || statusC === 'to-be-checked-in' || statusC === 'reserved') {
                             // 予約済み座席としてカウント（E列は関係なし）
                             reservedSeats++;
-                            
+
                             // チェックイン済みかどうかを判定
                             if ((statusC === '予約済' && statusE === '済') || statusC === 'checked-in') {
                                 checkedInSeats++;
@@ -2417,7 +2493,7 @@
                 if (calculatedTotal !== processedSeats) {
                     validationErrors.push(`座席数不一致: 計算値=${calculatedTotal}, 処理済み=${processedSeats}`);
                 }
-                
+
                 // チェックイン済み座席数の妥当性チェック
                 if (checkedInSeats > reservedSeats) {
                     validationErrors.push(`チェックイン済み座席数が予約済み座席数を超えています: チェックイン=${checkedInSeats}, 予約済み=${reservedSeats}`);
@@ -2478,7 +2554,7 @@
             // データからクラス一覧を抽出
             extractClassesFromData() {
                 const classes = new Set();
-                
+
                 // 現在のデータからクラスを抽出
                 if (this.currentData && this.currentData.timeslots) {
                     this.currentData.timeslots.forEach(timeslot => {
@@ -2542,18 +2618,18 @@
                     }
 
                     console.log(`Starting class analysis for group: ${group}`);
-                    
+
                     // プログレス表示を追加
                     this.showProgress(`クラス ${group} の分析を開始しています...`);
-                    
+
                     // 既存データから分析（API関数が存在しないため、直接フォールバック方式を使用）
                     const classData = await this.analyzeClassFromExistingData(group);
-                    
+
                     // プログレスを非表示
                     this.hideProgress();
-                    
+
                     this.showClassAnalysisModal(group, classData);
-                    
+
                 } catch (error) {
                     console.error('Class analysis failed:', error);
                     this.hideProgress();
@@ -2591,26 +2667,26 @@
 
                 // 各公演の詳細データを順次取得（API負荷軽減のため並行実行を制限）
                 const performances = [];
-                
+
                 for (let i = 0; i < classTimeslots.length; i++) {
                     const timeslot = classTimeslots[i];
-                    
+
                     // 前のリクエストが完了してから次のリクエストを開始
                     if (i > 0) {
                         await new Promise(resolve => setTimeout(resolve, 200));
                     }
-                    
+
                     try {
                         console.log(`Fetching seat data for ${timeslot.day}日目 ${timeslot.timeslot}...`);
-                        
+
                         // 実際のseatMapデータを取得
                         const seatData = await this.getDetailedSeatData(timeslot);
                         if (seatData && seatData.length > 0) {
                             console.log(`Successfully got seat data for ${timeslot.day}日目 ${timeslot.timeslot}: ${seatData.length} seats`);
-                            
+
                             // seatMapデータから正確なチェックイン情報を計算
                             const seatAnalysis = this.analyzeSeatData(seatData);
-                            
+
                             performances.push({
                                 day: timeslot.day,
                                 timeslot: timeslot.timeslot,
@@ -2626,11 +2702,11 @@
                             });
                         } else {
                             console.log(`No seat data available for ${timeslot.day}日目 ${timeslot.timeslot}, using fallback`);
-                            
+
                             // seatMapデータが取得できない場合は既存データを使用
                             const reservedSeats = timeslot.reservedSeats || 0;
                             const checkedInSeats = timeslot.checkedInSeats || 0;
-                            
+
                             performances.push({
                                 day: timeslot.day,
                                 timeslot: timeslot.timeslot,
@@ -2647,11 +2723,11 @@
                         }
                     } catch (error) {
                         console.error(`Failed to get detailed data for ${timeslot.day}日目 ${timeslot.timeslot}:`, error);
-                        
+
                         // エラー時は既存データを使用
                         const reservedSeats = timeslot.reservedSeats || 0;
                         const checkedInSeats = timeslot.checkedInSeats || 0;
-                        
+
                         performances.push({
                             day: timeslot.day,
                             timeslot: timeslot.timeslot,
@@ -2667,7 +2743,7 @@
                         });
                     }
                 }
-                
+
                 // 分析データを集計
                 performances.forEach(perf => {
                     analysis.totalSeats += perf.totalSeats;
@@ -2675,15 +2751,15 @@
                     analysis.totalEmptySeats += perf.emptySeats;
                     analysis.totalReservedSeats += perf.reservedSeats;
                     analysis.totalCheckedInSeats += perf.checkedInSeats;
-                    
+
                     const capacityLevel = perf.capacityLevel;
                     analysis.capacityLevels[capacityLevel]++;
-                    
+
                     analysis.performances.push(perf);
                 });
 
                 // クラス全体のチェックイン率を計算
-                analysis.overallCheckedInRate = analysis.totalReservedSeats > 0 ? 
+                analysis.overallCheckedInRate = analysis.totalReservedSeats > 0 ?
                     ((analysis.totalCheckedInSeats / analysis.totalReservedSeats) * 100).toFixed(1) : 0;
 
                 return analysis;
@@ -2693,28 +2769,28 @@
             showClassAnalysisModal(group, analysisData) {
                 const overlay = document.createElement('div');
                 overlay.className = 'modal-overlay';
-                
+
                 const modal = document.createElement('div');
                 modal.className = 'modal-content';
-                
+
                 const header = document.createElement('div');
                 header.className = 'modal-header';
                 header.innerHTML = `
                     <h2 class="modal-title">${group}組 - クラス別分析</h2>
                     <button class="modal-close">&times;</button>
                 `;
-                
+
                 const body = document.createElement('div');
                 body.className = 'modal-body';
-                
+
                 // 分析データをレンダリング
                 this.renderClassAnalysisContent(body, analysisData);
-                
+
                 modal.appendChild(header);
                 modal.appendChild(body);
                 overlay.appendChild(modal);
                 document.body.appendChild(overlay);
-                
+
                 // 閉じるボタンのイベント
                 const closeBtn = header.querySelector('.modal-close');
                 const closeModal = () => {
@@ -2728,7 +2804,7 @@
 
             // クラス分析コンテンツをレンダリング
             renderClassAnalysisContent(body, analysisData) {
-                const occupancyRate = analysisData.totalSeats > 0 ? 
+                const occupancyRate = analysisData.totalSeats > 0 ?
                     ((analysisData.totalOccupiedSeats / analysisData.totalSeats) * 100).toFixed(1) : 0;
 
                 body.innerHTML = `
@@ -2832,20 +2908,20 @@
                 if (!performances || performances.length === 0) {
                     return 'データなし';
                 }
-                
+
                 const sourceCounts = performances.reduce((acc, perf) => {
                     const source = perf.dataSource || 'unknown';
                     acc[source] = (acc[source] || 0) + 1;
                     return acc;
                 }, {});
-                
+
                 const sourceLabels = {
                     'seatMap': 'API (seatMap)',
                     'fallback': '推定データ',
                     'error': 'エラー時フォールバック',
                     'unknown': '不明'
                 };
-                
+
                 return Object.entries(sourceCounts)
                     .map(([source, count]) => `${sourceLabels[source] || source}: ${count}件`)
                     .join(', ');
@@ -2856,11 +2932,11 @@
                 if (!performances || performances.length === 0) {
                     return 'データなし';
                 }
-                
+
                 const seatMapCount = performances.filter(p => p.dataSource === 'seatMap').length;
                 const totalCount = performances.length;
                 const accuracy = totalCount > 0 ? Math.round((seatMapCount / totalCount) * 100) : 0;
-                
+
                 if (accuracy >= 80) {
                     return `高精度 (${accuracy}%がAPIデータ)`;
                 } else if (accuracy >= 50) {
@@ -2874,7 +2950,7 @@
             showProgress(message) {
                 // 既存のプログレスを削除
                 this.hideProgress();
-                
+
                 const progressDiv = document.createElement('div');
                 progressDiv.id = 'class-analysis-progress';
                 progressDiv.style.cssText = `
@@ -2896,9 +2972,9 @@
                         <div id="progress-bar" style="width: 0%; height: 100%; background: #4CAF50; transition: width 0.3s ease;"></div>
                     </div>
                 `;
-                
+
                 document.body.appendChild(progressDiv);
-                
+
                 // プログレスバーをアニメーション
                 setTimeout(() => {
                     const progressBar = document.getElementById('progress-bar');
@@ -2925,7 +3001,7 @@
                 return performances.map(perf => {
                     const capacityLevelText = this.getCapacityLevelText(perf.capacityLevel);
                     const lastChecked = perf.lastChecked ? new Date(perf.lastChecked).toLocaleString('ja-JP') : '-';
-                    
+
                     return `
                         <div style="border: 1px solid #e1e5e9; border-left: 4px solid ${this.getCapacityLevelColor(perf.capacityLevel)}; border-radius: 8px; padding: 12px; margin: 8px 0; background: white;">
                             <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -2963,7 +3039,7 @@
                     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
                         return false;
                     }
-                    
+
                     // 追加のネットワークチェック（オプション）
                     return true;
                 } catch (error) {
@@ -2975,7 +3051,7 @@
             // ネットワークエラーかどうかを判定
             isNetworkError(error) {
                 if (!error) return false;
-                
+
                 const errorMessage = error.message || error.toString();
                 const networkErrorPatterns = [
                     'ERR_NAME_NOT_RESOLVED',
@@ -2991,8 +3067,8 @@
                     'network',
                     'offline'
                 ];
-                
-                return networkErrorPatterns.some(pattern => 
+
+                return networkErrorPatterns.some(pattern =>
                     errorMessage.toLowerCase().includes(pattern.toLowerCase())
                 );
             }
@@ -3000,7 +3076,7 @@
             // オフラインモードの処理
             async handleOfflineMode() {
                 console.log('Offline mode detected');
-                
+
                 // オフライン状態の表示
                 this.elements.timeslotsContainer.innerHTML = `
                     <div style="text-align: center; padding: 40px; color: #666;">
@@ -3012,7 +3088,7 @@
                         </button>
                     </div>
                 `;
-                
+
                 // クラス別分析もオフライン表示
                 if (this.elements.classButtonsContainer) {
                     this.elements.classButtonsContainer.innerHTML = `
@@ -3021,7 +3097,7 @@
                         </div>
                     `;
                 }
-                
+
                 // 定期的に接続をチェック
                 this.startOfflineReconnectionCheck();
             }
@@ -3029,10 +3105,10 @@
             // ネットワークエラーの処理
             async handleNetworkError(error) {
                 console.error('Network error detected:', error);
-                
+
                 // ネットワーク状態インジケーターを表示
                 this.showNetworkStatus('error', this.getNetworkErrorMessage(error));
-                
+
                 // オフライン同期システムが利用可能かチェック
                 if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
                     console.log('Offline sync system available, delegating operations');
@@ -3047,7 +3123,7 @@
             // ネットワークエラーメッセージを取得
             getNetworkErrorMessage(error) {
                 const errorMessage = error.message || error.toString();
-                
+
                 if (errorMessage.includes('ERR_NAME_NOT_RESOLVED')) {
                     return 'DNS解決に失敗しました。インターネット接続を確認してください。';
                 } else if (errorMessage.includes('ERR_NETWORK_CHANGED')) {
@@ -3065,12 +3141,12 @@
             async delegateToOfflineSync() {
                 try {
                     console.log('Delegating to offline sync system');
-                    
+
                     // オフライン同期システムに操作を追加
                     if (window.OfflineSyncV2.addOperation) {
                         await window.OfflineSyncV2.addOperation('getDetailedCapacityAnalysis', [null, null, null]);
                     }
-                    
+
                     // オフライン状態の表示
                     this.elements.timeslotsContainer.innerHTML = `
                         <div style="text-align: center; padding: 40px; color: #666;">
@@ -3090,13 +3166,13 @@
                 if (this.offlineCheckInterval) {
                     clearInterval(this.offlineCheckInterval);
                 }
-                
+
                 this.offlineCheckInterval = setInterval(async () => {
                     if (this.checkNetworkConnection()) {
                         console.log('Network connection restored');
                         clearInterval(this.offlineCheckInterval);
                         this.offlineCheckInterval = null;
-                        
+
                         // 接続復旧時の処理
                         this.showNetworkStatus('success', 'ネットワーク接続が復旧しました');
                         this.showSuccess('データを再取得しています...');
@@ -3108,11 +3184,11 @@
             // ネットワーク状態を表示
             showNetworkStatus(type, message) {
                 if (!this.elements.networkStatus || !this.elements.networkStatusText) return;
-                
+
                 this.elements.networkStatus.className = `network-status-indicator ${type}`;
                 this.elements.networkStatusText.textContent = message;
                 this.elements.networkStatus.style.display = 'block';
-                
+
                 // 成功の場合は3秒後に非表示
                 if (type === 'success') {
                     setTimeout(() => {
@@ -3126,10 +3202,10 @@
             // 接続再試行
             async retryConnection() {
                 if (!this.elements.networkStatusText) return;
-                
+
                 this.elements.networkStatusText.textContent = '接続を再試行中...';
                 this.elements.networkStatus.className = 'network-status-indicator';
-                
+
                 try {
                     // ネットワーク接続をチェック
                     if (this.checkNetworkConnection()) {
@@ -3147,9 +3223,10 @@
 
         // ダッシュボードを初期化
         const dashboard = new MonitoringDashboard();
-        
+
         // グローバルに公開
         window.MonitoringDashboard = dashboard;
     </script>
 </body>
+
 </html>
