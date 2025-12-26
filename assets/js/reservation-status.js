@@ -4,7 +4,7 @@
  */
 
 import { apiUrlManager } from './config.js';
-import { subscribeToSeatUpdates, subscribeToReservationUpdates } from './supabase-client.js';
+import { subscribeToSeatUpdates, subscribeToReservationUpdates, getBookingForScan } from './supabase-client.js';
 
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -134,33 +134,21 @@ function showDetails(data) {
             }
         });
 
-        // POLLING FALLBACK: Check every 5 seconds
+        // POLLING FALLBACK: Check every 3 seconds "pseudo-instantly"
         // This ensures updates even if WebSocket drops or is blocked
-        setInterval(() => {
-            // We can check the seat status via Supabase REST (cheap)
-            // Using the imported helper would require import... 
-            // Let's use getBookingForScan or just re-fetch details silently via existing `fetchJsonp` 
-            // but fetchJsonp is GAS based (slow).
-            // Better to use Supabase client if available.
-            // But we only have `subscribeToSeatUpdates` imported.
-            // We should assume `supabase` global is available or import `getBookingForScan`.
-
-            // Simple approach: Re-check via Supabase RPC check if available, 
-            // or just trust the Subscription for now.
-            // The user ASKED for "constant monitoring". 
-            // Let's use supabase client directly if window.supabase exists.
-            if (window.supabaseInstance) { // Assuming global instance or we can re-create
-                // Actually `subscribeToSeatUpdates` uses `getSupabase()`.
-                // Let's import `getBookingForScan` which is fast RPC.
-                import('./supabase-client.js').then(mod => {
-                    mod.getBookingForScan(data.id).then(res => {
-                        if (res.success && res.data.status === 'checked_in') {
-                            updateUIAsCheckedIn();
-                        }
-                    });
-                });
+        const pollingInterval = setInterval(async () => {
+            // Stop polling if already checked in (UI updated)
+            if (document.getElementById('status-badge').className.includes('checked_in')) {
+                clearInterval(pollingInterval);
+                return;
             }
-        }, 5000);
+
+            const res = await getBookingForScan(data.id);
+            if (res.success && res.data.status === 'checked_in') {
+                updateUIAsCheckedIn();
+                clearInterval(pollingInterval);
+            }
+        }, 3000);
     }
 
     // Initial check (in case already checked in)
