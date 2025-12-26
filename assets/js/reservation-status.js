@@ -4,6 +4,7 @@
  */
 
 import { apiUrlManager } from './config.js';
+import { subscribeToSeatUpdates } from './supabase-client.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Check URL parameters for auto-login

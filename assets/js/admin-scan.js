@@ -1,17 +1,17 @@
 /**
  * admin-scan.js
- * 管理者用QRスキャナー＆チェックイン制御
+ * スタンドアローン QRスキャナー＆チェックイン
  */
 
 import { apiUrlManager } from './config.js';
-import { fetchMasterDataFromSupabase, fetchPerformancesFromSupabase } from './supabase-client.js';
+import { fetchMasterDataFromSupabase } from './supabase-client.js';
 
 const state = {
     group: '',
     day: '',
     timeslot: '',
-    scanner: null, // Replaces html5QrcodeScanner
-    isScanning: false, // Kept for scanner state management
+    scanner: null,
+    isScanning: false,
     currentBooking: null
 };
 
@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-change-mode').addEventListener('click', exitScanMode);
 
     // Tab switching
-    document.querySelectorAll('.tab-btn').forEach(btn => {
+    document.querySelectorAll('.tab').forEach(btn => {
         btn.addEventListener('click', (e) => switchTab(e.target.dataset.tab));
     });
 
@@ -65,10 +65,10 @@ function initSetup() {
         // Reset downstream
         inputs.day.innerHTML = '<option value="" disabled selected>読み込み中...</option>';
         inputs.day.disabled = true;
-        inputs.timeslot.innerHTML = '<option value="" disabled selected>時間帯を選択してください</option>';
+        inputs.timeslot.innerHTML = '<option value="" disabled selected>-</option>';
         inputs.timeslot.disabled = true;
-        checkSetupValidity(inputs);
 
+        checkSetupValidity(inputs);
         fetchScannablePerformances(state.group, inputs);
     });
 
@@ -112,17 +112,21 @@ async function initializeMasterData() {
         populateGroupSelect();
     } else {
         console.error('Master Data Load Error:', result.error);
-        document.getElementById('target-group').innerHTML = '<option disabled selected>データ読み込み失敗</option>';
+        targetGroup.innerHTML = '<option disabled selected>データ読み込み失敗</option>';
     }
 }
 
 function startScanMode() {
     setupSection.style.display = 'none';
     scanSection.style.display = 'block';
-    document.getElementById('disp-target').innerText = `${state.group} ${state.day}日目 ${state.timeslot}`;
 
-    // Start Camera by default
-    startScanner();
+    // Update Header Info
+    document.getElementById('disp-target-group').innerText = state.group;
+    document.getElementById('disp-target-time').innerText = `${state.day}日目 / ${state.timeslot}時間帯`;
+
+    // Start Camera by default (if active tab is camera)
+    const activeTab = document.querySelector('.tab.active').dataset.tab;
+    if (activeTab === 'camera') startScanner();
 }
 
 function exitScanMode() {
@@ -132,25 +136,21 @@ function exitScanMode() {
 }
 
 function switchTab(tabName) {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll(`.tab-btn[data-tab="${tabName}"]`).forEach(b => b.classList.add('active'));
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll(`.tab[data-tab="${tabName}"]`).forEach(b => b.classList.add('active'));
 
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     document.getElementById(`tab-${tabName}`).classList.add('active');
 
     if (tabName === 'camera') startScanner();
-    else stopScanner(); // Stop camera when manual input
+    else stopScanner();
 }
 
-// ==========================================
-// Scanner Logic
-// ==========================================
+// Scanner
 function startScanner() {
     if (state.isScanning) return;
-
-    // Initialize scanner
-    // Use html5-qrcode library
     const readerId = "reader";
+
     if (!state.html5QrcodeScanner) {
         state.html5QrcodeScanner = new Html5Qrcode(readerId);
     }
@@ -166,7 +166,7 @@ function startScanner() {
         state.isScanning = true;
     }).catch(err => {
         console.error("Camera start failed", err);
-        alert('カメラの起動に失敗しました。権限を確認してください。');
+        // alert('カメラの起動に失敗しました');
     });
 }
 
@@ -178,43 +178,31 @@ function stopScanner() {
     }
 }
 
-function onScanSuccess(decodedText, decodedResult) {
-    // Prevent multiple reads
-    if (document.getElementById('scan-result').style.display === 'block') return;
+function onScanSuccess(decodedText) {
+    // Prevent multiple triggers if modal is open
+    if (document.getElementById('result-overlay').style.display === 'flex') return;
 
-    // Parse: TICKET:{id}:{passcode}
-    console.log(`Scan result: ${decodedText}`);
-
+    // Parse TICKET:{id}:{pass}
     let id, pass;
     if (decodedText.startsWith('TICKET:')) {
         const parts = decodedText.split(':');
         id = parts[1];
         pass = parts[2];
+    } else if (!isNaN(decodedText)) {
+        id = decodedText;
+        pass = null;
     } else {
-        // Try simple ID parsing if just number
-        if (!isNaN(decodedText)) {
-            id = decodedText;
-            pass = null;
-        } else {
-            console.warn('Invalid QR format');
-            return; // Ignore
-        }
+        return;
     }
 
-    // Pause scanner visual (optional)
-    // Fetch details
     fetchBookingAndConfirm(id, pass);
 }
 
 function onScanFailure(error) {
-    // console.warn(`Scan error: ${error}`);
+    // ignore
 }
 
-
-// ==========================================
 // Check-In Logic
-// ==========================================
-
 async function handleManualCheck() {
     const id = document.getElementById('manual-id').value;
     const pass = document.getElementById('manual-pass').value;
@@ -223,127 +211,180 @@ async function handleManualCheck() {
 }
 
 async function fetchBookingAndConfirm(id, passcode) {
-    // Show Loading
-    showResultModal('照会中...', 'データを取得しています...');
+    // Show Loading in Modal
+    showResultModal('照会中...', '<p>データを取得しています...</p>');
     state.currentBooking = null;
 
     try {
         const apiUrl = apiUrlManager.getCurrentUrl();
-        // passcodeがnullの場合(手動)は idのみで検索するAPIが必要だが、
-        // getBookingDetailsはpasscode必須に実装した。
-        // 管理者権限用APIを作るか、パスコード無しでpublic情報だけ返すか、
-        // あるいは `getBooking` (internal like) を呼ぶか。
-        // ここではAPIに `action=get_booking_details` をそのまま呼ぶ。
-        // パスコードが空だとエラーになるAPI設計の場合は修正が必要。
-        // 実装済み `checkInReservation` は `getBookingByCredentials` を呼ぶ。
-        // とりあえずパスコードがある場合はそれを使い、なければ空文字を送ってみる。
+        // Since we need to support JSONP for GAS
+        fetchJsonp(apiUrl, { action: 'get_booking_details', id, passcode: passcode || '' }, (json) => {
+            if (json.success) {
+                state.currentBooking = json.data;
+                renderConfirmation(json.data);
+            } else {
+                showResultModal('エラー', `<p style="color:var(--danger)">${json.error || 'データが見つかりません'}</p>`);
+                document.getElementById('btn-confirm-checkin').style.display = 'none';
+            }
+        });
 
-        let url = `${apiUrl}?action=get_booking_details&id=${id}&passcode=${passcode || ''}`;
-
-        const response = await fetch(url);
-        const json = await response.json();
-
-        if (json.success) {
-            const booking = json.data;
-            state.currentBooking = booking;
-            renderConfirmation(booking);
-        } else {
-            showResultModal('エラー', `<span class="danger-text">${json.error || 'データが見つかりません'}</span>`);
-            // Hide buttons except Cancel
-            document.getElementById('btn-confirm-checkin').style.display = 'none';
-        }
     } catch (e) {
-        showResultModal('エラー', '通信エラーが発生しました');
+        showResultModal('エラー', '<p>通信エラーが発生しました</p>');
         document.getElementById('btn-confirm-checkin').style.display = 'none';
     }
 }
 
 function renderConfirmation(booking) {
+    const perf = booking.performances || {};
+    const seats = booking.seats ? booking.seats.map(s => s.seat_id).join(', ') : '-';
+
+    // Status Logic
+    const isTargetMatch = (perf.group_name === state.group && perf.timeslot === state.timeslot && perf.day == state.day);
+
     let html = `
-        <div style="text-align:left; margin-bottom:10px;">
-            <p><strong>名前:</strong> ${booking.name}</p>
-            <p><strong>公演:</strong> ${booking.performances?.group_name} (${booking.performances?.timeslot})</p>
-            <p><strong>座席:</strong> ${booking.seats.map(s => s.seat_id).join(', ')}</p>
-            <p><strong>ステータス:</strong> ${getStatusBadge(booking.status)}</p>
+        <div style="font-size:1.1rem; font-weight:bold; margin-bottom:0.5rem;">${booking.name} 様</div>
+        <div style="font-size:0.9rem; color:var(--text-sub); margin-bottom:1rem;">
+             ${booking.grade_class || ''} 
+        </div>
+        <div style="display:grid; grid-template-columns:auto 1fr; gap:0.5rem; font-size:0.95rem;">
+            <div style="color:var(--text-sub)">公演:</div>
+            <div>${perf.group_name} <br> ${perf.day}日目 ${perf.timeslot}</div>
+            
+            <div style="color:var(--text-sub)">座席:</div>
+            <div style="font-weight:bold">${seats}</div>
+            
+            <div style="color:var(--text-sub)">状態:</div>
+            <div>${getStatusBadge(booking.status)}</div>
         </div>
     `;
 
-    // Validation Warning
-    const targetIsDifferent =
-        booking.performances?.group_name !== state.group ||
-        booking.performances?.timeslot !== state.timeslot; // Day check omitted for simplicity but should act
-
-    if (targetIsDifferent) {
-        html += `<div class="warning-text">⚠ 注意: このチケットは現在の受付対象（${state.group} ${state.timeslot}）と異なります！</div>`;
+    if (!isTargetMatch) {
+        html += `<div style="background:#fff3cd; color:#856404; padding:0.5rem; border-radius:4px; margin-top:10px; font-size:0.9rem;">
+            ⚠ 公演日時が異なります (${perf.group_name} ${perf.timeslot})
+        </div>`;
     }
+
+    const btn = document.getElementById('btn-confirm-checkin');
 
     if (booking.status === 'checked_in') {
-        html += `<div class="warning-text">既にチェックイン済みです。</div>`;
-        document.getElementById('btn-confirm-checkin').style.display = 'none';
+        html += `<div style="color:var(--primary); font-weight:bold; margin-top:10px;">既にチェックイン済みです</div>`;
+        btn.style.display = 'none';
     } else if (booking.status === 'cancelled') {
-        html += `<div class="danger-text">キャンセルされた予約です。</div>`;
-        document.getElementById('btn-confirm-checkin').style.display = 'none';
+        html += `<div style="color:var(--danger); font-weight:bold; margin-top:10px;">キャンセルされた予約です</div>`;
+        btn.style.display = 'none';
     } else {
-        document.getElementById('btn-confirm-checkin').style.display = 'inline-block';
+        btn.style.display = 'inline-block';
     }
 
-    showResultModal('チェックイン確認', html);
+    showResultModal('予約確認', html);
 }
 
 function showResultModal(title, contentHtml) {
-    document.getElementById('scan-result').style.display = 'block';
+    const overlay = document.getElementById('result-overlay');
+    overlay.style.display = 'flex';
     document.getElementById('res-title').innerText = title;
     document.getElementById('res-content').innerHTML = contentHtml;
-    // Hide success msg
-    document.getElementById('success-msg').style.display = 'none';
 }
 
 function hideResultModal() {
-    document.getElementById('scan-result').style.display = 'none';
+    document.getElementById('result-overlay').style.display = 'none';
     state.currentBooking = null;
-    // Resume scanning if on camera tab
-    // (Actually scanning never stopped, just ignored results)
 }
 
-async function executeCheckIn() {
+function executeCheckIn() {
     if (!state.currentBooking) return;
-
-    // Call API
     const booking = state.currentBooking;
     const btn = document.getElementById('btn-confirm-checkin');
     btn.disabled = true;
     btn.innerText = '送信中...';
 
-    const params = {
+    const apiUrl = apiUrlManager.getCurrentUrl();
+    fetchJsonp(apiUrl, {
         action: 'check_in',
         id: booking.id,
         passcode: booking.passcode
-    };
-
-    try {
-        const apiUrl = apiUrlManager.getCurrentUrl();
-        fetchJsonp(apiUrl, params, (json) => {
-            if (json.success) {
-                hideResultModal();
-                showSuccessMsg(`${booking.name} 様のチェックイン完了`);
-                setTimeout(() => {
-                    document.getElementById('success-msg').style.display = 'none';
-                }, 3000);
-            } else {
-                alert('チェックイン失敗: ' + (json.error || '不明なエラー'));
-            }
-            btn.disabled = false;
-            btn.innerText = 'チェックイン実行';
-        });
-
-    } catch (e) {
-        alert('通信エラー');
+    }, (json) => {
         btn.disabled = false;
-        btn.innerText = 'チェックイン実行';
-    }
+        btn.innerText = 'チェックイン';
+
+        if (json.success) {
+            hideResultModal();
+            showToast(`${booking.name} 様 チェックイン完了`);
+        } else {
+            alert('失敗: ' + json.error);
+        }
+    });
 }
 
-// Helper fetchJsonp (Should be shared but duplicate for safety here)
+function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.innerText = msg;
+    el.style.display = 'block';
+    // Animation handled by css, reset simply
+    const newOne = el.cloneNode(true);
+    el.parentNode.replaceChild(newOne, el);
+    newOne.style.display = 'block';
+}
+
+function getStatusBadge(status) {
+    const map = {
+        'confirmed': '<span class="status-badge status-confirmed">予約済</span>',
+        'checked_in': '<span class="status-badge status-checked_in">来場済</span>',
+        'cancelled': '<span class="status-badge status-cancelled">無効</span>'
+    };
+    return map[status] || status;
+}
+
+
+// --- Helper / Logic Reuse ---
+
+let performanceScanData = [];
+async function fetchScannablePerformances(group, inputs) {
+    try {
+        const apiUrl = apiUrlManager.getCurrentUrl();
+        fetchJsonp(apiUrl, { action: 'get_performances', group }, (json) => {
+            if (json.success) {
+                performanceScanData = json.data;
+                const days = [...new Set(performanceScanData.map(p => p.day))].sort();
+
+                inputs.day.innerHTML = '<option value="" disabled selected>日程を選択</option>';
+                days.forEach(day => {
+                    const option = document.createElement('option');
+                    option.value = day;
+                    option.textContent = `${day}日目`;
+                    inputs.day.appendChild(option);
+                });
+                inputs.day.disabled = false;
+            } else {
+                alert('データ取得失敗');
+            }
+        });
+    } catch (e) { console.error(e); }
+}
+
+function updateTimeslotOptionsForScan(inputs) {
+    const day = parseInt(state.day);
+    const timeslots = performanceScanData
+        .filter(p => p.day == day)
+        .map(p => p.timeslot)
+        .sort();
+
+    inputs.timeslot.innerHTML = '<option value="" disabled selected>時間を選択</option>';
+    timeslots.forEach(slot => {
+        const option = document.createElement('option');
+        option.value = slot;
+        option.textContent = slot; // Just show 'A', 'B' etc
+        inputs.timeslot.appendChild(option);
+    });
+    inputs.timeslot.disabled = false;
+}
+
+function checkSetupValidity(inputs) {
+    const isValid = state.group && state.day && state.timeslot;
+    inputs.startBtn.disabled = !isValid;
+}
+
+// JSONP Helper
 function fetchJsonp(url, params, callback) {
     const callbackName = 'jsonp_scan_' + Math.round(100000 * Math.random());
     window[callbackName] = function (data) {
@@ -355,74 +396,4 @@ function fetchJsonp(url, params, callback) {
     const queryString = Object.keys(params).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&');
     script.src = `${url}?${queryString}&callback=${callbackName}`;
     document.body.appendChild(script);
-}
-
-// 公演データキャッシュ (Admin用)
-let performanceScanData = [];
-
-async function fetchScannablePerformances(group, inputs) {
-    try {
-        const apiUrl = apiUrlManager.getCurrentUrl();
-        const url = `${apiUrl}?action=get_performances&group=${encodeURIComponent(group)}`;
-        const response = await fetch(url);
-        const json = await response.json();
-
-        if (json.success) {
-            performanceScanData = json.data;
-
-            // Populate Days
-            const days = [...new Set(performanceScanData.map(p => p.day))].sort();
-            inputs.day.innerHTML = '<option value="" disabled selected>日程を選択してください</option>';
-            days.forEach(day => {
-                const option = document.createElement('option');
-                option.value = day;
-                option.textContent = `${day}日目`;
-                inputs.day.appendChild(option);
-            });
-            inputs.day.disabled = false;
-        } else {
-            alert('公演データの取得に失敗しました: ' + json.error);
-        }
-    } catch (e) {
-        console.error(e);
-        alert('通信エラーが発生しました');
-    }
-}
-
-function updateTimeslotOptionsForScan(inputs) {
-    const day = parseInt(state.day);
-    const timeslots = performanceScanData
-        .filter(p => p.day == day)
-        .map(p => p.timeslot)
-        .sort();
-
-    inputs.timeslot.innerHTML = '<option value="" disabled selected>時間帯を選択してください</option>';
-    timeslots.forEach(slot => {
-        const option = document.createElement('option');
-        option.value = slot;
-        option.textContent = `${slot}時間帯`;
-        inputs.timeslot.appendChild(option);
-    });
-
-    inputs.timeslot.disabled = false;
-}
-
-function checkSetupValidity(inputs) {
-    const isValid = state.group && state.day && state.timeslot;
-    inputs.startBtn.disabled = !isValid;
-}
-
-function showSuccessMsg(text) {
-    const el = document.getElementById('success-msg');
-    el.style.display = 'block';
-    document.getElementById('msg-text').innerText = text;
-}
-
-function getStatusBadge(status) {
-    const map = {
-        'confirmed': '<span style="color:green;font-weight:bold">予約確定</span>',
-        'checked_in': '<span style="color:blue;font-weight:bold">チェックイン済</span>',
-        'cancelled': '<span style="color:red;font-weight:bold">キャンセル</span>'
-    };
-    return map[status] || status;
 }

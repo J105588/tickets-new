@@ -125,3 +125,29 @@ export async function fetchSeatsFromSupabase(group, day, timeslot) {
         return { success: false, error: e.message };
     }
 }
+
+export function subscribeToSeatUpdates(bookingId, onUpdate) {
+    const sb = getSupabase();
+    if (!sb) return null;
+
+    console.log(`Subscribing to updates for booking_id=${bookingId}`);
+
+    // Listen to changes in the 'seats' table where booking_id matches
+    const channel = sb.channel(`booking-${bookingId}`)
+        .on(
+            'postgres_changes',
+            {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'seats',
+                filter: `booking_id=eq.${bookingId}`
+            },
+            (payload) => {
+                console.log('Realtime update received:', payload);
+                if (onUpdate) onUpdate(payload.new);
+            }
+        )
+        .subscribe();
+
+    return channel;
+}
