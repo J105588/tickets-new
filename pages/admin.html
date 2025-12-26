@@ -98,9 +98,13 @@
                 <button class="mobile-menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
                 <h1 class="page-title">予約管理</h1>
             </div>
-            <button class="btn btn-primary" style="margin-left: auto;" onclick="refreshData()"><i
-                    class="fas fa-sync"></i>
-                更新</button>
+            <div style="margin-left: auto; display: flex; align-items: center; gap: 10px;">
+                <div style="display: flex; align-items: center; font-size: 0.9rem;">
+                    <input type="checkbox" id="auto-refresh-toggle" style="margin-right: 5px;">
+                    <label for="auto-refresh-toggle" style="cursor: pointer; user-select: none;">自動更新</label>
+                </div>
+                <button class="btn btn-primary" onclick="refreshData()"><i class="fas fa-sync"></i> 更新</button>
+            </div>
         </div>
 
         <div class="filter-bar">

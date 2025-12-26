@@ -30,9 +30,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-seat-change').addEventListener('click', promptSeatChange);
     document.getElementById('btn-cancel-res').addEventListener('click', confirmCancel);
 
+    // Auto Refresh Toggle
+    document.getElementById('auto-refresh-toggle').addEventListener('change', (e) => {
+        if (e.target.checked) {
+            startAutoRefresh();
+        } else {
+            stopAutoRefresh();
+        }
+    });
+
     document.getElementById('btn-close-seat-modal').addEventListener('click', closeSeatModal);
     document.getElementById('btn-submit-seat-change').addEventListener('click', submitSeatChange);
 });
+
+let refreshInterval = null;
+
+function startAutoRefresh() {
+    if (refreshInterval) clearInterval(refreshInterval);
+    refreshInterval = setInterval(() => {
+        applyFilters(true); // true = isBackground
+    }, 5000);
+}
+
+function stopAutoRefresh() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+        refreshInterval = null;
+    }
+}
 
 // フィルタオプションの読み込み
 async function loadFilterOptions() {
@@ -48,23 +73,25 @@ async function loadFilterOptions() {
 }
 
 // データ検索
-window.applyFilters = function () {
+window.applyFilters = function (isBackground = false) {
     const group = document.getElementById('filter-group').value;
     const day = document.getElementById('filter-date').value;
     const year = document.getElementById('filter-year').value;
 
-    // Add Search Box if exists (assuming added later or minimal filter)
-    // For now simple filters
-    fetchReservations({ group, day, year });
+    fetchReservations({ group, day, year }, isBackground);
 };
 
 window.refreshData = function () {
-    applyFilters();
+    applyFilters(false);
 };
 
-async function fetchReservations(filters) {
+async function fetchReservations(filters, isBackground = false) {
     const tbody = document.getElementById('reservation-table-body');
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">読み込み中...</td></tr>';
+
+    // Only show loading if NOT background refresh
+    if (!isBackground) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">読み込み中...</td></tr>';
+    }
 
     // RPC Call
     const result = await adminGetReservations(filters);
@@ -73,7 +100,11 @@ async function fetchReservations(filters) {
         currentReservations = result.data; // array
         renderTable(currentReservations);
     } else {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">エラー: ${result.error}</td></tr>`;
+        if (!isBackground) {
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">エラー: ${result.error}</td></tr>`;
+        } else {
+            console.error('Auto-refresh failed:', result.error);
+        }
     }
 }
 
