@@ -225,7 +225,8 @@ export async function adminGetReservations(filters) {
             p_day: filters.day ? parseInt(filters.day) : null,
             p_timeslot: filters.timeslot || null,
             p_status: filters.status || null,
-            p_search: filters.search || null
+            p_search: filters.search || null,
+            p_year: filters.year ? parseInt(filters.year) : null
         });
         if (error) throw error;
         return data;

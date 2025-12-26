@@ -171,7 +171,8 @@ CREATE OR REPLACE FUNCTION admin_get_reservations(
   p_day INT DEFAULT NULL,
   p_timeslot TEXT DEFAULT NULL,
   p_status TEXT DEFAULT NULL,
-  p_search TEXT DEFAULT NULL
+  p_search TEXT DEFAULT NULL,
+  p_year INT DEFAULT NULL -- Added for grade filtering
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -214,6 +215,11 @@ BEGIN
        b.name ILIKE '%' || p_search || '%' OR 
        b.email ILIKE '%' || p_search || '%' OR
        b.id::TEXT = p_search
+    )
+    AND (
+       p_year IS NULL OR 
+       b.grade_class LIKE p_year || '-%' OR -- Match "1-1" etc
+       b.grade_class LIKE p_year || '年%'    -- Match "1年" etc
     );
 
   RETURN jsonb_build_object('success', true, 'data', COALESCE(v_results, '[]'::jsonb));
