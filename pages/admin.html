@@ -4,300 +4,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>予約管理ダッシュボード | Admin</title>
+    <title>予約管理画面 | 市川学園座席管理システム - 國枝版</title>
     <link rel="stylesheet" href="../assets/css/styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/admin.css">
+    <link rel="stylesheet" href="../assets/css/seats.css">
     <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        :root {
-            --sidebar-width: 250px;
-            --primary-color: #6366f1;
+    <script>
+        // Auth Check
+        if (!sessionStorage.getItem('admin_session')) {
+            window.location.href = 'admin-login.html';
         }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
-            margin: 0;
-            display: flex;
-            min-height: 100vh;
-        }
-
-        /* Sidebar */
-        .sidebar {
-            width: var(--sidebar-width);
-            background: white;
-            border-right: 1px solid #e5e7eb;
-            display: flex;
-            flex-direction: column;
-            position: fixed;
-            height: 100vh;
-        }
-
-        .sidebar-header {
-            padding: 1.5rem;
-            font-weight: 700;
-            font-size: 1.25rem;
-            color: var(--primary-color);
-            border-bottom: 1px solid #f0f0f0;
-        }
-
-        .nav-links {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            flex: 1;
-        }
-
-        .nav-links li a {
-            display: flex;
-            align-items: center;
-            padding: 1rem 1.5rem;
-            color: #4b5563;
-            text-decoration: none;
-            transition: 0.2s;
-            gap: 10px;
-        }
-
-        .nav-links li a:hover,
-        .nav-links li a.active {
-            background: #eef2ff;
-            color: var(--primary-color);
-            border-right: 3px solid var(--primary-color);
-        }
-
-        /* Main Content */
-        .main-content {
-            margin-left: var(--sidebar-width);
-            flex: 1;
-            padding: 2rem;
-            width: calc(100% - var(--sidebar-width));
-            /* fix width */
-        }
-
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-        }
-
-        .page-title {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #111827;
-        }
-
-        /* Filters */
-        .filter-bar {
-            background: white;
-            padding: 1.5rem;
-            border-radius: 12px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-            margin-bottom: 2rem;
-            display: flex;
-            gap: 1rem;
-            flex-wrap: wrap;
-            align-items: flex-end;
-        }
-
-        .filter-group {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .filter-group label {
-            font-size: 0.875rem;
-            font-weight: 500;
-            color: #6b7280;
-        }
-
-        .form-select,
-        .form-input {
-            padding: 0.5rem 1rem;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            font-size: 0.95rem;
-            min-width: 150px;
-        }
-
-        /* Table */
-        .table-container {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th,
-        td {
-            padding: 1rem 1.5rem;
-            text-align: left;
-            border-bottom: 1px solid #f3f4f6;
-        }
-
-        th {
-            background: #f9fafb;
-            font-weight: 600;
-            color: #374151;
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        tr:hover {
-            background: #f9fafb;
-        }
-
-        /* Badges */
-        .badge {
-            padding: 4px 10px;
-            border-radius: 99px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .bg-green {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .bg-blue {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-
-        .bg-red {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        /* Actions */
-        .btn-icon {
-            background: none;
-            border: none;
-            cursor: pointer;
-            color: #6b7280;
-            padding: 5px;
-            transition: 0.2s;
-        }
-
-        .btn-icon:hover {
-            color: var(--primary-color);
-        }
-
-        /* Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-
-        .modal.active {
-            display: flex;
-        }
-
-        .modal-content {
-            background: white;
-            padding: 2rem;
-            border-radius: 12px;
-            width: 90%;
-            max-width: 600px;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 1.5rem;
-        }
-
-        .close-btn {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-        }
-
-        .action-bar {
-            display: flex;
-            gap: 1rem;
-            margin-top: 2rem;
-            padding-top: 1rem;
-            border-top: 1px solid #eee;
-        }
-
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border-radius: 6px;
-            border: none;
-            cursor: pointer;
-            flex: 1;
-            font-weight: 500;
-        }
-
-        .btn-primary {
-            background: var(--primary-color);
-            color: white;
-        }
-
-        .btn-danger {
-            background: #ef4444;
-            color: white;
-        }
-
-        .btn-secondary {
-            background: #e5e7eb;
-            color: #374151;
-        }
-    </style>
+    </script>
 </head>
 
 <body>
 
-    <nav class="sidebar">
+    <nav class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <i class="fas fa-ticket-alt"></i> TicketSystem
+            <span>TicketSystem</span>
+            <button class="mobile-menu-btn" onclick="toggleSidebar()" style="display:none;font-size:1rem;">✕</button>
         </div>
         <ul class="nav-links">
             <li><a href="#" class="active"><i class="fas fa-list"></i> 予約管理</a></li>
             <li><a href="admin-settings.html"><i class="fas fa-cog"></i> 設定・マスタ</a></li>
-            <li><a href="admin-scan.html"><i class="fas fa-qrcode"></i> スキャン</a></li>
+            <li><a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> ログアウト</a></li>
         </ul>
     </nav>
 
     <main class="main-content">
         <div class="page-header">
-            <h1 class="page-title">予約管理</h1>
-            <button class="btn btn-primary" style="width: auto;" onclick="refreshData()"><i class="fas fa-sync"></i>
+            <div style="display:flex; align-items:center;">
+                <button class="mobile-menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <h1 class="page-title">予約管理</h1>
+            </div>
+            <button class="btn btn-primary" style="margin-left: auto;" onclick="refreshData()"><i
+                    class="fas fa-sync"></i>
                 更新</button>
         </div>
 
         <div class="filter-bar">
             <div class="filter-group">
-                <label>公演 (団体)</label>
+                <label for="filter-group">公演 (団体)</label>
                 <select id="filter-group" class="form-select">
                     <option value="">すべて</option>
                     <!-- JS populated -->
                 </select>
             </div>
             <div class="filter-group">
-                <label>日程</label>
+                <label for="filter-date">日程</label>
                 <select id="filter-date" class="form-select">
                     <option value="">すべて</option>
                     <option value="1">1日目</option>
@@ -305,7 +62,7 @@
                 </select>
             </div>
             <div class="filter-group">
-                <label>学年</label>
+                <label for="filter-year">学年</label>
                 <select id="filter-year" class="form-select">
                     <option value="">すべて</option>
                     <option value="1">1年</option>
@@ -353,6 +110,9 @@
                 <!-- Content -->
             </div>
             <div class="action-bar">
+                <button id="btn-edit-toggle" class="btn btn-secondary" onclick="toggleEditMode()">編集</button>
+                <button id="btn-save-changes" class="btn btn-primary" onclick="saveChanges()"
+                    style="display:none;">保存</button>
                 <button class="btn btn-secondary" onclick="resendEmail()">メール再送</button>
                 <button class="btn btn-secondary" onclick="promptSeatChange()">座席変更</button>
                 <button class="btn btn-danger" onclick="confirmCancel()">予約取消</button>
@@ -360,10 +120,30 @@
         </div>
     </div>
 
+    <!-- Seat Selection Modal -->
+    <div id="seat-modal" class="modal">
+        <div class="modal-content" style="max-width: 900px; width: 95%;">
+            <div class="modal-header">
+                <h2 style="margin:0;">座席変更</h2>
+                <button class="close-btn" onclick="closeSeatModal()">&times;</button>
+            </div>
+            <p>新しい座席を選択してください。</p>
+
+            <div id="seat-map-container"
+                style="overflow:auto; max-height:60vh; border:1px solid #ddd; padding:10px; background:white;">
+                <!-- Seat Map Rendered Here -->
+                <div style="text-align:center; padding:20px;">読み込み中...</div>
+            </div>
+
+            <div style="margin-top:1rem; display:flex; justify-content:space-between; align-items:center;">
+                <div>選択中: <strong id="new-seats-display">-</strong></div>
+                <button class="btn btn-primary" onclick="submitSeatChange()">変更を確定</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
-    <script src="../assets/js/config.js"></script>
-    <script src="../assets/js/supabase-client.js"></script>
-    <script src="../assets/js/admin.js"></script>
+    <script type="module" src="../assets/js/admin.js"></script>
 </body>
 
 </html>

@@ -4,106 +4,142 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>チェックイン (QR読取) | Admin</title>
-    <link rel="stylesheet" href="../assets/css/styles.css">
+    <title>チェックイン | 市川学園座席管理システム - 國枝版</title>
+    <link rel="stylesheet" href="../assets/css/admin.css">
     <link rel="stylesheet" href="../assets/css/admin-scan.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- HTML5-QRCode Library -->
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        if (!sessionStorage.getItem('admin_session')) {
+            window.location.href = 'admin-login.html';
+        }
+    </script>
 </head>
 
 <body>
 
-    <header class="app-header">
-        <div class="logo">
-            <i class="fas fa-qrcode"></i> Admin Check-in
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <span>TicketSystem</span>
+            <button class="mobile-menu-btn" onclick="toggleSidebar()" style="display:none; font-size:1rem;">✕</button>
         </div>
-        <button id="btn-change-mode" class="btn btn-sm btn-outline-light">条件変更</button>
-    </header>
+        <ul class="nav-links">
+            <li><a href="admin.html"><i class="fas fa-list"></i> 予約管理</a></li>
+            <li><a href="admin-settings.html"><i class="fas fa-cog"></i> 設定・マスタ</a></li>
+            <li><a href="admin-scan.html" class="active"><i class="fas fa-qrcode"></i> スキャン</a></li>
+            <li><a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> ログアウト</a></li>
+        </ul>
+    </nav>
 
-    <main class="scan-container">
-
-        <!-- Step 1: Target Selection -->
-        <section id="setup-section">
-            <h2>チェックイン対象設定</h2>
-            <div class="form-group">
-                <label>部活・団体</label>
-                <select id="target-group" class="form-control">
-                    <option value="" disabled selected>読み込み中...</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>日程</label>
-                <select id="target-day" class="form-control" disabled>
-                    <option value="1">1日目</option>
-                    <option value="2">2日目</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>時間帯</label>
-                <select id="target-timeslot" class="form-control" disabled>
-                    <option value="A">A (09:00~)</option>
-                </select>
-            </div>
-            <button id="btn-start-scan" class="btn btn-primary btn-block" disabled>スキャン開始</button>
-        </section>
-
-        <!-- Step 2: Scanner & Manual Input -->
-        <section id="scan-section" style="display: none;">
-            <div class="target-info">
-                <strong id="disp-target"></strong> の受付中
+    <main class="main-content">
+        <div class="page-header">
+            <div style="display:flex; align-items:center;">
+                <button class="mobile-menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <h1 class="page-title">チェックイン</h1>
             </div>
 
-            <!-- Tabs -->
-            <div class="scan-tabs">
-                <button class="tab-btn active" data-tab="camera">カメラ読取</button>
-                <button class="tab-btn" data-tab="manual">ID入力</button>
-            </div>
+        </div>
 
-            <!-- Camera Tab -->
-            <div id="tab-camera" class="tab-content active">
-                <div id="reader"></div>
-                <!-- <p class="note">カメラへのアクセスを許可してください</p> -->
-            </div>
+        <div class="scan-container card">
 
-            <!-- Manual Tab -->
-            <div id="tab-manual" class="tab-content">
+            <!-- Step 1: Target Selection -->
+            <section id="setup-section">
+                <h2 style="margin-top:0;">チェックイン対象設定</h2>
                 <div class="form-group">
-                    <label>予約ID</label>
-                    <input type="number" id="manual-id" class="form-control" placeholder="IDか数字を入力">
+                    <label>部活・団体</label>
+                    <select id="target-group" class="form-select">
+                        <option value="" disabled selected>読み込み中...</option>
+                    </select>
                 </div>
-                <!-- パスコードは管理者入力時はスキップ可能とするか、セキュリティのため必須とするか。
-                     ユーザー要件：「QRを読み取る(もしくはIDを手動入力する)」
-                     管理者がID聞いて入力するならパスコードも聞けば良いが、面倒ならIDだけでもレコード特定は可能。
-                     ただ、他人への誤チェックイン防止のため、名前確認ダイアログを出す。
-                -->
-                <div class="form-group">
-                    <label>確認コード (4桁)</label>
-                    <input type="text" id="manual-pass" class="form-control" placeholder="不明な場合は空欄可">
-                    <small>※空欄の場合はデータ照会のみ行います</small>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <div class="form-group">
+                        <label>日程</label>
+                        <select id="target-day" class="form-select" disabled>
+                            <option value="1">1日目</option>
+                            <option value="2">2日目</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>時間帯</label>
+                        <select id="target-timeslot" class="form-select" disabled>
+                            <option value="A">A (09:00~)</option>
+                        </select>
+                    </div>
                 </div>
-                <button id="btn-manual-check" class="btn btn-primary btn-block">照会</button>
-            </div>
 
-            <!-- Result Modal / Status Area -->
-            <div id="scan-result" class="scan-result" style="display: none;">
-                <h3 id="res-title">確認</h3>
-                <div id="res-content"></div>
-                <div class="res-actions">
-                    <button id="btn-confirm-checkin" class="btn btn-success">チェックイン実行</button>
-                    <button id="btn-cancel-checkin" class="btn btn-secondary">キャンセル</button>
+                <button id="btn-start-scan" class="btn btn-primary" style="width:100%; justify-content: center;"
+                    disabled>スキャン開始</button>
+            </section>
+
+            <!-- Step 2: Scanner & Manual Input -->
+            <section id="scan-section" style="display: none;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                    <h3 style="margin:0;">スキャン実行</h3>
+                    <button id="btn-change-mode" class="btn btn-secondary"
+                        style="font-size:0.85rem; padding:0.4rem 0.8rem;">条件変更</button>
                 </div>
-            </div>
-            <div id="success-msg" class="success-msg" style="display: none;">
-                <i class="fas fa-check-circle"></i> <span id="msg-text"></span>
-            </div>
-        </section>
+
+                <div class="target-info">
+                    <strong id="disp-target"></strong> の受付中
+                </div>
+
+                <!-- Tabs -->
+                <div class="scan-tabs">
+                    <button class="tab-btn active" data-tab="camera">カメラ読取</button>
+                    <button class="tab-btn" data-tab="manual">ID入力</button>
+                </div>
+
+                <!-- Camera Tab -->
+                <div id="tab-camera" class="tab-content active">
+                    <div id="reader" style="width:100%; border-radius:8px; overflow:hidden;"></div>
+                </div>
+
+                <!-- Manual Tab -->
+                <div id="tab-manual" class="tab-content">
+                    <div class="form-group">
+                        <label>予約ID</label>
+                        <input type="number" id="manual-id" class="form-input" placeholder="IDか数字を入力">
+                    </div>
+                    <div class="form-group">
+                        <label>確認コード (4桁)</label>
+                        <input type="text" id="manual-pass" class="form-input" placeholder="不明な場合は空欄可">
+                        <small style="color:#666;">※空欄の場合はデータ照会のみ行います</small>
+                    </div>
+                    <button id="btn-manual-check" class="btn btn-primary"
+                        style="width:100%; justify-content: center;">照会</button>
+                </div>
+
+                <!-- Result Modal / Status Area -->
+                <div id="scan-result" class="scan-result" style="display: none;">
+                    <h3 id="res-title">確認</h3>
+                    <div id="res-content"></div>
+                    <div class="res-actions">
+                        <button id="btn-confirm-checkin" class="btn btn-primary"
+                            style="background-color:#10b981;">チェックイン実行</button>
+                        <button id="btn-cancel-checkin" class="btn btn-secondary">キャンセル</button>
+                    </div>
+                </div>
+                <div id="success-msg" class="success-msg" style="display: none;">
+                    <i class="fas fa-check-circle"></i> <span id="msg-text"></span>
+                </div>
+            </section>
+        </div>
 
     </main>
 
     <script type="module" src="../assets/js/admin-scan.js"></script>
+    <script>
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+        }
+        function logout() {
+            sessionStorage.removeItem('admin_session');
+            window.location.href = 'admin-login.html';
+        }
+    </script>
 </body>
 
 </html>

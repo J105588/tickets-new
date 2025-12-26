@@ -61,6 +61,15 @@ export async function fetchMasterDataFromSupabase() {
     }
 }
 
+export async function fetchMasterGroups() {
+    const result = await fetchMasterDataFromSupabase();
+    if (result.success) {
+        return result.data.groups;
+    }
+    console.error('Failed to fetch master groups', result.error);
+    return [];
+}
+
 export async function fetchPerformancesFromSupabase(groupName) {
     const sb = getSupabase();
     if (!sb) return { success: false, error: 'Supabase client not initialized' };

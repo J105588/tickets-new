@@ -272,6 +272,19 @@ class SupabaseIntegration {
     
     return bookingUpdate;
   }
+
+  // 予約情報の更新（汎用）
+  updateBooking(bookingId, updates) {
+    const data = {
+      ...updates,
+      updated_at: new Date().toISOString()
+    };
+    
+    return this._request(`bookings?id=eq.${bookingId}`, {
+      method: 'PATCH',
+      body: data
+    });
+  }
 }
 
 // グローバルインスタンス

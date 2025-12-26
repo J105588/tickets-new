@@ -4,95 +4,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>システム設定 | Admin</title>
-    <link rel="stylesheet" href="../assets/css/styles.css">
+    <title>システム設定 | 市川学園座席管理システム - 國枝版</title>
+    <link rel="stylesheet" href="../assets/css/admin.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        .settings-container {
-            max-width: 800px;
-            margin: 2rem auto;
-            padding: 0 1rem;
-        }
-
-        .card {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-            padding: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .card h2 {
-            margin-top: 0;
-            border-bottom: 2px solid #f0f0f0;
-            padding-bottom: 0.5rem;
-            margin-bottom: 1rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .table-wrapper {
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th,
-        td {
-            text-align: left;
-            padding: 0.75rem;
-            border-bottom: 1px solid #eee;
-        }
-
-        th {
-            background-color: #f8f9fa;
-        }
-
-        .btn-sm {
-            padding: 0.25rem 0.5rem;
-            font-size: 0.875rem;
-        }
-
-        .form-row {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1rem;
-            align-items: flex-end;
-        }
-
-        .form-row .form-group {
-            flex: 1;
-            margin-bottom: 0;
-        }
-
-        .status-active {
-            color: green;
-        }
-
-        .status-inactive {
-            color: #999;
-        }
-    </style>
+    <script>
+        if (!sessionStorage.getItem('admin_session')) window.location.href = 'admin-login.html';
+    </script>
 </head>
 
 <body>
 
-    <header class="app-header">
-        <div class="logo">
-            <i class="fas fa-cog"></i> System Settings
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <span>TicketSystem</span>
+            <button class="mobile-menu-btn" onclick="toggleSidebar()" style="display:none; font-size:1rem;">✕</button>
         </div>
-        <div>
-            <a href="admin-scan.html" class="btn btn-sm btn-outline-light">スキャン画面へ</a>
-        </div>
-    </header>
+        <ul class="nav-links">
+            <li><a href="admin.html"><i class="fas fa-list"></i> 予約管理</a></li>
+            <li><a href="admin-settings.html" class="active"><i class="fas fa-cog"></i> 設定・マスタ</a></li>
+            <li><a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> ログアウト</a></li>
+        </ul>
+    </nav>
 
-    <main class="settings-container">
+    <main class="main-content">
+        <div class="page-header">
+            <div style="display:flex; align-items:center;">
+                <button class="mobile-menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+                <h1 class="page-title">システム設定</h1>
+            </div>
+        </div>
 
         <!-- Initial Loader -->
         <div id="loading">プログレスバー: データ読み込み中...</div>
@@ -101,7 +42,10 @@
 
             <!-- Groups Management -->
             <section class="card">
-                <h2>団体管理 <button class="btn btn-primary btn-sm" onclick="showAddGroupModal()">+ 追加</button></h2>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                    <h2 style="margin:0;">団体管理</h2>
+                    <button class="btn btn-primary btn-sm" onclick="showAddGroupModal()">+ 追加</button>
+                </div>
                 <div class="table-wrapper">
                     <table id="groups-table">
                         <thead>
@@ -168,8 +112,7 @@
     </main>
 
     <!-- Scripts -->
-    <script src="../assets/js/config.js"></script>
-    <script src="../assets/js/api.js"></script>
+    <!-- Scripts -->
     <script type="module" src="../assets/js/admin-settings.js"></script>
 </body>
 

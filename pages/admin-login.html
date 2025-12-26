@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理者ログイン | 市川学園座席管理システム - 國枝版</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/css/admin.css">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .login-card {
+            background: white;
+            padding: 3rem;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .error {
+            color: #ef4444;
+            margin-top: 1rem;
+            font-size: 0.875rem;
+            display: none;
+            background: #fee2e2;
+            padding: 0.5rem;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login-card">
+        <h1>管理者ログイン</h1>
+        <form id="login-form">
+            <div class="form-group">
+                <input type="password" id="password" class="form-input" placeholder="パスワードを入力" required>
+            </div>
+            <button type="submit" id="btn-login" class="btn btn-primary" style="width:100%">ログイン</button>
+            <div id="error-msg" class="error">パスワードが間違っています</div>
+        </form>
+    </div>
+
+    <script type="module">
+        import { apiUrlManager } from '../assets/js/config.js';
+
+        // Robust JSONP Helper
+        function fetchJsonp(url, params, callback, timeout = 10000) {
+            const callbackName = 'jsonp_login_' + Math.round(100000 * Math.random());
+            let isCompleted = false;
+
+            window[callbackName] = function (data) {
+                if (isCompleted) return;
+                isCompleted = true;
+                delete window[callbackName];
+                // Remove script safely
+                const el = document.getElementById(callbackName);
+                if (el) document.body.removeChild(el);
+
+                callback(data);
+            };
+
+            const script = document.createElement('script');
+            const queryString = Object.keys(params).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&');
+            script.src = `${url}?${queryString}&callback=${callbackName}`;
+            script.id = callbackName;
+
+            script.onerror = () => {
+                if (isCompleted) return;
+                isCompleted = true;
+                delete window[callbackName];
+                const el = document.getElementById(callbackName);
+                if (el) document.body.removeChild(el);
+
+                // Invoke callback with error structure
+                callback({ success: false, error: 'Network Error (Script Load Failed)' });
+            };
+
+            document.body.appendChild(script);
+
+            // Timeout
+            setTimeout(() => {
+                if (!isCompleted) {
+                    isCompleted = true;
+                    // clean up
+                    delete window[callbackName];
+                    const el = document.getElementById(callbackName);
+                    if (el) document.body.removeChild(el);
+
+                    callback({ success: false, error: 'Request Timed Out (Backend may be sleeping or undeployed)' });
+                }
+            }, timeout);
+        }
+
+        document.getElementById('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const passwordInput = document.getElementById('password');
+            const password = passwordInput.value.trim();
+            const btn = document.getElementById('btn-login');
+            const errorMsg = document.getElementById('error-msg');
+
+            if (!password) {
+                alert('パスワードを入力してください');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerText = '確認中...';
+            errorMsg.style.display = 'none';
+            errorMsg.innerText = '';
+
+            try {
+                const apiUrl = apiUrlManager.getCurrentUrl();
+                console.log('Login attempting against:', apiUrl);
+
+                fetchJsonp(apiUrl, { action: 'verify_admin_password', password: password }, (res) => {
+                    console.log('Login Response:', res);
+                    if (res && res.success) {
+                        // Success
+                        sessionStorage.setItem('admin_session', 'active');
+                        sessionStorage.setItem('admin_verified_at', new Date().toISOString());
+
+                        // Show success state briefly then redirect
+                        btn.innerText = 'ログイン成功';
+                        btn.style.background = '#10b981';
+                        setTimeout(() => {
+                            window.location.href = 'admin.html';
+                        }, 500);
+
+                    } else {
+                        // Failure
+                        errorMsg.style.display = 'block';
+                        errorMsg.innerText = res.error || 'パスワードが違います'; // res.error might be network error
+                        btn.disabled = false;
+                        btn.innerText = 'ログイン';
+                        passwordInput.value = ''; // clear input
+                        passwordInput.focus();
+                    }
+                });
+            } catch (err) {
+                console.error(err);
+                errorMsg.style.display = 'block';
+                errorMsg.innerText = 'System Error: ' + err.message;
+                btn.disabled = false;
+                btn.innerText = 'ログイン';
+            }
+        });
+    </script>
+</body>
+
+</html>

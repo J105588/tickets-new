@@ -48,6 +48,62 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 let masterGroups = [];
 
+function initSetup() {
+    const inputs = {
+        group: targetGroup,
+        day: targetDay,
+        timeslot: targetTimeslot,
+        startBtn: document.getElementById('btn-start-scan')
+    };
+
+    // Group Change
+    inputs.group.addEventListener('change', (e) => {
+        state.group = e.target.value;
+        state.day = '';
+        state.timeslot = '';
+
+        // Reset downstream
+        inputs.day.innerHTML = '<option value="" disabled selected>読み込み中...</option>';
+        inputs.day.disabled = true;
+        inputs.timeslot.innerHTML = '<option value="" disabled selected>時間帯を選択してください</option>';
+        inputs.timeslot.disabled = true;
+        checkSetupValidity(inputs);
+
+        fetchScannablePerformances(state.group, inputs);
+    });
+
+    // Day Change
+    inputs.day.addEventListener('change', (e) => {
+        state.day = e.target.value;
+        state.timeslot = '';
+        updateTimeslotOptionsForScan(inputs);
+        checkSetupValidity(inputs);
+    });
+
+    // Timeslot Change
+    inputs.timeslot.addEventListener('change', (e) => {
+        state.timeslot = e.target.value;
+        checkSetupValidity(inputs);
+    });
+
+    // Start Button
+    inputs.startBtn.addEventListener('click', () => {
+        if (!inputs.startBtn.disabled) {
+            startScanMode();
+        }
+    });
+}
+
+function populateGroupSelect() {
+    targetGroup.innerHTML = '<option value="" disabled selected>団体を選択してください</option>';
+    masterGroups.forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = g.name;
+        opt.textContent = g.name;
+        targetGroup.appendChild(opt);
+    });
+}
+
 async function initializeMasterData() {
     const result = await fetchMasterDataFromSupabase();
 
@@ -258,36 +314,47 @@ async function executeCheckIn() {
     btn.disabled = true;
     btn.innerText = '送信中...';
 
+    const params = {
+        action: 'check_in',
+        id: booking.id,
+        passcode: booking.passcode
+    };
+
     try {
         const apiUrl = apiUrlManager.getCurrentUrl();
-        // check_in action
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            body: JSON.stringify({
-                action: 'check_in',
-                id: booking.id,
-                passcode: booking.passcode // 管理者権限での強制チェックイン用アクションがあればパスコード不要だが、今は流用
-            })
+        fetchJsonp(apiUrl, params, (json) => {
+            if (json.success) {
+                hideResultModal();
+                showSuccessMsg(`${booking.name} 様のチェックイン完了`);
+                setTimeout(() => {
+                    document.getElementById('success-msg').style.display = 'none';
+                }, 3000);
+            } else {
+                alert('チェックイン失敗: ' + (json.error || '不明なエラー'));
+            }
+            btn.disabled = false;
+            btn.innerText = 'チェックイン実行';
         });
-        const json = await response.json();
 
-        if (json.success) {
-            hideResultModal();
-            showSuccessMsg(`${booking.name} 様のチェックイン完了`);
-
-            // Auto hide message after 3s
-            setTimeout(() => {
-                document.getElementById('success-msg').style.display = 'none';
-            }, 3000);
-        } else {
-            alert('チェックイン失敗: ' + json.error);
-        }
     } catch (e) {
         alert('通信エラー');
-    } finally {
         btn.disabled = false;
         btn.innerText = 'チェックイン実行';
     }
+}
+
+// Helper fetchJsonp (Should be shared but duplicate for safety here)
+function fetchJsonp(url, params, callback) {
+    const callbackName = 'jsonp_scan_' + Math.round(100000 * Math.random());
+    window[callbackName] = function (data) {
+        delete window[callbackName];
+        document.body.removeChild(script);
+        callback(data);
+    };
+    const script = document.createElement('script');
+    const queryString = Object.keys(params).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&');
+    script.src = `${url}?${queryString}&callback=${callbackName}`;
+    document.body.appendChild(script);
 }
 
 // 公演データキャッシュ (Admin用)

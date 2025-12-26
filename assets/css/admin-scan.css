@@ -1,37 +1,6 @@
-/* admin-scan.css */
-body {
-    background-color: #343a40;
-    color: #fff;
-    font-family: 'Helvetica Neue', Arial, sans-serif;
-}
+/* admin-scan.css - Scanner Specific Styles */
 
-.scan-container {
-    max-width: 600px;
-    margin: 1rem auto;
-    padding: 20px;
-    background: #fff;
-    color: #333;
-    border-radius: 8px;
-    min-height: 400px;
-}
-
-.app-header {
-    background: #212529;
-    padding: 10px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: white;
-}
-
-.logo {
-    font-size: 1.2rem;
-    font-weight: bold;
-}
-
-h2 {
-    margin-top: 0;
-}
+/* Remove body/container styles as they are now handled by admin.css specific card/main-content classes */
 
 .target-info {
     background: #e9ecef;
@@ -57,11 +26,17 @@ h2 {
     cursor: pointer;
     font-weight: bold;
     color: #666;
+    transition: 0.2s;
+}
+
+.tab-btn:hover {
+    background: #f9fafb;
 }
 
 .tab-btn.active {
-    border-bottom-color: #6f42c1;
-    color: #6f42c1;
+    border-bottom-color: var(--primary-color, #6366f1);
+    color: var(--primary-color, #6366f1);
+    background: #f0f0ff;
 }
 
 .tab-content {
@@ -96,8 +71,8 @@ h2 {
 .success-msg {
     margin-top: 20px;
     padding: 15px;
-    background: #d4edda;
-    color: #155724;
+    background: #dcfce7;
+    color: #166534;
     border-radius: 8px;
     text-align: center;
     font-size: 1.2rem;
@@ -124,52 +99,4 @@ h2 {
 .danger-text {
     color: #721c24;
     font-weight: bold;
-}
-
-/* Buttons & Forms - reuse base styles roughly */
-.form-control {
-    width: 100%;
-    padding: 8px;
-    margin-bottom: 10px;
-    box-sizing: border-box;
-}
-
-.btn {
-    padding: 10px 15px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.btn-primary {
-    background: #007bff;
-    color: white;
-}
-
-.btn-success {
-    background: #28a745;
-    color: white;
-    width: 100%;
-}
-
-.btn-secondary {
-    background: #6c757d;
-    color: white;
-    width: 100%;
-}
-
-.btn-outline-light {
-    background: transparent;
-    border: 1px solid #fff;
-    color: #fff;
-}
-
-.btn-block {
-    width: 100%;
-}
-
-.note {
-    font-size: 0.8rem;
-    color: #666;
-    text-align: center;
 }

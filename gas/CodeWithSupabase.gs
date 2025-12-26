@@ -216,6 +216,20 @@ function doGet(e) {
            response = adminChangeSeats(e.parameter.id, newSeats);
            break;
            
+           case 'admin_update_reservation':
+             var updates = {
+                name: e.parameter.name,
+                email: e.parameter.email,
+                grade_class: e.parameter.grade_class,
+                club_affiliation: e.parameter.club_affiliation,
+                notes: e.parameter.notes
+             };
+             // Remove undefined
+             Object.keys(updates).forEach(key => updates[key] === undefined && delete updates[key]);
+             
+             response = adminUpdateReservation(e.parameter.id, updates);
+             break;
+             
          case 'admin_cancel_reservation':
            // 管理者権限でのキャンセル（パスコード不要バージョン、ログ残すなど）
            // ここでは既存のcancelReservationを再利用しつつ、passcodeチェックを回避するラッパーが必要だか、
@@ -227,6 +241,27 @@ function doGet(e) {
            // -> AdminAPI.gsに追加実装するほうが良い。
            response = adminCancelReservation(e.parameter.id);
            break;
+           
+         case 'check_in':
+           // Adminスキャン、または自己チェックイン
+           response = checkInReservation(e.parameter.id, e.parameter.passcode);
+           break;
+                    case 'verify_admin_password':
+            const propPass = PropertiesService.getScriptProperties().getProperty('ADMIN_PASSWORD_2');
+            
+            if (!propPass) {
+               response = { success: false, error: '管理者パスワードがサーバーに設定されていません' };
+            } else {
+               const correctPassword = propPass.trim();
+               const inputPassword = e.parameter.password ? e.parameter.password.trim() : '';
+               
+               if (inputPassword === correctPassword) {
+                 response = { success: true };
+               } else {
+                 response = { success: false, error: 'パスワードが違います' };
+               }
+            }
+            break;
            
          default:
            throw new Error("不明なアクション: " + action);
