@@ -3,6 +3,8 @@
  * 管理者用QRスキャナー＆チェックイン制御
  */
 
+import { apiUrlManager } from './config.js';
+
 const state = {
     group: '',
     day: '',

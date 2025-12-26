@@ -3,6 +3,8 @@
  * 予約確認・QR表示用スクリプト
  */
 
+import { apiUrlManager } from './config.js';
+
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Check URL parameters for auto-login
     const params = new URLSearchParams(window.location.search);

@@ -3,6 +3,8 @@
  * 予約フローを制御するスクリプト
  */
 
+import { apiUrlManager } from './config.js';
+
 // 状態管理
 const state = {
     group: '',
