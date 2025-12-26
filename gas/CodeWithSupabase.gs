@@ -165,6 +165,12 @@ function doGet(e) {
          case 'get_booking_details':
            response = getBookingDetails(e.parameter.id, e.parameter.passcode);
            break;
+         case 'get_performances':
+           response = getPerformancesForGroup(e.parameter.group);
+           break;
+         case 'get_master_data':
+           response = getMasterData();
+           break;
          default:
            throw new Error("不明なアクション: " + action);
        }

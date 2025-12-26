@@ -35,23 +35,65 @@ const navigation = {
 };
 
 // 初期化
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    await initializeMasterData();
     initStep1();
 });
+
+let masterGroups = [];
+
+async function initializeMasterData() {
+    try {
+        const apiUrl = apiUrlManager.getCurrentUrl();
+        const url = `${apiUrl}?action=get_master_data`;
+        const response = await fetch(url);
+        const json = await response.json();
+
+        if (json.success) {
+            masterGroups = json.data.groups;
+            populateGroupSelect();
+        } else {
+            console.error('Master Data Load Error:', json.error);
+            // Fallback: Show error in select
+            document.getElementById('group-select').innerHTML = '<option disabled selected>データの読み込みに失敗しました</option>';
+        }
+    } catch (e) {
+        console.error(e);
+        document.getElementById('group-select').innerHTML = '<option disabled selected>通信エラー発生</option>';
+    }
+}
+
+function populateGroupSelect() {
+    const select = document.getElementById('group-select');
+    select.innerHTML = '<option value="" disabled selected>選択してください</option>';
+
+    masterGroups.forEach(g => {
+        if (!g.is_active) return;
+        const option = document.createElement('option');
+        option.value = g.name;
+        option.textContent = g.name;
+        select.appendChild(option);
+    });
+}
+
 
 // ==========================================
 // Step 1: 公演選択
 // ==========================================
 function initStep1() {
-    inputs.group.addEventListener('change', () => {
+    inputs.group.addEventListener('change', async () => {
         state.group = inputs.group.value;
-        inputs.day.disabled = false;
-        checkStep1Validity();
+        inputs.day.innerHTML = '<option value="" disabled selected>読み込み中...</option>';
+        inputs.day.disabled = true;
+        inputs.timeslot.innerHTML = '<option value="" disabled selected>日程を選択してください</option>';
+        inputs.timeslot.disabled = true;
+
+        await fetchPerformances(state.group);
     });
 
     inputs.day.addEventListener('change', () => {
         state.day = inputs.day.value;
-        inputs.timeslot.disabled = false;
+        updateTimeslotOptions();
         checkStep1Validity();
     });
 
@@ -69,6 +111,65 @@ function initStep1() {
 function checkStep1Validity() {
     const isValid = state.group && state.day && state.timeslot;
     navigation.toStep2.disabled = !isValid;
+}
+
+// 公演データキャッシュ
+let performanceData = [];
+
+async function fetchPerformances(group) {
+    try {
+        const apiUrl = apiUrlManager.getCurrentUrl();
+        const url = `${apiUrl}?action=get_performances&group=${encodeURIComponent(group)}`;
+        const response = await fetch(url);
+        const json = await response.json();
+
+        if (json.success) {
+            performanceData = json.data;
+            updateDayOptions();
+        } else {
+            alert('公演データの取得に失敗しました: ' + json.error);
+        }
+    } catch (e) {
+        console.error(e);
+        alert('通信エラーが発生しました');
+    }
+}
+
+function updateDayOptions() {
+    const days = [...new Set(performanceData.map(p => p.day))].sort();
+
+    inputs.day.innerHTML = '<option value="" disabled selected>日程を選択してください</option>';
+    days.forEach(day => {
+        const option = document.createElement('option');
+        option.value = day;
+        option.textContent = `${day}日目`;
+        inputs.day.appendChild(option);
+    });
+
+    inputs.day.disabled = false;
+}
+
+function updateTimeslotOptions() {
+    const day = parseInt(state.day);
+    const timeslots = performanceData
+        .filter(p => p.day == day)
+        .map(p => p.timeslot)
+        .sort();
+
+    inputs.timeslot.innerHTML = '<option value="" disabled selected>時間帯を選択してください</option>';
+    timeslots.forEach(slot => {
+        const option = document.createElement('option');
+        option.value = slot;
+        option.textContent = `${slot}時間帯 (${getTimeString(slot)})`;
+        inputs.timeslot.appendChild(option);
+    });
+
+    inputs.timeslot.disabled = false;
+}
+
+function getTimeString(timeslot) {
+    const map = { 'A': '09:00~', 'B': '11:00~', 'C': '13:00~', 'D': '15:00~', 'E': '17:00~' };
+    return map[timeslot] || '';
 }
 
 // ==========================================

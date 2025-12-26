@@ -9,8 +9,8 @@ const state = {
     group: '',
     day: '',
     timeslot: '',
-    isScanning: false,
-    html5QrcodeScanner: null,
+    scanner: null, // Replaces html5QrcodeScanner
+    isScanning: false, // Kept for scanner state management
     currentBooking: null
 };
 
@@ -24,20 +24,8 @@ const targetTimeslot = document.getElementById('target-timeslot');
 // Init
 document.addEventListener('DOMContentLoaded', () => {
     // Setup inputs
-    targetGroup.addEventListener('change', () => {
-        state.group = targetGroup.value;
-        targetDay.disabled = false;
-    });
-    targetDay.addEventListener('change', () => {
-        state.day = targetDay.value;
-        targetTimeslot.disabled = false;
-    });
-    targetTimeslot.addEventListener('change', () => {
-        state.timeslot = targetTimeslot.value;
-        document.getElementById('btn-start-scan').disabled = false;
-    });
+    initSetup(); // Call the new setup function
 
-    document.getElementById('btn-start-scan').addEventListener('click', startScanMode);
     document.getElementById('btn-change-mode').addEventListener('click', exitScanMode);
 
     // Tab switching
@@ -281,6 +269,61 @@ async function executeCheckIn() {
         btn.disabled = false;
         btn.innerText = 'チェックイン実行';
     }
+}
+
+// 公演データキャッシュ (Admin用)
+let performanceScanData = [];
+
+async function fetchScannablePerformances(group, inputs) {
+    try {
+        const apiUrl = apiUrlManager.getCurrentUrl();
+        const url = `${apiUrl}?action=get_performances&group=${encodeURIComponent(group)}`;
+        const response = await fetch(url);
+        const json = await response.json();
+
+        if (json.success) {
+            performanceScanData = json.data;
+
+            // Populate Days
+            const days = [...new Set(performanceScanData.map(p => p.day))].sort();
+            inputs.day.innerHTML = '<option value="" disabled selected>日程を選択してください</option>';
+            days.forEach(day => {
+                const option = document.createElement('option');
+                option.value = day;
+                option.textContent = `${day}日目`;
+                inputs.day.appendChild(option);
+            });
+            inputs.day.disabled = false;
+        } else {
+            alert('公演データの取得に失敗しました: ' + json.error);
+        }
+    } catch (e) {
+        console.error(e);
+        alert('通信エラーが発生しました');
+    }
+}
+
+function updateTimeslotOptionsForScan(inputs) {
+    const day = parseInt(state.day);
+    const timeslots = performanceScanData
+        .filter(p => p.day == day)
+        .map(p => p.timeslot)
+        .sort();
+
+    inputs.timeslot.innerHTML = '<option value="" disabled selected>時間帯を選択してください</option>';
+    timeslots.forEach(slot => {
+        const option = document.createElement('option');
+        option.value = slot;
+        option.textContent = `${slot}時間帯`;
+        inputs.timeslot.appendChild(option);
+    });
+
+    inputs.timeslot.disabled = false;
+}
+
+function checkSetupValidity(inputs) {
+    const isValid = state.group && state.day && state.timeslot;
+    inputs.startBtn.disabled = !isValid;
 }
 
 function showSuccessMsg(text) {

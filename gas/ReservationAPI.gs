@@ -214,3 +214,27 @@ ${statusUrl}
     // メール送信失敗は予約失敗にはしない
   }
 }
+
+// ==========================================
+// 公演情報取得 (Get Performances)
+// ==========================================
+
+/**
+ * 指定された団体の公演一覧を取得する
+ * @param {string} group - 団体名 (例: 演劇部)
+ */
+function getPerformancesForGroup(group) {
+  try {
+    // 1. Supabaseから取得 (performancesテーブル)
+    const endpoint = `performances?group_name=eq.${encodeURIComponent(group)}&select=day,timeslot,id`;
+    const result = supabaseIntegration._request(endpoint);
+    
+    if (!result.success) {
+      return { success: false, error: '公演データの取得に失敗しました' };
+    }
+    
+    return { success: true, data: result.data };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
