@@ -1,22 +1,86 @@
-/* reservation-status.css */
+/* reservation-status.css - Premium Design */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --primary-color: #6366f1;
+    --primary-hover: #4f46e5;
+    --secondary-color: #64748b;
+    --background-color: #f8fafc;
+    --surface-color: rgba(255, 255, 255, 0.85);
+    /* Glassmorphism */
+    --text-color: #1e293b;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
+    --radius-lg: 16px;
+    --radius-md: 12px;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
 body {
-    background-color: #f0f2f5;
-    font-family: 'Helvetica Neue', Arial, sans-serif;
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+    color: var(--text-color);
+    min-height: 100vh;
+    background-color: #0f172a;
+    /* Fallback */
+    background-image:
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.33) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.33) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(2ec4b6, 0.33) 0px, transparent 50%),
+        radial-gradient(at 0% 100%, rgba(236, 72, 153, 0.33) 0px, transparent 50%);
+    background-attachment: fixed;
+    background-size: cover;
+    display: flex;
+    flex-direction: column;
+}
+
+.app-header {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: white;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.logo {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
 }
 
 .status-container {
-    max-width: 500px;
-    margin: 2rem auto;
-    padding: 20px;
-    background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    max-width: 480px;
+    width: 90%;
+    margin: 0 auto 3rem;
+    padding: 2.5rem;
+    background: var(--surface-color);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 h2 {
     text-align: center;
-    color: #333;
-    margin-bottom: 1.5rem;
+    color: #1e293b;
+    margin-bottom: 2rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
 }
 
 /* Form Styles */
@@ -24,86 +88,121 @@ h2 {
     margin-bottom: 1.5rem;
 }
 
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-color);
+    font-size: 0.95rem;
+}
+
 .form-control {
     width: 100%;
-    padding: 12px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    font-size: 16px;
+    padding: 12px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: 1rem;
+    font-family: inherit;
+    transition: all 0.2s;
+    background: rgba(255, 255, 255, 0.9);
     box-sizing: border-box;
+    /* Important fix for width overflow */
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
 }
 
 .btn {
-    padding: 12px;
+    padding: 14px 20px;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     cursor: pointer;
-    font-size: 16px;
+    font-size: 1rem;
+    font-weight: 600;
     width: 100%;
-    transition: 0.2s;
+    transition: all 0.2s;
+    display: block;
+    box-sizing: border-box;
 }
 
 .btn-primary {
-    background: #6f42c1;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-hover));
     color: white;
+    box-shadow: 0 4px 6px rgba(99, 102, 241, 0.25);
 }
 
 .btn-primary:active {
-    transform: scale(0.98);
+    transform: translateY(1px);
+    box-shadow: 0 2px 4px rgba(99, 102, 241, 0.25);
 }
 
 .btn-outline {
     background: transparent;
-    border: 1px solid #6c757d;
-    color: #6c757d;
+    border: 1px solid var(--text-muted);
+    color: var(--text-muted);
     margin-top: 1rem;
 }
 
-/* Details Styles */
+.btn-danger {
+    background: #ef4444;
+    color: white;
+    margin-bottom: 1rem;
+}
+
+/* Details Section */
 .status-header {
     text-align: center;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 1rem;
-    margin-bottom: 1rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 1.5rem;
 }
 
 .badge {
     display: inline-block;
-    padding: 5px 10px;
-    border-radius: 20px;
-    font-size: 0.9rem;
-    font-weight: bold;
-    margin-bottom: 0.5rem;
+    padding: 6px 12px;
+    border-radius: 9999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    letter-spacing: 0.025em;
 }
 
-/* Status Colors */
 .status-confirmed {
-    background: #d4edda;
-    color: #155724;
+    background: #dcfce7;
+    color: #166534;
 }
 
 .status-checked-in {
-    background: #cce5ff;
-    color: #004085;
+    background: #dbeafe;
+    color: #1e40af;
 }
 
 .status-cancelled {
-    background: #f8d7da;
-    color: #721c24;
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+#disp-program-name {
+    font-size: 1.5rem;
+    margin: 0;
+    line-height: 1.3;
 }
 
 .qr-area {
     text-align: center;
     margin: 2rem 0;
-    padding: 1rem;
-    background: #fafafa;
-    border-radius: 8px;
+    padding: 2rem;
+    background: white;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-color);
 }
 
 #qrcode {
     display: inline-block;
-    padding: 10px;
-    background: white;
 }
 
 #qrcode img {
@@ -112,24 +211,27 @@ h2 {
 
 .qr-note {
     font-size: 0.9rem;
-    color: #666;
-    margin-top: 10px;
+    color: var(--text-muted);
+    margin-top: 1rem;
 }
 
 .qr-alt {
+    margin-top: 0.5rem;
+    font-family: monospace;
     font-size: 1.2rem;
-    margin-top: 5px;
+    color: var(--text-color);
 }
 
 .details-box {
-    background: #fff;
+    margin-bottom: 2rem;
 }
 
 .detail-row {
     display: flex;
     justify-content: space-between;
     padding: 12px 0;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.95rem;
 }
 
 .detail-row:last-child {
@@ -137,12 +239,15 @@ h2 {
 }
 
 .label {
-    color: #888;
-    font-size: 0.95rem;
+    color: var(--text-muted);
 }
 
 .value {
-    font-weight: 500;
-    color: #333;
+    font-weight: 600;
+    color: var(--text-color);
     text-align: right;
+}
+
+.action-buttons {
+    margin-top: 2rem;
 }

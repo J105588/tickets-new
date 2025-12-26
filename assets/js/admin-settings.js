@@ -3,7 +3,7 @@
  * マスタデータ設定画面の制御
  */
 
-import { apiUrlManager } from './config.js';
+import { fetchMasterDataFromSupabase } from './supabase-client.js';
 
 let masterData = {
     groups: [],
@@ -16,23 +16,15 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function fetchMasterData() {
-    try {
-        const apiUrl = apiUrlManager.getCurrentUrl();
-        const url = `${apiUrl}?action=get_master_data`;
-        const response = await fetch(url);
-        const json = await response.json();
+    const result = await fetchMasterDataFromSupabase();
 
-        if (json.success) {
-            masterData = json.data;
-            renderAll();
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('main-content').style.display = 'block';
-        } else {
-            alert('データ読み込み失敗: ' + json.error);
-        }
-    } catch (e) {
-        console.error(e);
-        alert('通信エラー');
+    if (result.success) {
+        masterData = result.data;
+        renderAll();
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('main-content').style.display = 'block';
+    } else {
+        alert('データ読み込み失敗: ' + result.error);
     }
 }
 

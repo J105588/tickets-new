@@ -1,7 +1,7 @@
 // config.js
 // 複数のAPI URL（使用数上限回避のため分散）
 const GAS_API_URLS = [
-  "https://script.google.com/macros/s/AKfycbxeabRqGftPxskWxjP2K0z2E2CY_pEp97UOxttG61pwnGZf_eP6_sV9A4ln6n8HubXfnQ/exec"
+  "https://script.google.com/macros/s/AKfycbzXQ6sxHxXQ1WUHEwa-MuPw1sQnYaZ55QBmjHql7SYc-7e_7uuGex0muElX91zaM2GqrA/exec"
   //jxjin2010@gmail.com
   //"https://script.google.com/macros/s/AKfycbwfHVEZwLbCs_sJ3ckyr6vdCLfI3twmiENbBuSOidMUOLAnGwfmGoyvGLcXihJMu8T1/exec",
   //jxjin.ig.school@gmail.com
@@ -17,6 +17,12 @@ const GAS_API_URLS = [
   // 赤松
   //"https://script.google.com/macros/s/AKfycbxhXhbb42I2QBgtsa239zj6P5xnrq59i-2Q4rX20dl3fmcUMCmG27nfSV8L6PLdLwuKLg/exec"
 ];
+
+// Supabase設定（直接接続用）
+const SUPABASE_CONFIG = {
+  url: "https://dsmnqpcizmudfkfitrfg.supabase.co", // 例: https://xyz.supabase.co
+  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzbW5xcGNpem11ZGZrZml0cmZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5ODc3OTksImV4cCI6MjA3NDU2Mzc5OX0.0BBCmyV_IrZBch-hvPgW5HuG6-zgE7T1Hdvl7a-aB7g" // 公開可能な匿名キー
+};
 
 // ログ記録用スプレッドシートID
 const LOG_SPREADSHEET_ID = '1ZGQ5BTNW_pTDuMvbZgla2B_soisdvtCM2UrnVi_L-5c'; // 実際のスプレッドシートIDに置き換えてください
@@ -372,5 +378,5 @@ function debugLog(message, obj = null) {
 }
 
 // 個別にエクスポート
-export { GAS_API_URLS, BACKGROUND_SYNC_URL, DEBUG_MODE, debugLog, apiUrlManager, DemoMode };
+export { GAS_API_URLS, BACKGROUND_SYNC_URL, DEBUG_MODE, debugLog, apiUrlManager, DemoMode, SUPABASE_CONFIG };
 export { FEATURE_FLAGS, FULL_CAPACITY_NOTIFICATION_EMAILS, ENHANCED_MONITORING_CONFIG };

@@ -4,19 +4,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>チケット予約 | 演劇・音楽発表会</title>
+    <title>チケット予約 － 市川学園</title>
     <link rel="stylesheet" href="../assets/css/styles.css">
     <link rel="stylesheet" href="../assets/css/seats.css">
     <link rel="stylesheet" href="../assets/css/reservation.css">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
 
     <header class="app-header">
         <div class="logo">
-            <i class="fas fa-ticket-alt"></i> Ticket Reserve
+            <i class="fas fa-ticket-alt"></i> 市川学園座席管理システム ― 國枝版
         </div>
     </header>
 
@@ -60,7 +62,7 @@
         <section id="step-2" class="step-content">
             <div class="header-with-action">
                 <h2>座席を選択してください</h2>
-                <button class="btn btn-secondary btn-sm" onclick="showStep(1)">戻る</button>
+                <button id="btn-back-to-step-1" class="btn btn-secondary btn-sm">戻る</button>
             </div>
             <p class="instruction">スクリーン側が前方です。クリックして選択してください（複数選択可）。</p>
 
@@ -72,7 +74,7 @@
                     <div class="seat selected"></div>選択中
                 </div>
                 <div class="legend-item">
-                    <div class="seat reserved"></div>予約済
+                    <div class="seat reserved"></div>選択不可
                 </div>
             </div>
 
@@ -92,7 +94,7 @@
         <section id="step-3" class="step-content">
             <div class="header-with-action">
                 <h2>予約者情報を入力してください</h2>
-                <button class="btn btn-secondary btn-sm" onclick="showStep(2)">戻る</button>
+                <button id="btn-back-to-step-2" class="btn btn-secondary btn-sm">戻る</button>
             </div>
 
             <form id="reservation-form">
@@ -106,12 +108,24 @@
                     <small>予約完了メールとQRコードが送信されます。</small>
                 </div>
                 <div class="form-group">
-                    <label for="res-grade">所属年組 (在校生の場合)</label>
-                    <input type="text" id="res-grade" class="form-control" placeholder="例: 3年1組, 保護者, 一般">
+                    <label>お子様の所属年組 <span class="required">*</span></label>
+                    <div style="display: flex; gap: 10px;">
+                        <select id="res-grade-year" class="form-control">
+                            <option value="">年を選択 <span class="required">*</span></option>
+                            <!-- 1-6年 + その他 -->
+                        </select>
+                        <select id="res-grade-class" class="form-control">
+                            <option value="">組を選択 <span class="required">*</span></option>
+                            <!-- 1-11組 -->
+                        </select>
+                    </div>
                 </div>
                 <div class="form-group">
-                    <label for="res-club">所属部活 (任意)</label>
-                    <input type="text" id="res-club" class="form-control" placeholder="例: サッカー部">
+                    <label for="res-club-select">お子様の所属部活 <span class="required">*</span></label>
+                    <select id="res-club-select" class="form-control">
+                        <option value="">選択してください</option>
+                        <!-- JSで動的生成 -->
+                    </select>
                 </div>
 
                 <div class="confirmation-box">

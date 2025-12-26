@@ -14,7 +14,7 @@ class SupabaseIntegration {
   }
 
   // Supabase API呼び出しの基本メソッド
-  async _request(endpoint, options = {}) {
+  _request(endpoint, options = {}) {
     const url = `${this.url}/rest/v1/${endpoint}`;
     const method = (options.method || 'GET').toUpperCase();
     const isMutation = method !== 'GET' && method !== 'HEAD';
@@ -32,7 +32,7 @@ class SupabaseIntegration {
     };
 
     try {
-      const response = await UrlFetchApp.fetch(url, {
+      const response = UrlFetchApp.fetch(url, {
         method: method,
         headers: headers,
         payload: options.body ? JSON.stringify(options.body) : undefined,
@@ -62,52 +62,52 @@ class SupabaseIntegration {
   }
 
   // 公演データの取得
-  async getPerformance(group, day, timeslot) {
+  getPerformance(group, day, timeslot) {
     const endpoint = `performances?group_name=eq.${encodeURIComponent(group)}&day=eq.${day}&timeslot=eq.${timeslot}&select=*`;
-    return await this._request(endpoint);
+    return this._request(endpoint, { useServiceRole: true });
   }
 
   // 公演データの作成
-  async createPerformance(group, day, timeslot) {
+  createPerformance(group, day, timeslot) {
     const data = {
       group_name: group,
       day: day,
       timeslot: timeslot
     };
-    return await this._request('performances', {
+    return this._request('performances', {
       method: 'POST',
       body: data
     });
   }
 
   // 座席データの取得（既存のデータ構造に合わせた形式）
-  async getSeats(performanceId, status = null) {
+  getSeats(performanceId, status = null) {
     let endpoint = `seats?performance_id=eq.${performanceId}&select=*`;
     if (status) {
       endpoint += `&status=eq.${status}`;
     }
-    return await this._request(endpoint);
+    return this._request(endpoint);
   }
 
   // 座席データの更新
-  async updateSeat(performanceId, seatId, updates) {
+  updateSeat(performanceId, seatId, updates) {
     const data = {
       ...updates,
       updated_at: new Date().toISOString()
     };
     
-    return await this._request(`seats?performance_id=eq.${performanceId}&seat_id=eq.${seatId}`, {
+    return this._request(`seats?performance_id=eq.${performanceId}&seat_id=eq.${seatId}`, {
       method: 'PATCH',
       body: data
     });
   }
 
   // 複数座席の一括更新
-  async updateMultipleSeats(performanceId, updates) {
+  updateMultipleSeats(performanceId, updates) {
     const results = [];
     
     for (const update of updates) {
-      const result = await this.updateSeat(performanceId, update.seatId, update.data);
+      const result = this.updateSeat(performanceId, update.seatId, update.data);
       results.push({
         seatId: update.seatId,
         success: result.success,
@@ -119,7 +119,7 @@ class SupabaseIntegration {
   }
 
   // 座席の予約
-  async reserveSeats(performanceId, seatIds, reservedBy) {
+  reserveSeats(performanceId, seatIds, reservedBy) {
     const updates = seatIds.map(seatId => ({
       seatId: seatId,
       data: {
@@ -129,11 +129,11 @@ class SupabaseIntegration {
       }
     }));
     
-    return await this.updateMultipleSeats(performanceId, updates);
+    return this.updateMultipleSeats(performanceId, updates);
   }
 
   // 座席のチェックイン
-  async checkInSeats(performanceId, seatIds) {
+  checkInSeats(performanceId, seatIds) {
     const updates = seatIds.map(seatId => ({
       seatId: seatId,
       data: {
@@ -142,13 +142,13 @@ class SupabaseIntegration {
       }
     }));
     
-    return await this.updateMultipleSeats(performanceId, updates);
+    return this.updateMultipleSeats(performanceId, updates);
   }
 
   // 当日券の割り当て
-  async assignWalkInSeats(performanceId, count) {
+  assignWalkInSeats(performanceId, count) {
     // 利用可能な座席を取得
-    const availableSeatsResult = await this.getSeats(performanceId, 'available');
+    const availableSeatsResult = this.getSeats(performanceId, 'available');
     if (!availableSeatsResult.success || availableSeatsResult.data.length < count) {
       return { success: false, error: '利用可能な座席が不足しています' };
     }
@@ -170,12 +170,12 @@ class SupabaseIntegration {
       }
     }));
     
-    return await this.updateMultipleSeats(performanceId, updates);
+    return this.updateMultipleSeats(performanceId, updates);
   }
 
   // 座席データの統計取得
-  async getSeatStatistics(performanceId) {
-    const seatsResult = await this.getSeats(performanceId);
+  getSeatStatistics(performanceId) {
+    const seatsResult = this.getSeats(performanceId);
     if (!seatsResult.success) {
       return { success: false, error: '座席データの取得に失敗しました' };
     }
@@ -194,9 +194,9 @@ class SupabaseIntegration {
   }
 
   // 接続テスト
-  async testConnection() {
+  testConnection() {
     try {
-      const result = await this._request('performances?select=count');
+      const result = this._request('performances?select=count');
       return { success: true, message: 'Supabase接続成功' };
     } catch (error) {
       return { success: false, error: `Supabase接続失敗: ${error.message}` };
@@ -204,8 +204,8 @@ class SupabaseIntegration {
   }
 
   // 予約データの作成
-  async createBooking(data) {
-    return await this._request('bookings', {
+  createBooking(data) {
+    return this._request('bookings', {
       method: 'POST',
       body: {
         ...data,
@@ -218,9 +218,9 @@ class SupabaseIntegration {
   }
 
   // 予約データの取得（ID指定）
-  async getBooking(bookingId) {
+  getBooking(bookingId) {
     const endpoint = `bookings?id=eq.${bookingId}&select=*,seats(seat_id,row_letter,seat_number)`;
-    const result = await this._request(endpoint, {
+    const result = this._request(endpoint, {
       method: 'GET',
       useServiceRole: true
     });
@@ -232,9 +232,9 @@ class SupabaseIntegration {
   }
 
   // 予約情報の取得（IDとパスコード）- RLS回避のためService Roleを使用
-  async getBookingByCredentials(bookingId, passcode) {
+  getBookingByCredentials(bookingId, passcode) {
     const query = `id=eq.${bookingId}&passcode=eq.${passcode}`;
-    const result = await this._request(`bookings?select=*,seats(seat_id,row_letter,seat_number),performances(group_name,day,timeslot)&${query}`, {
+    const result = this._request(`bookings?select=*,seats(seat_id,row_letter,seat_number),performances(group_name,day,timeslot)&${query}`, {
       method: 'GET',
       useServiceRole: true // 機密情報取得のため管理者権限を使用
     });
@@ -245,9 +245,9 @@ class SupabaseIntegration {
   }
 
   // 予約ステータスの更新（および関連座席の更新）
-  async updateBookingStatus(bookingId, status) {
+  updateBookingStatus(bookingId, status) {
     // 1. 予約ステータス更新
-    const bookingUpdate = await this._request(`bookings?id=eq.${bookingId}`, {
+    const bookingUpdate = this._request(`bookings?id=eq.${bookingId}`, {
       method: 'PATCH',
       body: {
         status: status,
@@ -260,7 +260,7 @@ class SupabaseIntegration {
     // 2. 関連座席のステータス更新（チェックインの場合）
     if (status === 'checked_in') {
       // 予約に紐付く座席を取得して更新するのが確実だが、ここでは簡易的にbooking_idで更新
-      const seatUpdate = await this._request(`seats?booking_id=eq.${bookingId}`, {
+      const seatUpdate = this._request(`seats?booking_id=eq.${bookingId}`, {
         method: 'PATCH',
         body: {
           status: 'checked_in',

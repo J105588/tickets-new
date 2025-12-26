@@ -41,19 +41,45 @@ function createReservation(data) {
 
     // 3. 予約データの作成 (bookingsテーブル)
     const passcode = Math.floor(1000 + Math.random() * 9000).toString(); // 4桁の数字
-    const bookingData = {
-      performance_id: performanceId,
-      name: data.name,
-      email: data.email,
-      grade_class: data.grade_class,
-      club_affiliation: data.club_affiliation,
-      passcode: passcode,
-      status: 'confirmed'
-    };
     
-    const bookingResult = supabaseIntegration.createBooking(bookingData);
-    if (!bookingResult.success || !bookingResult.data || bookingResult.data.length === 0) {
-      return { success: false, error: '予約データの作成に失敗しました: ' + (bookingResult.error || '不明なエラー') };
+    // ランダムな予約ID (6桁) を生成して衝突しないか確認しながら保存
+    // 注意: 本来はDB側でUUIDを使うのがベストだが、既存互換維持のため数値ID生成
+    let bookingResult;
+    let retries = 0;
+    while(retries < 3) {
+      const randomId = Math.floor(100000 + Math.random() * 900000); 
+      const bookingData = {
+        id: randomId, // 明示的にIDを指定
+        performance_id: performanceId,
+        name: data.name,
+        email: data.email,
+        grade_class: data.grade_class,
+        club_affiliation: data.club_affiliation,
+        passcode: passcode,
+        status: 'confirmed'
+      };
+      
+      bookingResult = supabaseIntegration.createBooking(bookingData);
+      
+      // 成功したらループ抜ける
+      if (bookingResult.success && bookingResult.data && bookingResult.data.length > 0) {
+        break;
+      }
+      
+      // エラーチェック（重複エラーならリトライ、それ以外は失敗）
+      // Supabase(Postgres)の重複エラーコードは23505だが、GAS経由のエラーメッセージで判断
+      if (bookingResult.error && bookingResult.error.includes('duplicate key')) {
+         retries++;
+         console.log('Booking ID collision, retrying...', randomId);
+         continue;
+      } else {
+         // その他のエラー
+         return { success: false, error: '予約データの作成に失敗しました: ' + (bookingResult.error || '不明なエラー') };
+      }
+    }
+
+    if (!bookingResult || !bookingResult.success) {
+       return { success: false, error: '予約IDの生成に失敗しました。もう一度お試しください。' };
     }
     
     const bookingId = bookingResult.data[0].id; // 新しく作成された予約ID
@@ -162,6 +188,72 @@ function checkInReservation(bookingId, passcode) {
 }
 
 // ==========================================
+// 予約キャンセル (Cancel Reservation)
+// ==========================================
+
+/**
+ * 予約をキャンセルする
+ * 安全のため、bookingIdとpasscodeの両方が必要
+ */
+function cancelReservation(bookingId, passcode) {
+  try {
+    // 1. 予約の検証
+    const getRes = supabaseIntegration.getBookingByCredentials(bookingId, passcode);
+    if (!getRes.success) {
+      return { success: false, error: '予約が見つからないか、パスコードが間違っています' };
+    }
+    
+    const booking = getRes.data;
+    if (booking.status === 'cancelled') {
+        return { success: false, error: 'この予約は既にキャンセルされています' };
+    }
+    if (booking.status === 'checked_in') {
+        return { success: false, error: 'チェックイン済みの予約はキャンセルできません' };
+    }
+
+    // 2. 予約ステータスを cancelled に更新
+    const updateRes = supabaseIntegration.updateBookingStatus(bookingId, 'cancelled');
+    if (!updateRes.success) {
+        return { success: false, error: '予約ステータスの更新に失敗しました' };
+    }
+
+    // 3. 座席を開放 (status='available', reserved_by=null, booking_id=null)
+    const performanceId = booking.performance_id;
+    
+    // bookingsテーブルに関連づいている座席を取得するのは難しい（bookingには座席ID配列がない場合がある）
+    // しかし、seatsテーブルには booking_id があるはず
+    const seatsRes = supabaseIntegration._request(`seats?performance_id=eq.${performanceId}&booking_id=eq.${bookingId}`);
+    if (seatsRes.success && seatsRes.data.length > 0) {
+        const seatIds = seatsRes.data.map(s => s.seat_id);
+        
+        // 一括更新用データ作成
+        const updates = seatIds.map(sid => ({
+            seatId: sid,
+            data: {
+                status: 'available',
+                reserved_by: null,
+                booking_id: null,
+                reserved_at: null,
+                checked_in_at: null
+            }
+        }));
+        
+        const releaseRes = supabaseIntegration.updateMultipleSeats(performanceId, updates);
+        if (!releaseRes.success) {
+             console.error(`Warning: Booking ${bookingId} cancelled but seats ${seatIds.join(',')} failed to release.`);
+             // ユーザーにはキャンセル成功として伝えるが、裏でログ残す
+        }
+    }
+
+    return { success: true, message: '予約をキャンセルしました' };
+
+  } catch (e) {
+    console.error('cancelReservation Error:', e);
+    return { success: false, error: e.message };
+  }
+}
+
+// ==========================================
 // メール送信ヘルパー
 // ==========================================
 
@@ -172,7 +264,7 @@ function sendReservationEmail(to, info) {
   
   // ScriptPropertyからフロントエンドのベースURLを取得する設計を推奨
   // 今回は仮置き
-  const baseUrl = 'https://example.com/tickets-new'; 
+  const baseUrl = 'https://j105588.github.io/tickets-new'; 
   const statusUrl = `${baseUrl}/pages/reservation-status.html?id=${info.bookingId}&pass=${info.passcode}`;
   
   const subject = `【チケット予約完了】${info.group}公演`;

@@ -33,18 +33,23 @@ async function fetchBookingDetails(id, passcode) {
 
     try {
         const apiUrl = apiUrlManager.getCurrentUrl();
-        const url = `${apiUrl}?action=get_booking_details&id=${id}&passcode=${passcode}`;
+        // Use JSONP for GET request as well to avoid CORS issues completely
+        const params = {
+            action: 'get_booking_details',
+            id: id,
+            passcode: passcode
+        };
 
-        const response = await fetch(url);
-        const json = await response.json();
+        fetchJsonp(apiUrl, params, (json) => {
+            if (json.success) {
+                showDetails(json.data);
+            } else {
+                alert('確認失敗: ' + (json.error || '情報が見つかりません'));
+                btn.disabled = false;
+                btn.innerText = '確認する';
+            }
+        });
 
-        if (json.success) {
-            showDetails(json.data);
-        } else {
-            alert('確認失敗: ' + (json.error || '情報が見つかりません'));
-            btn.disabled = false;
-            btn.innerText = '確認する';
-        }
     } catch (e) {
         console.error(e);
         alert('通信エラーが発生しました');
@@ -100,6 +105,79 @@ function showDetails(data) {
         width: 180,
         height: 180
     });
+    // Cancel Button
+    const cancelBtn = document.getElementById('btn-cancel');
+    if (cancelBtn) {
+        if (data.status === 'confirmed') {
+            cancelBtn.style.display = 'inline-block';
+            cancelBtn.onclick = () => cancelBooking(data.id, data.passcode);
+        } else {
+            cancelBtn.style.display = 'none';
+        }
+    }
+}
+
+async function cancelBooking(id, passcode) {
+    if (!confirm('本当に予約をキャンセルしますか？\nこの操作は取り消せません。')) return;
+
+    const btn = document.getElementById('btn-cancel');
+    const originalText = btn.innerText;
+    btn.disabled = true;
+    btn.innerText = '処理中...';
+
+    const params = {
+        action: 'cancel_reservation',
+        id: id,
+        passcode: passcode
+    };
+
+    try {
+        const apiUrl = apiUrlManager.getCurrentUrl();
+        fetchJsonp(apiUrl, params, (json) => {
+            if (json.success) {
+                alert('予約をキャンセルしました。');
+                location.reload();
+            } else {
+                alert('キャンセル失敗: ' + (json.error || '不明なエラー'));
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
+        });
+
+    } catch (e) {
+        console.error(e);
+        alert('通信エラーが発生しました');
+        btn.disabled = false;
+        btn.innerText = originalText;
+    }
+}
+
+/**
+ * JSONP Fetch Helper
+ */
+function fetchJsonp(url, params, callback) {
+    const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
+    window[callbackName] = function (data) {
+        delete window[callbackName];
+        document.body.removeChild(script);
+        callback(data);
+    };
+
+    const script = document.createElement('script');
+
+    // Construct query string
+    const queryString = Object.keys(params)
+        .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(params[key]))
+        .join('&');
+
+    script.src = `${url}?${queryString}&callback=${callbackName}`;
+    script.onerror = function () {
+        delete window[callbackName];
+        document.body.removeChild(script);
+        alert('APIへの接続に失敗しました (JSONP Error)');
+    };
+
+    document.body.appendChild(script);
 }
 
 function getStatusText(status) {

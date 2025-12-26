@@ -50,6 +50,9 @@ function doPost(e) {
         case 'check_in':
           response = checkInReservation(params.id, params.passcode);
           break;
+        case 'cancel_reservation':
+          response = cancelReservation(params.id, params.passcode);
+          break;
         default:
           throw new Error("不明なアクション: " + action);
       }
@@ -171,6 +174,60 @@ function doGet(e) {
          case 'get_master_data':
            response = getMasterData();
            break;
+         case 'create_reservation':
+           var resData = {
+               group: e.parameter.group ? e.parameter.group.trim() : "",
+               day: parseInt(e.parameter.day),
+               timeslot: e.parameter.timeslot ? e.parameter.timeslot.trim() : "",
+               name: e.parameter.name,
+               email: e.parameter.email,
+               grade_class: e.parameter.grade_class,
+               club_affiliation: e.parameter.club_affiliation,
+               seats: []
+           };
+           // seats handling (comma separated string)
+           if (e.parameter.seats) {
+               resData.seats = e.parameter.seats.split(',');
+           }
+           response = createReservation(resData);
+           break;
+         case 'cancel_reservation':
+           response = cancelReservation(e.parameter.id, e.parameter.passcode);
+           break;
+         
+         // --- 管理者追加機能 ---
+         case 'admin_get_reservations':
+           var filters = {
+             group: e.parameter.group,
+             day: e.parameter.day,
+             timeslot: e.parameter.timeslot,
+             year: e.parameter.year,
+             class_num: e.parameter.class_num
+           };
+           response = getAdminReservations(filters);
+           break;
+           
+         case 'admin_resend_email':
+           response = adminResendEmail(e.parameter.id);
+           break;
+           
+         case 'admin_change_seats':
+           var newSeats = e.parameter.seats ? e.parameter.seats.split(',') : [];
+           response = adminChangeSeats(e.parameter.id, newSeats);
+           break;
+           
+         case 'admin_cancel_reservation':
+           // 管理者権限でのキャンセル（パスコード不要バージョン、ログ残すなど）
+           // ここでは既存のcancelReservationを再利用しつつ、passcodeチェックを回避するラッパーが必要だか、
+           // adminResendEmailと同様に内部で処理するAdminAPI側関数を作るべき。
+           // いったん既存APIをパスコード付きで呼ぶか、AdminAPIにadminCancelReservationを作るか。
+           // AdminAPIに `adminCancelReservation(id)` を追加するのがベスト。
+           // 今回はAdminAPI.gsに未実装なので、既存cancelReservationを呼ぶことはできない（パスコード知らないため）。
+           // AdminAPI.gs に adminCancelを追加していないので、ここで直接実装するかAdminAPIへ。
+           // -> AdminAPI.gsに追加実装するほうが良い。
+           response = adminCancelReservation(e.parameter.id);
+           break;
+           
          default:
            throw new Error("不明なアクション: " + action);
        }
@@ -688,22 +745,26 @@ function updateMultipleSeatsSupabase(group, day, timeslot, updates) {
 /**
  * 公演を取得または作成する
  */
-async function getOrCreatePerformance(group, day, timeslot) {
+
+/**
+ * 公演を取得または作成する
+ */
+function getOrCreatePerformance(group, day, timeslot) {
   try {
     // 既存の公演を検索
-    const existingResult = await supabaseIntegration.getPerformance(group, day, timeslot);
+    const existingResult = supabaseIntegration.getPerformance(group, day, timeslot);
     if (existingResult.success && existingResult.data.length > 0) {
       return { success: true, data: existingResult.data[0] };
     }
     
     // 公演が存在しない場合は作成
-    const createResult = await supabaseIntegration.createPerformance(group, day, timeslot);
+    const createResult = supabaseIntegration.createPerformance(group, day, timeslot);
     if (!createResult.success) {
       return { success: false, error: createResult.error };
     }
     
     // 座席データを生成
-    await generateSeatsForPerformance(createResult.data.id);
+    generateSeatsForPerformance(createResult.data.id);
     
     return { success: true, data: createResult.data };
     

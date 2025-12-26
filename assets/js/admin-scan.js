@@ -4,6 +4,7 @@
  */
 
 import { apiUrlManager } from './config.js';
+import { fetchMasterDataFromSupabase, fetchPerformancesFromSupabase } from './supabase-client.js';
 
 const state = {
     group: '',
@@ -22,10 +23,14 @@ const targetDay = document.getElementById('target-day');
 const targetTimeslot = document.getElementById('target-timeslot');
 
 // Init
-document.addEventListener('DOMContentLoaded', () => {
-    // Setup inputs
-    initSetup(); // Call the new setup function
+document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Master Data
+    await initializeMasterData();
 
+    // 2. Setup inputs
+    initSetup();
+
+    // 3. Event Listeners
     document.getElementById('btn-change-mode').addEventListener('click', exitScanMode);
 
     // Tab switching
@@ -40,6 +45,20 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-confirm-checkin').addEventListener('click', executeCheckIn);
     document.getElementById('btn-cancel-checkin').addEventListener('click', hideResultModal);
 });
+
+let masterGroups = [];
+
+async function initializeMasterData() {
+    const result = await fetchMasterDataFromSupabase();
+
+    if (result.success) {
+        masterGroups = result.data.groups;
+        populateGroupSelect();
+    } else {
+        console.error('Master Data Load Error:', result.error);
+        document.getElementById('target-group').innerHTML = '<option disabled selected>データ読み込み失敗</option>';
+    }
+}
 
 function startScanMode() {
     setupSection.style.display = 'none';

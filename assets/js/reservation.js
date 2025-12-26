@@ -4,6 +4,7 @@
  */
 
 import { apiUrlManager } from './config.js';
+import { fetchMasterDataFromSupabase, fetchPerformancesFromSupabase, fetchSeatsFromSupabase } from './supabase-client.js';
 
 // 状態管理
 const state = {
@@ -37,29 +38,22 @@ const navigation = {
 // 初期化
 document.addEventListener('DOMContentLoaded', async () => {
     await initializeMasterData();
+    populateFormDropdowns();
     initStep1();
 });
 
 let masterGroups = [];
 
 async function initializeMasterData() {
-    try {
-        const apiUrl = apiUrlManager.getCurrentUrl();
-        const url = `${apiUrl}?action=get_master_data`;
-        const response = await fetch(url);
-        const json = await response.json();
+    // Supabaseからマスターデータ取得
+    const result = await fetchMasterDataFromSupabase();
 
-        if (json.success) {
-            masterGroups = json.data.groups;
-            populateGroupSelect();
-        } else {
-            console.error('Master Data Load Error:', json.error);
-            // Fallback: Show error in select
-            document.getElementById('group-select').innerHTML = '<option disabled selected>データの読み込みに失敗しました</option>';
-        }
-    } catch (e) {
-        console.error(e);
-        document.getElementById('group-select').innerHTML = '<option disabled selected>通信エラー発生</option>';
+    if (result.success) {
+        masterGroups = result.data.groups;
+        populateGroupSelect();
+    } else {
+        console.error('Master Data Load Error:', result.error);
+        document.getElementById('group-select').innerHTML = '<option disabled selected>データの読み込みに失敗しました</option>';
     }
 }
 
@@ -74,6 +68,65 @@ function populateGroupSelect() {
         option.textContent = g.name;
         select.appendChild(option);
     });
+}
+
+function populateFormDropdowns() {
+    // 年 (1-6 + その他)
+    const yearSelect = document.getElementById('res-grade-year');
+    if (yearSelect) {
+        yearSelect.innerHTML = '<option value="">年を選択</option>';
+        for (let i = 1; i <= 6; i++) {
+            const opt = document.createElement('option');
+            opt.value = `${i}年`;
+            opt.innerText = `${i}年`;
+            yearSelect.appendChild(opt);
+        }
+        const otherOpt = document.createElement('option');
+        otherOpt.value = 'その他';
+        otherOpt.innerText = 'その他';
+        yearSelect.appendChild(otherOpt);
+    }
+
+    // 組 (1-11)
+    const classSelect = document.getElementById('res-grade-class');
+    if (classSelect) {
+        classSelect.innerHTML = '<option value="">組を選択</option>';
+        for (let i = 1; i <= 11; i++) {
+            const opt = document.createElement('option');
+            opt.value = `${i}組`;
+            opt.innerText = `${i}組`;
+            classSelect.appendChild(opt);
+        }
+    }
+
+    // 部活 (masterGroupsから)
+    const clubSelect = document.getElementById('res-club-select');
+    if (clubSelect) {
+        clubSelect.innerHTML = '<option value="">選択してください</option>';
+        // masterGroups is global and populated by initializeMasterData
+        if (typeof masterGroups !== 'undefined' && masterGroups.length > 0) {
+            masterGroups.forEach(g => {
+                if (!g.is_active) return;
+                const opt = document.createElement('option');
+                opt.value = g.name;
+                opt.innerText = g.name;
+                clubSelect.appendChild(opt);
+            });
+        }
+    }
+}
+
+function getGradeClassValue() {
+    const yElem = document.getElementById('res-grade-year');
+    const cElem = document.getElementById('res-grade-class');
+    if (!yElem || !cElem) return '';
+
+    const y = yElem.value;
+    const c = cElem.value;
+    if (y === 'その他') return 'その他';
+    // Both must be selected for a valid student grade/class
+    if (y && c) return `${y}${c}`;
+    return '';
 }
 
 
@@ -106,6 +159,14 @@ function initStep1() {
         loadSeatMap();
         showStep(2);
     });
+
+    document.getElementById('btn-back-to-step-1').addEventListener('click', () => {
+        showStep(1);
+    });
+
+    document.getElementById('btn-back-to-step-2').addEventListener('click', () => {
+        showStep(2);
+    });
 }
 
 function checkStep1Validity() {
@@ -118,16 +179,13 @@ let performanceData = [];
 
 async function fetchPerformances(group) {
     try {
-        const apiUrl = apiUrlManager.getCurrentUrl();
-        const url = `${apiUrl}?action=get_performances&group=${encodeURIComponent(group)}`;
-        const response = await fetch(url);
-        const json = await response.json();
+        const result = await fetchPerformancesFromSupabase(group);
 
-        if (json.success) {
-            performanceData = json.data;
+        if (result.success) {
+            performanceData = result.data;
             updateDayOptions();
         } else {
-            alert('公演データの取得に失敗しました: ' + json.error);
+            alert('公演データの取得に失敗しました: ' + result.error);
         }
     } catch (e) {
         console.error(e);
@@ -186,92 +244,149 @@ async function loadSeatMap() {
     state.selectedSeats = [];
     updateSelectedSeatsUI();
 
+
+
     try {
-        // API呼び出し (GAS Web App)
-        // 注意: api.jsが実装されている前提、なければfetchを直書き
-        const apiUrl = apiUrlManager.getCurrentUrl(); // config.jsから取得
-        const url = `${apiUrl}?action=get_seats&group=${encodeURIComponent(state.group)}&day=${state.day}&timeslot=${state.timeslot}`;
+        // 直接Supabaseから座席データを取得
+        const result = await fetchSeatsFromSupabase(state.group, state.day, state.timeslot);
 
-        const response = await fetch(url);
-        const json = await response.json();
+        if (!result.success) throw new Error(result.error || 'データ取得失敗');
 
-        if (!json.success) throw new Error(json.error || 'データ取得失敗');
-
-        renderSeatMap(json.data); // dataは座席オブジェクトのマップまたは配列
+        // データ形式の変換（必要なら）
+        // renderSeatMapは { seat_id, status, ... } の配列を期待していると仮定
+        renderSeatMap(result.data);
 
     } catch (e) {
         console.error(e);
-        alert('座席データの読み込みに失敗しました。');
+        alert('座席データの読み込みに失敗しました: ' + e.message);
     } finally {
         loadingSpinner.style.display = 'none';
     }
 }
 
-function renderSeatMap(seatMap) {
-    // 簡易的な座席マップ描画 (seats-main.jsからロジックを借用・簡易化)
-    // ここでは単純にA-E列などを並べる実装例
+// 座席マップを描画する関数
+function renderSeatMap(seatList) {
+    const container = document.getElementById('seat-map-container');
+    container.innerHTML = '';
 
-    // データが配列かオブジェクトか確認
-    const seats = Array.isArray(seatMap) ? seatMap : Object.values(seatMap);
+    // データ形式の正規化 (配列化)
+    const seats = Array.isArray(seatList) ? seatList : Object.values(seatList);
 
-    // 行ごとにグループ化
+    // レイアウト抽出
     const rows = {};
     seats.forEach(seat => {
-        // seat.id (A1) -> row A
-        const row = seat.id.charAt(0);
-        if (!rows[row]) rows[row] = [];
-        rows[row].push(seat);
+        const id = seat.seat_id || seat.id;
+        if (!id) return;
+
+        // IDから行と番号を抽出 (A1 -> Row:A, Num:1)
+        const match = id.match(/^([A-Z]+)(\d+)$/);
+        if (match) {
+            const rowLabel = match[1];
+            const seatNumber = parseInt(match[2]);
+
+            if (!rows[rowLabel]) rows[rowLabel] = [];
+            rows[rowLabel].push({
+                ...seat,
+                seat_id: id,
+                seatNumber: seatNumber
+            });
+        }
     });
 
-    const wrapper = document.createElement('div');
-    wrapper.className = 'seat-layout-wrapper';
-    wrapper.style.textAlign = 'center';
-    wrapper.style.padding = '20px';
+    const seatSection = document.createElement('div');
+    seatSection.className = 'seat-section';
+    seatSection.style.minWidth = 'fit-content'; // コンテンツ幅に合わせる
+    seatSection.style.margin = '0 auto';       // 中央寄せ
+    seatSection.style.padding = '20px';
 
-    Object.keys(rows).sort().forEach(rowKey => {
+    // 行をソート (A, B, C...)
+    const sortedRows = Object.keys(rows).sort();
+
+    sortedRows.forEach(rowLabel => {
         const rowDiv = document.createElement('div');
         rowDiv.className = 'seat-row';
+        rowDiv.style.display = 'flex';
+        rowDiv.style.justifyContent = 'center';
         rowDiv.style.marginBottom = '10px';
 
         // 座席番号順にソート
-        rows[rowKey].sort((a, b) => {
-            const numA = parseInt(a.id.substring(1));
-            const numB = parseInt(b.id.substring(1));
-            return numA - numB;
-        });
+        const sortedSeats = rows[rowLabel].sort((a, b) => a.seatNumber - b.seatNumber);
 
-        rows[rowKey].forEach(seat => {
-            const seatEl = document.createElement('div');
-            seatEl.className = `seat ${seat.status}`;
-            seatEl.dataset.id = seat.id;
-            seatEl.innerText = seat.id;
-            seatEl.style.display = 'inline-block';
-            seatEl.style.width = '30px';
-            seatEl.style.height = '30px';
-            seatEl.style.margin = '2px';
-            seatEl.style.fontSize = '10px';
-            seatEl.style.lineHeight = '30px';
-            seatEl.style.border = '1px solid #ccc';
-            seatEl.style.borderRadius = '4px';
-            seatEl.style.cursor = 'pointer';
-
-            // スタイル適用 (cssクラスに依存)
-            // .seat.available { background: white; }
-            // .seat.reserved { background: yellow; }
-
-            if (seat.status === 'available') {
-                seatEl.onclick = () => toggleSeat(seat.id, seatEl);
-            } else {
-                seatEl.style.opacity = '0.5';
-                seatEl.style.cursor = 'not-allowed';
-            }
-
+        sortedSeats.forEach(seat => {
+            const seatEl = createSeatElement(seat);
             rowDiv.appendChild(seatEl);
+
+            // 通路の挿入 (13, 14の間 と 25, 26の間)
+            if (seat.seatNumber === 13 || seat.seatNumber === 25) {
+                const passage = document.createElement('div');
+                passage.className = 'passage-vertical';
+                passage.style.width = '30px'; // 通路幅
+                passage.style.flexShrink = '0';
+                rowDiv.appendChild(passage);
+            }
         });
-        wrapper.appendChild(rowDiv);
+
+        seatSection.appendChild(rowDiv);
+
+        // 横の通路 (F列の後)
+        if (rowLabel === 'F') {
+            const horizontalPassage = document.createElement('div');
+            horizontalPassage.className = 'passage-horizontal';
+            horizontalPassage.style.height = '30px'; // 通路高さ
+            seatSection.appendChild(horizontalPassage);
+        }
     });
 
-    seatMapContainer.appendChild(wrapper);
+    container.appendChild(seatSection);
+}
+
+function createSeatElement(seat) {
+    const seatEl = document.createElement('div');
+    seatEl.className = `seat ${seat.status}`;
+    // 自身の選択状態を反映
+    if (state.selectedSeats.includes(seat.seat_id)) {
+        seatEl.classList.add('selected');
+    }
+
+    seatEl.dataset.id = seat.seat_id;
+    seatEl.innerText = seat.seat_id; // ID全体を表示 (A1, A2...)
+
+    // スタイルはCSSクラスで制御
+    seatEl.addEventListener('click', () => handleSeatClick(seat));
+
+    return seatEl;
+}
+
+function handleSeatClick(seat) {
+    if (seat.status !== 'available') {
+        return; // 空席以外は選択不可
+    }
+
+    const id = seat.seat_id;
+    const index = state.selectedSeats.indexOf(id);
+
+    if (index > -1) {
+        // 選択解除
+        state.selectedSeats.splice(index, 1);
+    } else {
+        // 新規選択 (最大数制限)
+        if (state.selectedSeats.length >= state.maxSeats) {
+            alert(`一度に予約できるのは${state.maxSeats}席までです。`);
+            return;
+        }
+        state.selectedSeats.push(id);
+    }
+
+    updateSelectedSeatsUI();
+
+    // UI更新 (非効率だが確実)
+    const el = document.querySelector(`.seat[data-id="${id}"]`);
+    if (el) {
+        el.classList.toggle('selected');
+        // selectedクラスがつくとCSSで緑になるはず
+        // ただし .status クラス (available) があるので、CSSの詳細度に注意
+        // .seat.selected { ... } が .seat.available より優先される必要がある
+    }
 }
 
 function toggleSeat(seatId, el) {
@@ -319,40 +434,50 @@ document.getElementById('reservation-form').addEventListener('submit', async (e)
     e.preventDefault();
     if (!confirm('この内容で予約を確定しますか？')) return;
 
+    // Validation
+    const name = document.getElementById('res-name').value;
+    const email = document.getElementById('res-email').value;
+    const gradeClass = getGradeClassValue();
+    const club = document.getElementById('res-club-select').value;
+
+    if (!name || !email || !gradeClass || !club) {
+        alert('必須項目が入力されていません。\n(お名前、メールアドレス、所属年組、所属部活)');
+        return;
+    }
+
     const btn = document.getElementById('btn-submit');
     const originalText = btn.innerText;
     btn.disabled = true;
     btn.innerText = '送信中...';
 
-    const formData = {
-        action: 'create_reservation', // GAS側の分岐用
+    const params = {
+        action: 'create_reservation',
         group: state.group,
         day: state.day,
         timeslot: state.timeslot,
-        seats: state.selectedSeats,
-        name: document.getElementById('res-name').value,
-        email: document.getElementById('res-email').value,
-        grade_class: document.getElementById('res-grade').value,
-        club_affiliation: document.getElementById('res-club').value
+        seats: state.selectedSeats.join(','), // Array to CSV
+        name: name,
+        email: email,
+        grade_class: gradeClass,
+        club_affiliation: club
     };
 
     try {
         const apiUrl = apiUrlManager.getCurrentUrl();
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            body: JSON.stringify(formData) // POST payload
-        });
-        const json = await response.json();
+        console.log("Submitting via JSONP to:", apiUrl);
 
-        if (json.success) {
-            // 完了画面へ
-            document.getElementById('result-booking-id').innerText = json.data.bookingId; // APIが返すID
-            showStep(4);
-        } else {
-            alert('予約に失敗しました: ' + json.error);
-            btn.disabled = false;
-            btn.innerText = originalText;
-        }
+        fetchJsonp(apiUrl, params, (json) => {
+            if (json.success) {
+                // 完了画面へ
+                document.getElementById('result-booking-id').innerText = json.data.bookingId;
+                showStep(4);
+            } else {
+                alert('予約に失敗しました: ' + json.error);
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
+        });
+
     } catch (err) {
         console.error(err);
         alert('通信エラーが発生しました。');
@@ -360,6 +485,34 @@ document.getElementById('reservation-form').addEventListener('submit', async (e)
         btn.innerText = originalText;
     }
 });
+
+/**
+ * JSONP Fetch Helper
+ */
+function fetchJsonp(url, params, callback) {
+    const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
+    window[callbackName] = function (data) {
+        delete window[callbackName];
+        document.body.removeChild(script);
+        callback(data);
+    };
+
+    const script = document.createElement('script');
+
+    // Construct query string
+    const queryString = Object.keys(params)
+        .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(params[key]))
+        .join('&');
+
+    script.src = `${url}?${queryString}&callback=${callbackName}`;
+    script.onerror = function () {
+        delete window[callbackName];
+        document.body.removeChild(script);
+        alert('APIへの接続に失敗しました (JSONP Error)');
+    };
+
+    document.body.appendChild(script);
+}
 
 
 // ==========================================
