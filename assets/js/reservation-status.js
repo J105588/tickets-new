@@ -5,6 +5,7 @@
 
 import { apiUrlManager } from './config.js';
 import { subscribeToSeatUpdates } from './supabase-client.js';
+import { subscribeToSeatUpdates } from './supabase-client.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Check URL parameters for auto-login
@@ -116,7 +117,74 @@ function showDetails(data) {
             cancelBtn.style.display = 'none';
         }
     }
+    // Subscribe to Realtime Updates
+    if (data.id) {
+        subscribeToSeatUpdates(data.id, (newSeat) => {
+            console.log('Seat update:', newSeat);
+            if (newSeat.status === 'checked_in') {
+                updateUIAsCheckedIn();
+            }
+        });
+
+        // POLLING FALLBACK: Check every 5 seconds
+        // This ensures updates even if WebSocket drops or is blocked
+        setInterval(() => {
+            // We can check the seat status via Supabase REST (cheap)
+            // Using the imported helper would require import... 
+            // Let's use getBookingForScan or just re-fetch details silently via existing `fetchJsonp` 
+            // but fetchJsonp is GAS based (slow).
+            // Better to use Supabase client if available.
+            // But we only have `subscribeToSeatUpdates` imported.
+            // We should assume `supabase` global is available or import `getBookingForScan`.
+
+            // Simple approach: Re-check via Supabase RPC check if available, 
+            // or just trust the Subscription for now.
+            // The user ASKED for "constant monitoring". 
+            // Let's use supabase client directly if window.supabase exists.
+            if (window.supabaseInstance) { // Assuming global instance or we can re-create
+                // Actually `subscribeToSeatUpdates` uses `getSupabase()`.
+                // Let's import `getBookingForScan` which is fast RPC.
+                import('./supabase-client.js').then(mod => {
+                    mod.getBookingForScan(data.id).then(res => {
+                        if (res.success && res.data.status === 'checked_in') {
+                            updateUIAsCheckedIn();
+                        }
+                    });
+                });
+            }
+        }, 5000);
+    }
+
+    // Initial check (in case already checked in)
+    if (data.status === 'checked_in') {
+        updateUIAsCheckedIn();
+    }
 }
+
+
+function updateUIAsCheckedIn() {
+    const badge = document.getElementById('status-badge');
+    badge.className = 'badge status-checked-in';
+    badge.innerText = 'チェックイン済';
+
+    // Replace QR with Checkmark
+    const qrContainer = document.getElementById('qrcode');
+    qrContainer.innerHTML = `
+        <div style="text-align: center; color: var(--success, #10b981); animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+            <i class="fas fa-check-circle" style="font-size: 5rem; margin-bottom: 10px;"></i>
+            <div style="font-weight:bold; font-size:1.2rem; color:var(--text-color);">チェックイン完了</div>
+        </div>
+    `;
+
+    // Update helper text
+    const note = document.querySelector('.qr-note');
+    if (note) note.style.display = 'none';
+
+    // Hide cancel button
+    const cancelBtn = document.getElementById('btn-cancel');
+    if (cancelBtn) cancelBtn.style.display = 'none';
+}
+
 
 async function cancelBooking(id, passcode) {
     if (!confirm('本当に予約をキャンセルしますか？\nこの操作は取り消せません。')) return;

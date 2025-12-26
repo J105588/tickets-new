@@ -67,3 +67,104 @@ DROP POLICY IF EXISTS "Enable read for public" ON performances;
 CREATE POLICY "Enable read for public" 
 ON performances FOR SELECT 
 USING (true);
+
+
+-- ==========================================
+-- RPC Functions (Supabase Direct Access)
+-- ==========================================
+
+-- 高速チェックイン用関数 (Client -> Supabase Direct)
+-- GASを経由せず、クライアントから直接呼び出してチェックインを実行します
+CREATE OR REPLACE FUNCTION check_in_reservation(p_reservation_id INT, p_passcode TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER -- 管理者権限で実行 (RLSをバイパス)
+AS $$
+DECLARE
+  v_booking bookings%ROWTYPE;
+BEGIN
+  -- 1. 予約の検索
+  SELECT * INTO v_booking FROM bookings WHERE id = p_reservation_id;
+  
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'error', '予約が見つかりません');
+  END IF;
+
+  -- 2. パスコードの照合 (p_passcodeが空でなく、一致しない場合エラー)
+  -- 運用でパスコードなしチェックインを許可する場合はこのブロックを調整してください
+  -- 今回は「パスコードが入力されている場合のみ」チェックする、あるいは「必須」にするか。
+  -- QRコードには含まれているので通常はチェックOK。
+  -- 手入力でパスコード省略された場合(NULL/Empty)はどうするか？
+  -- -> セキュリティリスクのため、一旦は必須または一致確認を行うスタイルにします。
+  
+  IF v_booking.passcode <> p_passcode AND p_passcode IS NOT NULL AND p_passcode <> '' THEN
+     RETURN jsonb_build_object('success', false, 'error', 'パスコードが違います');
+  END IF;
+
+  -- 3. ステータスの更新 (予約)
+  UPDATE bookings 
+  SET status = 'checked_in', checked_in_at = NOW() 
+  WHERE id = p_reservation_id;
+  
+  -- 4. ステータスの更新 (座席)
+  UPDATE seats 
+  SET status = 'checked_in', checked_in_at = NOW() 
+  WHERE booking_id = p_reservation_id;
+  
+  RETURN jsonb_build_object(
+    'success', true, 
+    'message', 'チェックイン完了',
+    'data', jsonb_build_object('id', v_booking.id, 'name', v_booking.name)
+  );
+END;
+$$;
+
+
+-- 予約検索用関数 (Client -> Supabase Direct)
+-- スキャナーでQRコードを読み取った際に、GASを経由せずに予約情報を高速取得します
+CREATE OR REPLACE FUNCTION get_booking_for_scan(p_id INT)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_booking RECORD;
+  v_seats RECORD;
+  v_perf RECORD;
+BEGIN
+  -- 1. 予約基本情報
+  SELECT b.*, p.group_name, p.day, p.timeslot
+  INTO v_booking
+  FROM bookings b
+  JOIN performances p ON b.performance_id = p.id
+  WHERE b.id = p_id;
+  
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('success', false, 'error', '予約が見つかりません');
+  END IF;
+
+  -- 2. 座席情報 (集約)
+  SELECT string_agg(seat_id, ', ' ORDER BY seat_id) as seat_list
+  INTO v_seats
+  FROM seats
+  WHERE booking_id = p_id;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'data', jsonb_build_object(
+      'id', v_booking.id,
+      'name', v_booking.name,
+      'grade_class', v_booking.grade_class,
+      'status', v_booking.status,
+      'passcode', v_booking.passcode, 
+      'performances', jsonb_build_object(
+         'group_name', v_booking.group_name,
+         'day', v_booking.day,
+         'timeslot', v_booking.timeslot
+      ),
+      'seats', CASE WHEN v_seats.seat_list IS NULL THEN '[]'::jsonb ELSE jsonb_build_array(jsonb_build_object('seat_id', v_seats.seat_list)) END
+    )
+  );
+END;
+$$;
+

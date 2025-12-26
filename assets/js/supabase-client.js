@@ -151,3 +151,40 @@ export function subscribeToSeatUpdates(bookingId, onUpdate) {
 
     return channel;
 }
+
+export async function checkInReservation(id, passcode) {
+    const sb = getSupabase();
+    if (!sb) return { success: false, error: 'System Error' };
+
+    try {
+        const { data, error } = await sb.rpc('check_in_reservation', {
+            p_reservation_id: parseInt(id),
+            p_passcode: passcode || ''
+        });
+
+        if (error) throw error;
+        return data;
+
+    } catch (e) {
+        console.error('RPC Error:', e);
+        return { success: false, error: e.message };
+    }
+}
+
+export async function getBookingForScan(id) {
+    const sb = getSupabase();
+    if (!sb) return { success: false, error: 'System Error' };
+
+    try {
+        const { data, error } = await sb.rpc('get_booking_for_scan', {
+            p_id: parseInt(id)
+        });
+
+        if (error) throw error;
+        return data;
+
+    } catch (e) {
+        console.error('RPC Error:', e);
+        return { success: false, error: e.message };
+    }
+}

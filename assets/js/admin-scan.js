@@ -1,10 +1,10 @@
 /**
  * admin-scan.js
- * スタンドアローン QRスキャナー＆チェックイン
+ * スタンドアローン QRスキャナー＆チェックイン (高速版)
  */
 
 import { apiUrlManager } from './config.js';
-import { fetchMasterDataFromSupabase } from './supabase-client.js';
+import { fetchMasterDataFromSupabase, checkInReservation, getBookingForScan } from './supabase-client.js';
 
 const state = {
     group: '',
@@ -155,7 +155,7 @@ function startScanner() {
         state.html5QrcodeScanner = new Html5Qrcode(readerId);
     }
 
-    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+    const config = { fps: 15, qrbox: { width: 250, height: 250 } }; // FPS increased for speed
 
     state.html5QrcodeScanner.start(
         { facingMode: "environment" },
@@ -166,7 +166,6 @@ function startScanner() {
         state.isScanning = true;
     }).catch(err => {
         console.error("Camera start failed", err);
-        // alert('カメラの起動に失敗しました');
     });
 }
 
@@ -211,73 +210,136 @@ async function handleManualCheck() {
 }
 
 async function fetchBookingAndConfirm(id, passcode) {
-    // Show Loading in Modal
-    showResultModal('照会中...', '<p>データを取得しています...</p>');
+    // Show Loading
+    showResultModal('照会中...', '<div class="spinner"></div><p style="text-align:center">確認中...</p>');
     state.currentBooking = null;
 
-    try {
-        const apiUrl = apiUrlManager.getCurrentUrl();
-        // Since we need to support JSONP for GAS
-        fetchJsonp(apiUrl, { action: 'get_booking_details', id, passcode: passcode || '' }, (json) => {
-            if (json.success) {
-                state.currentBooking = json.data;
-                renderConfirmation(json.data);
-            } else {
-                showResultModal('エラー', `<p style="color:var(--danger)">${json.error || 'データが見つかりません'}</p>`);
-                document.getElementById('btn-confirm-checkin').style.display = 'none';
-            }
-        });
+    // Direct Supabase RPC Call (Fast)
+    const result = await getBookingForScan(id);
 
-    } catch (e) {
-        showResultModal('エラー', '<p>通信エラーが発生しました</p>');
+    if (result.success) {
+        state.currentBooking = result.data;
+        renderConfirmation(result.data);
+    } else {
+        // Fallback to error
+        showResultModal('エラー', `<p style="color:var(--danger);text-align:center;font-weight:bold;font-size:1.2rem;">${result.error || 'データが見つかりません'}</p>`);
         document.getElementById('btn-confirm-checkin').style.display = 'none';
+
+        // Auto-close error after 2s
+        setTimeout(() => {
+            if (document.getElementById('result-overlay').style.display === 'flex') {
+                hideResultModal();
+            }
+        }, 2000);
     }
 }
 
 function renderConfirmation(booking) {
     const perf = booking.performances || {};
-    const seats = booking.seats ? booking.seats.map(s => s.seat_id).join(', ') : '-';
+    // seats is now an array of objects from RPC
+    const seats = booking.seats && booking.seats.length > 0 ? booking.seats.map(s => s.seat_id).join(', ') : '-';
 
     // Status Logic
     const isTargetMatch = (perf.group_name === state.group && perf.timeslot === state.timeslot && perf.day == state.day);
 
     let html = `
-        <div style="font-size:1.1rem; font-weight:bold; margin-bottom:0.5rem;">${booking.name} 様</div>
-        <div style="font-size:0.9rem; color:var(--text-sub); margin-bottom:1rem;">
+        <div style="font-size:1.4rem; font-weight:800; margin-bottom:0.5rem; text-align:center;">${booking.name} 様</div>
+        <div style="font-size:1rem; color:var(--text-sub); margin-bottom:1.5rem; text-align:center;">
              ${booking.grade_class || ''} 
         </div>
-        <div style="display:grid; grid-template-columns:auto 1fr; gap:0.5rem; font-size:0.95rem;">
-            <div style="color:var(--text-sub)">公演:</div>
-            <div>${perf.group_name} <br> ${perf.day}日目 ${perf.timeslot}</div>
-            
-            <div style="color:var(--text-sub)">座席:</div>
-            <div style="font-weight:bold">${seats}</div>
-            
-            <div style="color:var(--text-sub)">状態:</div>
-            <div>${getStatusBadge(booking.status)}</div>
+        
+        <div style="background:#f8fafc; padding:1rem; border-radius:12px; margin-bottom:1rem;">
+             <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:8px;">
+                <span style="color:var(--text-sub)">公演</span>
+                <span style="font-weight:600">${perf.group_name}</span>
+             </div>
+             <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:8px;">
+                <span style="color:var(--text-sub)">日時</span>
+                <span style="font-weight:600">${perf.day}日目 ${perf.timeslot}</span>
+             </div>
+             <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                <span style="color:var(--text-sub)">座席</span>
+                <span style="font-weight:800; font-size:1.2rem; color:var(--primary)">${seats}</span>
+             </div>
+        </div>
+        
+        <div style="text-align:center; margin-top:10px;">
+            ${getStatusBadge(booking.status)}
         </div>
     `;
 
     if (!isTargetMatch) {
-        html += `<div style="background:#fff3cd; color:#856404; padding:0.5rem; border-radius:4px; margin-top:10px; font-size:0.9rem;">
-            ⚠ 公演日時が異なります (${perf.group_name} ${perf.timeslot})
+        html += `<div style="background:#fee2e2; color:#991b1b; padding:1rem; border-radius:8px; margin-top:15px; font-weight:bold; text-align:center;">
+            ⚠ 公演日時が異なります<br>
+            <span style="font-size:0.9rem">対象: ${perf.group_name} ${perf.timeslot}</span>
         </div>`;
     }
 
     const btn = document.getElementById('btn-confirm-checkin');
 
+    // Reset buttons
+    btn.className = 'btn-lg btn-success'; // Reset style
+
     if (booking.status === 'checked_in') {
-        html += `<div style="color:var(--primary); font-weight:bold; margin-top:10px;">既にチェックイン済みです</div>`;
-        btn.style.display = 'none';
+        renderSuccessState('既にチェックイン済みです', false);
+        return; // Stop here, rendering handled by renderSuccessState
     } else if (booking.status === 'cancelled') {
-        html += `<div style="color:var(--danger); font-weight:bold; margin-top:10px;">キャンセルされた予約です</div>`;
+        html += `<div style="color:var(--danger); font-weight:bold; margin-top:10px; font-size:1.2rem; text-align:center;">キャンセルされた予約です</div>`;
         btn.style.display = 'none';
+        showResultModal('確認', html); // Show failure
     } else {
         btn.style.display = 'inline-block';
+        showResultModal('予約確認', html);
     }
-
-    showResultModal('予約確認', html);
 }
+
+async function executeCheckIn() {
+    if (!state.currentBooking) return;
+    const booking = state.currentBooking;
+    const btn = document.getElementById('btn-confirm-checkin');
+
+    btn.disabled = true;
+    btn.innerText = '送信中...';
+
+    // Direct Supabase RPC Check-in (Fast)
+    const result = await checkInReservation(booking.id, booking.passcode);
+
+    btn.disabled = false;
+    btn.innerText = 'チェックイン';
+
+    if (result.success) {
+        renderSuccessState('完了', true);
+    } else {
+        alert('失敗: ' + (result.error || '不明なエラー'));
+    }
+}
+
+
+// --- Large Success UI ---
+function renderSuccessState(msg, autoClose) {
+    const html = `
+        <div style="padding:2rem 0; text-align:center; animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+            <i class="fas fa-check-circle" style="font-size: 6rem; color: var(--success); margin-bottom: 20px; display:block;"></i>
+            <div style="font-size: 2rem; font-weight: 800; color: var(--text-main); line-height:1.2;">${msg}</div>
+        </div>
+    `;
+
+    // Hide buttons for pure success view
+    document.getElementById('btn-confirm-checkin').style.display = 'none';
+    document.getElementById('btn-cancel-checkin').style.display = 'none';
+
+    showResultModal('', html); // No title needed for big icon
+
+    if (autoClose) {
+        setTimeout(() => {
+            hideResultModal();
+            // Restore buttons for next time
+            document.getElementById('btn-confirm-checkin').style.display = 'inline-block';
+            document.getElementById('btn-cancel-checkin').style.display = 'inline-block';
+        }, 1500); // 1.5s Close
+    }
+}
+
 
 function showResultModal(title, contentHtml) {
     const overlay = document.getElementById('result-overlay');
@@ -289,48 +351,19 @@ function showResultModal(title, contentHtml) {
 function hideResultModal() {
     document.getElementById('result-overlay').style.display = 'none';
     state.currentBooking = null;
+
+    // Restore buttons
+    document.getElementById('btn-confirm-checkin').style.display = 'inline-block';
+    document.getElementById('btn-cancel-checkin').style.display = 'inline-block';
 }
 
-function executeCheckIn() {
-    if (!state.currentBooking) return;
-    const booking = state.currentBooking;
-    const btn = document.getElementById('btn-confirm-checkin');
-    btn.disabled = true;
-    btn.innerText = '送信中...';
-
-    const apiUrl = apiUrlManager.getCurrentUrl();
-    fetchJsonp(apiUrl, {
-        action: 'check_in',
-        id: booking.id,
-        passcode: booking.passcode
-    }, (json) => {
-        btn.disabled = false;
-        btn.innerText = 'チェックイン';
-
-        if (json.success) {
-            hideResultModal();
-            showToast(`${booking.name} 様 チェックイン完了`);
-        } else {
-            alert('失敗: ' + json.error);
-        }
-    });
-}
-
-function showToast(msg) {
-    const el = document.getElementById('toast');
-    el.innerText = msg;
-    el.style.display = 'block';
-    // Animation handled by css, reset simply
-    const newOne = el.cloneNode(true);
-    el.parentNode.replaceChild(newOne, el);
-    newOne.style.display = 'block';
-}
 
 function getStatusBadge(status) {
+    // Larger badges for scanner
     const map = {
-        'confirmed': '<span class="status-badge status-confirmed">予約済</span>',
-        'checked_in': '<span class="status-badge status-checked_in">来場済</span>',
-        'cancelled': '<span class="status-badge status-cancelled">無効</span>'
+        'confirmed': '<span class="status-badge status-confirmed" style="font-size:1.1rem; padding:6px 16px;">予約済</span>',
+        'checked_in': '<span class="status-badge status-checked_in" style="font-size:1.1rem; padding:6px 16px;">来場済</span>',
+        'cancelled': '<span class="status-badge status-cancelled" style="font-size:1.1rem; padding:6px 16px;">無効</span>'
     };
     return map[status] || status;
 }
@@ -384,7 +417,7 @@ function checkSetupValidity(inputs) {
     inputs.startBtn.disabled = !isValid;
 }
 
-// JSONP Helper
+// JSONP Helper (Still needed for performance fetching via GAS if not ported yet)
 function fetchJsonp(url, params, callback) {
     const callbackName = 'jsonp_scan_' + Math.round(100000 * Math.random());
     window[callbackName] = function (data) {
