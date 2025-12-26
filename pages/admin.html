@@ -18,13 +18,71 @@
             window.location.href = 'admin-login.html';
         }
     </script>
+    <style>
+        /* Force Modal Styles (Inline to bypass cache) */
+        .modal {
+            display: none !important;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.active {
+            display: flex !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+        }
+
+        .modal.active .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 1rem;
+        }
+
+        .close-btn {
+            font-size: 1.5rem;
+            cursor: pointer;
+            background: none;
+            border: none;
+        }
+    </style>
 </head>
+
 
 <body>
 
     <nav class="sidebar" id="sidebar">
         <div class="sidebar-header">
-            <span>TicketSystem</span>
+            <span>市川学園座席管理システム</span>
             <button class="mobile-menu-btn" onclick="toggleSidebar()" style="display:none;font-size:1rem;">✕</button>
         </div>
         <ul class="nav-links">
@@ -104,18 +162,17 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 style="margin:0;">予約詳細</h2>
-                <button class="close-btn" onclick="closeModal()">&times;</button>
+                <button id="btn-close-detail-modal" class="close-btn">&times;</button>
             </div>
             <div id="modal-body">
                 <!-- Content -->
             </div>
             <div class="action-bar">
-                <button id="btn-edit-toggle" class="btn btn-secondary" onclick="toggleEditMode()">編集</button>
-                <button id="btn-save-changes" class="btn btn-primary" onclick="saveChanges()"
-                    style="display:none;">保存</button>
-                <button class="btn btn-secondary" onclick="resendEmail()">メール再送</button>
-                <button class="btn btn-secondary" onclick="promptSeatChange()">座席変更</button>
-                <button class="btn btn-danger" onclick="confirmCancel()">予約取消</button>
+                <button id="btn-edit-toggle" class="btn btn-secondary">編集</button>
+                <button id="btn-save-changes" class="btn btn-primary" style="display:none;">保存</button>
+                <button id="btn-resend-email" class="btn btn-secondary">メール再送</button>
+                <button id="btn-seat-change" class="btn btn-secondary">座席変更</button>
+                <button id="btn-cancel-res" class="btn btn-danger">予約取消</button>
             </div>
         </div>
     </div>
@@ -125,7 +182,7 @@
         <div class="modal-content" style="max-width: 900px; width: 95%;">
             <div class="modal-header">
                 <h2 style="margin:0;">座席変更</h2>
-                <button class="close-btn" onclick="closeSeatModal()">&times;</button>
+                <button id="btn-close-seat-modal" class="close-btn">&times;</button>
             </div>
             <p>新しい座席を選択してください。</p>
 
@@ -137,7 +194,7 @@
 
             <div style="margin-top:1rem; display:flex; justify-content:space-between; align-items:center;">
                 <div>選択中: <strong id="new-seats-display">-</strong></div>
-                <button class="btn btn-primary" onclick="submitSeatChange()">変更を確定</button>
+                <button id="btn-submit-seat-change" class="btn btn-primary">変更を確定</button>
             </div>
         </div>
     </div>

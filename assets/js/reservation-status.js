@@ -4,8 +4,8 @@
  */
 
 import { apiUrlManager } from './config.js';
-import { subscribeToSeatUpdates } from './supabase-client.js';
-import { subscribeToSeatUpdates } from './supabase-client.js';
+import { subscribeToSeatUpdates, subscribeToReservationUpdates } from './supabase-client.js';
+
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Check URL parameters for auto-login
@@ -68,6 +68,7 @@ function showDetails(data) {
     // Populate Data
     document.getElementById('disp-program-name').innerText = data.performances?.group_name || '公演予約';
     document.getElementById('disp-id').innerText = data.id;
+    document.getElementById('disp-passcode').innerText = data.passcode;
 
     // Status Badge
     const badge = document.getElementById('status-badge');
@@ -122,6 +123,13 @@ function showDetails(data) {
         subscribeToSeatUpdates(data.id, (newSeat) => {
             console.log('Seat update:', newSeat);
             if (newSeat.status === 'checked_in') {
+                updateUIAsCheckedIn();
+            }
+        });
+
+        subscribeToReservationUpdates(data.id, (newBooking) => {
+            console.log('Booking update:', newBooking);
+            if (newBooking.status === 'checked_in') {
                 updateUIAsCheckedIn();
             }
         });

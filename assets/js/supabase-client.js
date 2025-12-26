@@ -32,15 +32,15 @@ function getSupabase() {
     }
 }
 
-// データ取得ヘルパー (GASのレスポンス形式に合わせる)
+// データ取得ヘルパー
 export async function fetchMasterDataFromSupabase() {
     const sb = getSupabase();
     if (!sb) return { success: false, error: 'Supabase client not initialized' };
 
     try {
         const [groups, dates, timeslots] = await Promise.all([
-            sb.from('groups').select('*').eq('is_active', true).order('display_order'),
-            sb.from('event_dates').select('*').eq('is_active', true).order('display_order'),
+            sb.from('groups').select('*').order('display_order'),
+            sb.from('event_dates').select('*').order('display_order'),
             sb.from('time_slots').select('*').order('display_order')
         ]);
 
@@ -62,12 +62,16 @@ export async function fetchMasterDataFromSupabase() {
 }
 
 export async function fetchMasterGroups() {
-    const result = await fetchMasterDataFromSupabase();
-    if (result.success) {
-        return result.data.groups;
+    const sb = getSupabase();
+    if (!sb) return [];
+
+    // active only for filters
+    const { data, error } = await sb.from('groups').select('*').eq('is_active', true).order('display_order');
+    if (error) {
+        console.error(error);
+        return [];
     }
-    console.error('Failed to fetch master groups', result.error);
-    return [];
+    return data;
 }
 
 export async function fetchPerformancesFromSupabase(groupName) {
@@ -115,10 +119,6 @@ export async function fetchSeatsFromSupabase(group, day, timeslot) {
 
         if (seatsError) throw seatsError;
 
-        // 3. Format as Map (seat_id -> status) or Object as expected by renderSeatMap
-        // renderSeatMap expects array of seat objects or similar.
-        // Let's return the array directly.
-
         return { success: true, data: seatsData };
 
     } catch (e) {
@@ -132,7 +132,6 @@ export function subscribeToSeatUpdates(bookingId, onUpdate) {
 
     console.log(`Subscribing to updates for booking_id=${bookingId}`);
 
-    // Listen to changes in the 'seats' table where booking_id matches
     const channel = sb.channel(`booking-${bookingId}`)
         .on(
             'postgres_changes',
@@ -144,6 +143,31 @@ export function subscribeToSeatUpdates(bookingId, onUpdate) {
             },
             (payload) => {
                 console.log('Realtime update received:', payload);
+                if (onUpdate) onUpdate(payload.new);
+            }
+        )
+        .subscribe();
+
+    return channel;
+}
+
+export function subscribeToReservationUpdates(bookingId, onUpdate) {
+    const sb = getSupabase();
+    if (!sb) return null;
+
+    console.log(`Subscribing to RESERVATION updates for booking_id=${bookingId}`);
+
+    const channel = sb.channel(`reservation-${bookingId}`)
+        .on(
+            'postgres_changes',
+            {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'bookings',
+                filter: `id=eq.${bookingId}`
+            },
+            (payload) => {
+                console.log('Realtime reservation update:', payload);
                 if (onUpdate) onUpdate(payload.new);
             }
         )
@@ -185,6 +209,95 @@ export async function getBookingForScan(id) {
 
     } catch (e) {
         console.error('RPC Error:', e);
+        return { success: false, error: e.message };
+    }
+}
+
+// --- Admin RPC Wrappers (Added for Refactor) ---
+
+export async function adminGetReservations(filters) {
+    const sb = getSupabase();
+    if (!sb) return { success: false, error: 'System Error' };
+
+    try {
+        const { data, error } = await sb.rpc('admin_get_reservations', {
+            p_group: filters.group || null,
+            p_day: filters.day ? parseInt(filters.day) : null,
+            p_timeslot: filters.timeslot || null,
+            p_status: filters.status || null,
+            p_search: filters.search || null
+        });
+        if (error) throw error;
+        return data;
+    } catch (e) {
+        console.error('RPC Error:', e);
+        return { success: false, error: e.message };
+    }
+}
+
+export async function adminUpdateBooking(bookingData) {
+    const sb = getSupabase();
+    if (!sb) return { success: false, error: 'System Error' };
+
+    try {
+        const { data, error } = await sb.rpc('admin_update_booking', {
+            p_id: parseInt(bookingData.id),
+            p_name: bookingData.name,
+            p_email: bookingData.email,
+            p_grade_class: bookingData.grade_class,
+            p_club_affiliation: bookingData.club_affiliation,
+            p_notes: bookingData.notes,
+            p_status: bookingData.status // Added
+        });
+        if (error) throw error;
+        return data;
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
+export async function adminCancelBooking(id) {
+    const sb = getSupabase();
+    if (!sb) return { success: false, error: 'System Error' };
+
+    try {
+        const { data, error } = await sb.rpc('admin_cancel_booking', { p_id: parseInt(id) });
+        if (error) throw error;
+        return data;
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
+export async function adminSwapSeats(bookingId, newSeatIds) {
+    const sb = getSupabase();
+    if (!sb) return { success: false, error: 'System Error' };
+
+    try {
+        const { data, error } = await sb.rpc('admin_swap_seats', {
+            p_booking_id: parseInt(bookingId),
+            p_new_seat_ids_str: newSeatIds.join(',')
+        });
+        if (error) throw error;
+        return data;
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
+export async function adminManageMaster(table, op, recordData) {
+    const sb = getSupabase();
+    if (!sb) return { success: false, error: 'System Error' };
+
+    try {
+        const { data, error } = await sb.rpc('admin_manage_master', {
+            p_table: table,
+            p_op: op,
+            p_data: recordData
+        });
+        if (error) throw error;
+        return data;
+    } catch (e) {
         return { success: false, error: e.message };
     }
 }

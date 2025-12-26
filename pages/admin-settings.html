@@ -5,13 +5,72 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>システム設定 | 市川学園座席管理システム</title>
-    <link rel="stylesheet" href="../assets/css/admin.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../assets/css/admin.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
         if (!sessionStorage.getItem('admin_session')) window.location.href = 'admin-login.html';
     </script>
+    <style>
+        /* Force Modal Styles (Inline to bypass cache) */
+        .modal {
+            display: none !important;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.active {
+            display: flex !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+        }
+
+        .modal.active .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 1rem;
+        }
+
+        .close-btn {
+            font-size: 1.5rem;
+            cursor: pointer;
+            background: none;
+            border: none;
+        }
+    </style>
 </head>
+
 
 <body>
 
@@ -36,20 +95,23 @@
         </div>
 
         <!-- Initial Loader -->
-        <div id="loading">プログレスバー: データ読み込み中...</div>
+        <div id="loading" style="text-align:center; padding:2rem;">
+            <i class="fas fa-spinner fa-spin"></i> データ読み込み中...
+        </div>
 
         <div id="main-content" style="display: none;">
 
             <!-- Groups Management -->
             <section class="card">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-                    <h2 style="margin:0;">団体管理</h2>
-                    <button class="btn btn-primary btn-sm" onclick="showAddGroupModal()">+ 追加</button>
+                    <h2 style="margin:0;">団体管理 (Groups)</h2>
+                    <button class="btn btn-primary btn-sm" onclick="openGroupModal()">+ 追加</button>
                 </div>
                 <div class="table-wrapper">
                     <table id="groups-table">
                         <thead>
                             <tr>
+                                <th>ID</th>
                                 <th>順序</th>
                                 <th>団体名</th>
                                 <th>状態</th>
@@ -65,14 +127,19 @@
 
             <!-- Schedule Management -->
             <section class="card">
-                <h2>日程管理</h2>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                    <h2 style="margin:0;">日程管理 (Dates)</h2>
+                    <button class="btn btn-primary btn-sm" onclick="openDateModal()">+ 追加</button>
+                </div>
                 <div class="table-wrapper">
                     <table id="dates-table">
                         <thead>
                             <tr>
+                                <th>ID</th>
                                 <th>順序</th>
                                 <th>日程ラベル</th>
                                 <th>状態</th>
+                                <th>操作</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -84,11 +151,16 @@
 
             <!-- Time Slots Management -->
             <section class="card">
-                <h2>時間帯管理</h2>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                    <h2 style="margin:0;">時間帯管理 (Slots)</h2>
+                    <button class="btn btn-primary btn-sm" onclick="openSlotModal()">+ 追加</button>
+                </div>
                 <div class="table-wrapper">
                     <table id="slots-table">
                         <thead>
                             <tr>
+                                <th>ID</th>
+                                <th>順序</th>
                                 <th>コード</th>
                                 <th>時間</th>
                                 <th>操作</th>
@@ -103,16 +175,37 @@
 
             <div class="card bg-light">
                 <h3><i class="fas fa-info-circle"></i> 設定の反映について</h3>
-                <p>ここでの変更は「予約画面」および「管理スキャン画面」に即座に反映されます。<br>
-                    ただし、すでに予約が入っているデータの整合性には十分注意してください。</p>
+                <p>ここでの変更は他の管理画面や予約画面に即座に反映されます。<br>
+                    特に「無効化」や「削除」は慎重に行ってください。</p>
             </div>
 
         </div>
 
     </main>
 
-    <!-- Scripts -->
-    <!-- Scripts -->
+    <!-- General Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title" style="margin:0;">設定</h2>
+                <button class="close-btn" onclick="closeSettingsModal()">&times;</button>
+            </div>
+
+            <form id="settings-form">
+                <input type="hidden" id="edit-id">
+                <input type="hidden" id="edit-type"> <!-- group, date, slot -->
+                <div id="modal-fields"></div>
+
+                <div class="action-bar" style="margin-top:20px;">
+                    <button type="submit" class="btn btn-primary" id="btn-save">保存</button>
+                    <button type="button" class="btn btn-danger" id="btn-delete" style="display:none;"
+                        onclick="handleDelete()">削除</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeSettingsModal()">キャンセル</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script type="module" src="../assets/js/admin-settings.js"></script>
 </body>
 

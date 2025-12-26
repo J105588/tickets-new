@@ -268,17 +268,25 @@ function renderConfirmation(booking) {
         </div>
     `;
 
-    if (!isTargetMatch) {
-        html += `<div style="background:#fee2e2; color:#991b1b; padding:1rem; border-radius:8px; margin-top:15px; font-weight:bold; text-align:center;">
-            ⚠ 公演日時が異なります<br>
-            <span style="font-size:0.9rem">対象: ${perf.group_name} ${perf.timeslot}</span>
-        </div>`;
-    }
-
     const btn = document.getElementById('btn-confirm-checkin');
 
     // Reset buttons
     btn.className = 'btn-lg btn-success'; // Reset style
+    btn.style.display = 'inline-block'; // Default to visible
+
+    if (!isTargetMatch) {
+        html += `<div style="background:#fee2e2; color:#b91c1c; padding:1.2rem; border-radius:8px; margin-top:15px; font-weight:bold; text-align:center; border:2px solid #ef4444;">
+            <i class="fas fa-exclamation-triangle" style="font-size:1.5rem; margin-bottom:5px; display:block;"></i>
+            公演情報が一致しません<br>
+            <span style="font-size:0.9rem; color:#7f1d1d; display:block; margin-top:5px;">
+                チケット: ${perf.group_name} ${perf.day}日目 ${perf.timeslot}<br>
+                設定: ${state.group} ${state.day}日目 ${state.timeslot}
+            </span>
+        </div>`;
+        btn.style.display = 'none'; // DISABLE CHECKIN for mismatch
+        showResultModal('入場不可', html);
+        return;
+    }
 
     if (booking.status === 'checked_in') {
         renderSuccessState('既にチェックイン済みです', false);
@@ -286,7 +294,7 @@ function renderConfirmation(booking) {
     } else if (booking.status === 'cancelled') {
         html += `<div style="color:var(--danger); font-weight:bold; margin-top:10px; font-size:1.2rem; text-align:center;">キャンセルされた予約です</div>`;
         btn.style.display = 'none';
-        showResultModal('確認', html); // Show failure
+        showResultModal('エラー', html); // Show failure
     } else {
         btn.style.display = 'inline-block';
         showResultModal('予約確認', html);

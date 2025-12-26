@@ -1,10 +1,17 @@
 /**
  * admin.js
- * 予約管理ダッシュボードのロジック
+ * 予約管理ダッシュボードのロジック (Supabase RPC版)
  */
 
-import { apiUrlManager, SUPABASE_CONFIG } from './config.js';
-import { fetchMasterGroups } from './supabase-client.js';
+import { apiUrlManager } from './config.js'; // Still needed for admin_resend_email (GAS)
+import {
+    fetchMasterGroups,
+    adminGetReservations,
+    adminUpdateBooking,
+    adminCancelBooking,
+    adminSwapSeats,
+    fetchSeatsFromSupabase
+} from './supabase-client.js';
 
 let currentReservations = [];
 let selectedBooking = null;
@@ -14,6 +21,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadFilterOptions();
     // 初期検索
     applyFilters();
+
+    // Event Listeners for Static Modal Buttons
+    document.getElementById('btn-close-detail-modal').addEventListener('click', closeModal);
+    document.getElementById('btn-edit-toggle').addEventListener('click', toggleEditMode);
+    document.getElementById('btn-save-changes').addEventListener('click', saveChanges);
+    document.getElementById('btn-resend-email').addEventListener('click', resendEmail);
+    document.getElementById('btn-seat-change').addEventListener('click', promptSeatChange);
+    document.getElementById('btn-cancel-res').addEventListener('click', confirmCancel);
+
+    document.getElementById('btn-close-seat-modal').addEventListener('click', closeSeatModal);
+    document.getElementById('btn-submit-seat-change').addEventListener('click', submitSeatChange);
 });
 
 // フィルタオプションの読み込み
@@ -35,6 +53,8 @@ window.applyFilters = function () {
     const day = document.getElementById('filter-date').value;
     const year = document.getElementById('filter-year').value;
 
+    // Add Search Box if exists (assuming added later or minimal filter)
+    // For now simple filters
     fetchReservations({ group, day, year });
 };
 
@@ -42,38 +62,33 @@ window.refreshData = function () {
     applyFilters();
 };
 
-function fetchReservations(filters) {
+async function fetchReservations(filters) {
     const tbody = document.getElementById('reservation-table-body');
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">読み込み中...</td></tr>';
 
-    const params = {
-        action: 'admin_get_reservations',
-        ...filters
-    };
+    // RPC Call
+    const result = await adminGetReservations(filters);
 
-    const apiUrl = apiUrlManager.getCurrentUrl();
-
-    fetchJsonp(apiUrl, params, (json) => {
-        if (json.success) {
-            currentReservations = json.data;
-            renderTable(json.data);
-        } else {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">エラー: ${json.error}</td></tr>`;
-        }
-    });
+    if (result.success) {
+        currentReservations = result.data; // array
+        renderTable(currentReservations);
+    } else {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">エラー: ${result.error}</td></tr>`;
+    }
 }
 
 function renderTable(data) {
     const tbody = document.getElementById('reservation-table-body');
     tbody.innerHTML = '';
 
-    if (data.length === 0) {
+    if (!data || data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">予約が見つかりません</td></tr>';
         return;
     }
 
     data.forEach(item => {
         const perf = item.performances || {};
+        // RPC aggregates seats as array of objects {seat_id: "A1"}
         const seats = item.seats ? item.seats.map(s => s.seat_id).join(', ') : '-';
 
         const tr = document.createElement('tr');
@@ -109,8 +124,6 @@ function renderTable(data) {
         tbody.appendChild(tr);
     });
 }
-// Removed delegated listener
-
 
 function getStatusBadge(status) {
     switch (status) {
@@ -122,14 +135,24 @@ function getStatusBadge(status) {
 }
 
 // 詳細モーダル
-// 詳細モーダル
 function openDetail(id) {
+    console.log('openDetail called with ID:', id);
     selectedBooking = currentReservations.find(r => r.id == id);
-    if (!selectedBooking) return;
 
+    if (!selectedBooking) {
+        console.error('Booking not found in currentReservations for ID:', id);
+        return;
+    }
     const perf = selectedBooking.performances || {};
     const seats = selectedBooking.seats ? selectedBooking.seats.map(s => s.seat_id).join(', ') : '-';
     const notes = selectedBooking.notes || '';
+
+    // Status Options
+    const statusOptions = `
+        <option value="confirmed" ${selectedBooking.status === 'confirmed' ? 'selected' : ''}>予約済 (confirmed)</option>
+        <option value="checked_in" ${selectedBooking.status === 'checked_in' ? 'selected' : ''}>入場済 (checked_in)</option>
+        <option value="cancelled" ${selectedBooking.status === 'cancelled' ? 'selected' : ''}>キャンセル (cancelled)</option>
+    `;
 
     // Render as inputs but disabled initially
     const html = `
@@ -137,8 +160,10 @@ function openDetail(id) {
             <div style="color:#666; display:flex; align-items:center;">ID</div>
             <div style="font-weight:bold">#${selectedBooking.id} <small>(${selectedBooking.passcode})</small></div>
             
-            <div style="color:#666; display:flex; align-items:center;">ステータス</div>
-            <div>${getStatusBadge(selectedBooking.status)}</div>
+            <label for="edit-status" style="color:#666; display:flex; align-items:center;">ステータス</label>
+            <select id="edit-status" class="form-select" disabled>
+                ${statusOptions}
+            </select>
             
             <label for="edit-name" style="color:#666; display:flex; align-items:center;">氏名</label>
             <input type="text" id="edit-name" class="form-control" value="${selectedBooking.name}" disabled>
@@ -168,7 +193,9 @@ function openDetail(id) {
     document.getElementById('modal-body').innerHTML = html;
 
     // reset buttons
-    document.getElementById('btn-edit-toggle').style.display = 'inline-block';
+    const editBtn = document.getElementById('btn-edit-toggle');
+    editBtn.style.display = 'inline-block';
+    editBtn.innerText = '編集';
     document.getElementById('btn-save-changes').style.display = 'none';
 
     document.getElementById('detail-modal').classList.add('active');
@@ -177,17 +204,20 @@ function openDetail(id) {
 function closeModal() {
     document.getElementById('detail-modal').classList.remove('active');
     selectedBooking = null;
-    // Reset edit mode state if needed
+    // Reset edit mode state
+    const nameInput = document.getElementById('edit-name');
+    if (nameInput) nameInput.disabled = true;
 };
 
 // 編集モード切替
 function toggleEditMode() {
-    const inputs = document.querySelectorAll('#modal-body input, #modal-body textarea');
+    const inputs = document.querySelectorAll('#modal-body input, #modal-body textarea, #modal-body select');
+    // Check first input disabled state
     const isEditing = !inputs[0].disabled;
 
     if (isEditing) {
-        // Cancel editing (re-render or just disable)
-        openDetail(selectedBooking.id); // Re-render to reset values
+        // Now canceling edit -> revert
+        openDetail(selectedBooking.id);
     } else {
         // Enable editing
         inputs.forEach(input => input.disabled = false);
@@ -197,15 +227,17 @@ function toggleEditMode() {
     }
 };
 
-function saveChanges() {
+async function saveChanges() {
     if (!selectedBooking) return;
 
     const updates = {
+        id: selectedBooking.id,
         name: document.getElementById('edit-name').value,
         email: document.getElementById('edit-email').value,
         grade_class: document.getElementById('edit-grade').value,
         club_affiliation: document.getElementById('edit-club').value,
-        notes: document.getElementById('edit-notes').value
+        notes: document.getElementById('edit-notes').value,
+        status: document.getElementById('edit-status').value
     };
 
     if (!updates.name) return alert('名前は必須です');
@@ -214,53 +246,58 @@ function saveChanges() {
     btn.innerText = '保存中...';
     btn.disabled = true;
 
-    callApi('admin_update_reservation', { id: selectedBooking.id, ...updates }, (res) => {
-        if (res.success) {
-            alert('保存しました');
-            closeModal();
-            refreshData(); // Refresh table to show changes
-        } else {
-            alert('保存失敗: ' + res.error);
-            btn.innerText = '変更を保存';
-            btn.disabled = false;
-        }
-    });
+    // Direct RPC
+    const res = await adminUpdateBooking(updates);
+
+    if (res.success) {
+        alert('保存しました');
+        closeModal();
+        refreshData();
+    } else {
+        alert('保存失敗: ' + res.error);
+        btn.innerText = '変更を保存';
+        btn.disabled = false;
+    }
 };
 
-// アクション
+// アクション: メール再送 (これだけはGAS APIを使う)
 function resendEmail() {
     if (!selectedBooking) return;
     if (!confirm('確認メールを再送しますか？')) return;
 
-    const btn = window.event ? window.event.target : document.activeElement;
+    const btn = document.getElementById('btn-resend-email');
     const org = btn.innerText;
     btn.innerText = '送信中...';
     btn.disabled = true;
 
-    callApi('admin_resend_email', { id: selectedBooking.id }, (res) => {
+    // Call GAS via JSONP
+    const url = apiUrlManager.getCurrentUrl();
+    fetchJsonp(url, { action: 'admin_resend_email', id: selectedBooking.id }, (res) => {
         alert(res.success ? 'メールを再送しました' : '送信失敗: ' + res.error);
         btn.innerText = org;
         btn.disabled = false;
     });
 };
 
-function confirmCancel() {
+async function confirmCancel() {
     if (!selectedBooking) return;
     if (selectedBooking.status === 'cancelled') return alert('既にキャンセルされています');
     if (!confirm('本当に予約を取り消しますか？\n（強制キャンセル）')) return;
 
-    callApi('admin_cancel_reservation', { id: selectedBooking.id }, (res) => {
-        if (res.success) {
-            alert('キャンセルしました');
-            closeModal();
-            refreshData();
-        } else {
-            alert('失敗: ' + res.error);
-        }
-    });
+    // RPC Force Cancel
+    const res = await adminCancelBooking(selectedBooking.id);
+
+    if (res.success) {
+        alert('キャンセルしました');
+        closeModal();
+        refreshData();
+    } else {
+        alert('失敗: ' + res.error);
+    }
 };
 
-// 座席変更関連
+// --- Seat Change Logic (Adapted from reservation.js) ---
+
 let selectedNewSeats = [];
 
 function openSeatChangeModal() {
@@ -269,35 +306,39 @@ function openSeatChangeModal() {
 
     document.getElementById('seat-modal').classList.add('active');
     document.getElementById('seat-map-container').innerHTML = '<div style="text-align:center; padding:20px;">座席データ読み込み中...</div>';
-    selectedNewSeats = [];
+
+    // Initialize with current seats
+    if (selectedBooking.seats) {
+        selectedNewSeats = selectedBooking.seats.map(s => s.seat_id);
+    } else {
+        selectedNewSeats = [];
+    }
     updateNewSeatsUI();
 
-    callApi('get_seats', {
-        group: perf.group_name,
-        day: perf.day,
-        timeslot: perf.timeslot
-    }, (res) => {
-        if (res.success) {
-            renderSeatMap(res.seatMap);
-        } else {
-            document.getElementById('seat-map-container').innerHTML = `<div style="color:red;text-align:center;">エラー: ${res.error}</div>`;
-        }
-    });
+    fetchSeatsFromSupabase(perf.group_name, perf.day, perf.timeslot)
+        .then(res => {
+            if (res.success) {
+                renderSeatMap(res.data);
+            } else {
+                document.getElementById('seat-map-container').innerHTML = `<div style="color:red;text-align:center;">エラー: ${res.error}</div>`;
+            }
+        });
 };
 
 function closeSeatModal() {
     document.getElementById('seat-modal').classList.remove('active');
 };
 
-function renderSeatMap(seatMap) {
+function renderSeatMap(seatsData) {
     const container = document.getElementById('seat-map-container');
     container.innerHTML = '';
 
-    const seats = Object.values(seatMap);
     const rows = {};
+    // Store original seat IDs for permission check
+    const originalSeatIds = selectedBooking.seats ? selectedBooking.seats.map(s => s.seat_id) : [];
 
-    seats.forEach(seat => {
-        const id = seat.id || seat.seat_id;
+    seatsData.forEach(seat => {
+        const id = seat.seat_id;
         const match = id.match(/^([A-Z]+)(\d+)$/);
         if (match) {
             const rowLabel = match[1];
@@ -324,25 +365,38 @@ function renderSeatMap(seatMap) {
 
         sortedSeats.forEach(seat => {
             const seatEl = document.createElement('div');
-            let statusClass = seat.status;
+            // Base Class
+            seatEl.className = `seat ${seat.status}`;
 
-            // Highlight my current seats
-            const isMySeat = selectedBooking.seats.some(s => s.seat_id === seat.id);
-            if (isMySeat) {
-                statusClass = 'my-seat';
-                seatEl.style.border = '2px solid blue'; // visible indicator
+            const isOriginal = originalSeatIds.includes(seat.id);
+            const isSelected = selectedNewSeats.includes(seat.id);
+
+            // Visual State Logic
+            if (isSelected) {
+                seatEl.classList.add('selected');
+                seatEl.classList.add('my-seat-selection');
+            } else if (isOriginal) {
+                // Was original, but currently deselected -> Show as "ghost"
+                seatEl.style.border = '2px dashed blue';
+                seatEl.style.backgroundColor = '#fff';
+                seatEl.style.color = '#333';
+                seatEl.style.opacity = '1';
+                seatEl.style.cursor = 'pointer';
             }
 
-            seatEl.className = `seat ${statusClass}`;
             seatEl.innerText = seat.id;
             seatEl.dataset.id = seat.id;
 
-            if (statusClass === 'available') {
+            // Interaction Logic
+            // Clickable if: Available OR Originally Mine OR Currently Selected
+            const isInteractable = (seat.status === 'available') || isOriginal || isSelected;
+
+            if (isInteractable) {
                 seatEl.style.cursor = 'pointer';
                 seatEl.onclick = () => handleSeatClick(seat, seatEl);
             } else {
                 seatEl.style.cursor = 'default';
-                seatEl.style.opacity = isMySeat ? '1' : '0.5';
+                seatEl.style.opacity = '0.5';
             }
 
             rowDiv.appendChild(seatEl);
@@ -354,7 +408,8 @@ function renderSeatMap(seatMap) {
             }
         });
         seatSection.appendChild(rowDiv);
-        if (rowLabel === 'F') { // Horizontal aisle
+
+        if (rowLabel === 'F') {
             const p = document.createElement('div'); p.style.height = '30px';
             seatSection.appendChild(p);
         }
@@ -364,52 +419,74 @@ function renderSeatMap(seatMap) {
 
 function handleSeatClick(seat, el) {
     const id = seat.id;
+    const originalSeatIds = selectedBooking.seats ? selectedBooking.seats.map(s => s.seat_id) : [];
+
     if (selectedNewSeats.includes(id)) {
+        // Deselect
         selectedNewSeats = selectedNewSeats.filter(s => s !== id);
         el.classList.remove('selected');
+        el.classList.remove('my-seat-selection');
+
+        // If it was original, restore "ghost" styling immediately
+        if (originalSeatIds.includes(id)) {
+            el.style.backgroundColor = '#fff';
+            el.style.color = '#333';
+            el.style.border = '2px dashed blue';
+            el.style.opacity = '1';
+        }
     } else {
+        // Select
+        // Allow if available OR if it is one of the original seats
+        if (seat.status !== 'available' && !originalSeatIds.includes(id)) return;
+
         selectedNewSeats.push(id);
         el.classList.add('selected');
+        el.classList.add('my-seat-selection');
+
+        // Remove ghost styling override
+        el.style.backgroundColor = '';
+        el.style.color = '';
+        el.style.border = '';
     }
     updateNewSeatsUI();
 }
 
 function updateNewSeatsUI() {
     const disp = document.getElementById('new-seats-display');
-    disp.innerText = selectedNewSeats.length > 0 ? selectedNewSeats.join(', ') : '未選択';
+    disp.innerText = selectedNewSeats.length > 0 ? selectedNewSeats.join(', ') : 'なし (全席開放)';
 }
 
-function submitSeatChange() {
-    if (selectedNewSeats.length === 0) return alert('座席を選択してください');
-    if (!confirm(`座席を ${selectedNewSeats.join(', ')} に変更しますか？`)) return;
+async function submitSeatChange() {
+    // If 0 seats, it means releasing all seats?
+    // User might want to just cancel logic, but if they explicitly deselected all, 
+    // maybe they want to make it a seat-less booking? 
+    // Let's allow 0 seats with a warning.
 
-    callApi('admin_change_seats', {
-        id: selectedBooking.id,
-        seats: selectedNewSeats.join(',')
-    }, (res) => {
-        if (res.success) {
-            alert('座席を変更しました');
-            closeSeatModal();
-            closeModal();
-            refreshData();
-        } else {
-            alert('変更失敗: ' + (res.error || '不明なエラー'));
-        }
-    });
+    const count = selectedNewSeats.length;
+    if (count === 0) {
+        if (!confirm('全ての座席を選択解除しました。このまま保存しますか？\n（予約は座席なし状態になります）')) return;
+    } else {
+        if (!confirm(`座席を ${selectedNewSeats.join(', ')} に変更しますか？`)) return;
+    }
+
+    // RPC Swap Seats
+    const res = await adminSwapSeats(selectedBooking.id, selectedNewSeats);
+
+    if (res.success) {
+        alert('座席を変更しました');
+        closeSeatModal();
+        closeModal();
+        refreshData();
+    } else {
+        alert('変更失敗: ' + (res.error || '不明なエラー'));
+    }
 };
 
-// Deprecated replace
 function promptSeatChange() {
     openSeatChangeModal();
 };
 
-
-// API Helper
-function callApi(action, params, callback) {
-    const url = apiUrlManager.getCurrentUrl();
-    fetchJsonp(url, { action, ...params }, callback);
-}
-
+// JSONP for Email Resend (Legacy)
 function fetchJsonp(url, params, callback) {
     const callbackName = 'jsonp_admin_' + Math.round(100000 * Math.random());
     window[callbackName] = function (data) {
@@ -431,7 +508,7 @@ window.toggleSidebar = function () {
     document.getElementById('sidebar').classList.toggle('active');
 };
 
-// グローバル公開（必要な場合）
+// Global expose
 window.openDetail = openDetail;
 window.toggleEditMode = toggleEditMode;
 window.saveChanges = saveChanges;
@@ -441,4 +518,7 @@ window.promptSeatChange = promptSeatChange;
 window.submitSeatChange = submitSeatChange;
 window.closeModal = closeModal;
 window.closeSeatModal = closeSeatModal;
-
+window.logout = function () {
+    sessionStorage.removeItem('admin_session');
+    window.location.href = 'admin-login.html';
+};

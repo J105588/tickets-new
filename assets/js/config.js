@@ -216,8 +216,11 @@ class DemoModeManager {
       params.delete('demo');
       const newSearch = params.toString();
       const newUrl = `${origin}${pathname}${newSearch ? '?' + newSearch : ''}${hash || ''}`;
-      window.history.replaceState(null, '', newUrl);
-      debugLog('[DemoMode] Removed demo parameter from URL');
+      if (window.location.href !== newUrl) {
+        console.log('[DemoMode] Replacing URL:', window.location.href, '->', newUrl);
+        window.history.replaceState(null, '', newUrl);
+        debugLog('[DemoMode] Removed demo parameter from URL');
+      }
     } catch (_) { }
   }
 
@@ -303,6 +306,7 @@ class DemoModeManager {
         const next = `${origin}${pathname}?${demoParam}${hash || ''}`;
         const modeName = this.isGeneproActive() ? 'GeneproMode' : 'DemoMode';
         debugLog(`[${modeName}] Append ${demoParam} to URL`, { from: href, to: next });
+        console.log('[DemoMode] Appending demo param:', href, '->', next);
         window.history.replaceState(null, '', next);
       }
     } catch (_) { }
