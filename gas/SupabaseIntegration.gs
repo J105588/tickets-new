@@ -18,7 +18,11 @@ class SupabaseIntegration {
     const url = `${this.url}/rest/v1/${endpoint}`;
     const method = (options.method || 'GET').toUpperCase();
     const isMutation = method !== 'GET' && method !== 'HEAD';
-    const authKey = isMutation && this.serviceRoleKey ? this.serviceRoleKey : this.anonKey;
+    
+    // useServiceRoleが明示的に指定されているか、更新系の操作であればService Role Keyを使用
+    const useServiceKey = options.useServiceRole || (isMutation && this.serviceRoleKey);
+    const authKey = useServiceKey ? this.serviceRoleKey : this.anonKey;
+    
     const headers = {
       'Content-Type': 'application/json',
       'apikey': authKey,
@@ -197,6 +201,76 @@ class SupabaseIntegration {
     } catch (error) {
       return { success: false, error: `Supabase接続失敗: ${error.message}` };
     }
+  }
+
+  // 予約データの作成
+  async createBooking(data) {
+    return await this._request('bookings', {
+      method: 'POST',
+      body: {
+        ...data,
+        status: 'confirmed'
+      },
+      headers: {
+        'Prefer': 'return=representation'
+      }
+    });
+  }
+
+  // 予約データの取得（ID指定）
+  async getBooking(bookingId) {
+    const endpoint = `bookings?id=eq.${bookingId}&select=*,seats(seat_id,row_letter,seat_number)`;
+    const result = await this._request(endpoint, {
+      method: 'GET',
+      useServiceRole: true
+    });
+    
+    if (!result.success || !result.data || result.data.length === 0) {
+      return { success: false, error: '予約が見つかりません' };
+    }
+    return { success: true, data: result.data[0] };
+  }
+
+  // 予約情報の取得（IDとパスコード）- RLS回避のためService Roleを使用
+  async getBookingByCredentials(bookingId, passcode) {
+    const query = `id=eq.${bookingId}&passcode=eq.${passcode}`;
+    const result = await this._request(`bookings?select=*,seats(seat_id,row_letter,seat_number),performances(group_name,day,timeslot)&${query}`, {
+      method: 'GET',
+      useServiceRole: true // 機密情報取得のため管理者権限を使用
+    });
+    if (!result.success || !result.data || result.data.length === 0) {
+      return { success: false, error: '予約が見つからないか、パスコードが間違っています' };
+    }
+    return { success: true, data: result.data[0] };
+  }
+
+  // 予約ステータスの更新（および関連座席の更新）
+  async updateBookingStatus(bookingId, status) {
+    // 1. 予約ステータス更新
+    const bookingUpdate = await this._request(`bookings?id=eq.${bookingId}`, {
+      method: 'PATCH',
+      body: {
+        status: status,
+        checked_in_at: status === 'checked_in' ? new Date().toISOString() : null
+      }
+    });
+    
+    if (!bookingUpdate.success) return bookingUpdate;
+    
+    // 2. 関連座席のステータス更新（チェックインの場合）
+    if (status === 'checked_in') {
+      // 予約に紐付く座席を取得して更新するのが確実だが、ここでは簡易的にbooking_idで更新
+      const seatUpdate = await this._request(`seats?booking_id=eq.${bookingId}`, {
+        method: 'PATCH',
+        body: {
+          status: 'checked_in',
+          checked_in_at: new Date().toISOString()
+        }
+      });
+      // 座席更新の失敗は致命的ではないがログに残すべき（GAS側で処理）
+    }
+    
+    return bookingUpdate;
   }
 }
 

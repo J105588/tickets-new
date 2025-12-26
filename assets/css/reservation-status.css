@@ -1,0 +1,148 @@
+/* reservation-status.css */
+body {
+    background-color: #f0f2f5;
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+}
+
+.status-container {
+    max-width: 500px;
+    margin: 2rem auto;
+    padding: 20px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+h2 {
+    text-align: center;
+    color: #333;
+    margin-bottom: 1.5rem;
+}
+
+/* Form Styles */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-control {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 16px;
+    box-sizing: border-box;
+}
+
+.btn {
+    padding: 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    width: 100%;
+    transition: 0.2s;
+}
+
+.btn-primary {
+    background: #6f42c1;
+    color: white;
+}
+
+.btn-primary:active {
+    transform: scale(0.98);
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid #6c757d;
+    color: #6c757d;
+    margin-top: 1rem;
+}
+
+/* Details Styles */
+.status-header {
+    text-align: center;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+}
+
+.badge {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+/* Status Colors */
+.status-confirmed {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-checked-in {
+    background: #cce5ff;
+    color: #004085;
+}
+
+.status-cancelled {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.qr-area {
+    text-align: center;
+    margin: 2rem 0;
+    padding: 1rem;
+    background: #fafafa;
+    border-radius: 8px;
+}
+
+#qrcode {
+    display: inline-block;
+    padding: 10px;
+    background: white;
+}
+
+#qrcode img {
+    margin: 0 auto;
+}
+
+.qr-note {
+    font-size: 0.9rem;
+    color: #666;
+    margin-top: 10px;
+}
+
+.qr-alt {
+    font-size: 1.2rem;
+    margin-top: 5px;
+}
+
+.details-box {
+    background: #fff;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.detail-row:last-child {
+    border-bottom: none;
+}
+
+.label {
+    color: #888;
+    font-size: 0.95rem;
+}
+
+.value {
+    font-weight: 500;
+    color: #333;
+    text-align: right;
+}

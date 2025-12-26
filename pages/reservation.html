@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>チケット予約 | 演劇・音楽発表会</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/seats.css">
+    <link rel="stylesheet" href="../assets/css/reservation.css">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+
+    <header class="app-header">
+        <div class="logo">
+            <i class="fas fa-ticket-alt"></i> Ticket Reserve
+        </div>
+    </header>
+
+    <main class="reservation-container">
+        <!-- プログレスバー -->
+        <div class="progress-bar">
+            <div class="step active" data-step="1">1. 公演選択</div>
+            <div class="step" data-step="2">2. 座席選択</div>
+            <div class="step" data-step="3">3. 情報入力</div>
+            <div class="step" data-step="4">4. 完了</div>
+        </div>
+
+        <!-- Step 1: 公演選択 -->
+        <section id="step-1" class="step-content active">
+            <h2>公演を選択してください</h2>
+            <div class="form-group">
+                <label for="group-select">部活・団体</label>
+                <select id="group-select" class="form-control">
+                    <option value="" disabled selected>選択してください</option>
+                    <option value="演劇部">演劇部</option>
+                    <option value="吹奏楽部">吹奏楽部</option>
+                    <option value="オーケストラ部">オーケストラ部</option>
+                    <option value="音楽部">音楽部</option>
+                    <option value="マーチング">マーチング</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="day-select">日程</label>
+                <select id="day-select" class="form-control" disabled>
+                    <option value="" disabled selected>部活を選択してください</option>
+                    <option value="1">1日目</option>
+                    <option value="2">2日目</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="timeslot-select">時間帯</label>
+                <select id="timeslot-select" class="form-control" disabled>
+                    <option value="" disabled selected>日程を選択してください</option>
+                    <!-- 他の時間帯はJSで動的に制御可能 -->
+                </select>
+            </div>
+            <button id="btn-to-step-2" class="btn btn-primary" disabled>次へ進む</button>
+        </section>
+
+        <!-- Step 2: 座席選択 -->
+        <section id="step-2" class="step-content">
+            <div class="header-with-action">
+                <h2>座席を選択してください</h2>
+                <button class="btn btn-secondary btn-sm" onclick="showStep(1)">戻る</button>
+            </div>
+            <p class="instruction">スクリーン側が前方です。クリックして選択してください（複数選択可）。</p>
+
+            <div class="seat-legend">
+                <div class="legend-item">
+                    <div class="seat available"></div>空席
+                </div>
+                <div class="legend-item">
+                    <div class="seat selected"></div>選択中
+                </div>
+                <div class="legend-item">
+                    <div class="seat reserved"></div>予約済
+                </div>
+            </div>
+
+            <div id="seat-map-container" class="seat-map-container">
+                <!-- 座席マップはJSで描画 -->
+                <div id="loading-spinner" class="spinner"></div>
+            </div>
+
+            <div class="selected-seats-info">
+                選択中の座席: <span id="selected-seats-display">なし</span>
+            </div>
+
+            <button id="btn-to-step-3" class="btn btn-primary" disabled>次へ進む</button>
+        </section>
+
+        <!-- Step 3: 情報入力 -->
+        <section id="step-3" class="step-content">
+            <div class="header-with-action">
+                <h2>予約者情報を入力してください</h2>
+                <button class="btn btn-secondary btn-sm" onclick="showStep(2)">戻る</button>
+            </div>
+
+            <form id="reservation-form">
+                <div class="form-group">
+                    <label for="res-name">お名前 <span class="required">*</span></label>
+                    <input type="text" id="res-name" class="form-control" placeholder="山田 太郎" required>
+                </div>
+                <div class="form-group">
+                    <label for="res-email">メールアドレス <span class="required">*</span></label>
+                    <input type="email" id="res-email" class="form-control" placeholder="example@email.com" required>
+                    <small>予約完了メールとQRコードが送信されます。</small>
+                </div>
+                <div class="form-group">
+                    <label for="res-grade">所属年組 (在校生の場合)</label>
+                    <input type="text" id="res-grade" class="form-control" placeholder="例: 3年1組, 保護者, 一般">
+                </div>
+                <div class="form-group">
+                    <label for="res-club">所属部活 (任意)</label>
+                    <input type="text" id="res-club" class="form-control" placeholder="例: サッカー部">
+                </div>
+
+                <div class="confirmation-box">
+                    <h4>予約内容確認</h4>
+                    <p><strong>公演:</strong> <span id="conf-group"></span></p>
+                    <p><strong>日時:</strong> <span id="conf-time"></span></p>
+                    <p><strong>座席:</strong> <span id="conf-seats"></span></p>
+                </div>
+
+                <button type="submit" id="btn-submit" class="btn btn-success btn-lg btn-block">予約を確定する</button>
+            </form>
+        </section>
+
+        <!-- Step 4: 完了 -->
+        <section id="step-4" class="step-content">
+            <div class="success-message">
+                <i class="fas fa-check-circle"></i>
+                <h2>予約が完了しました！</h2>
+                <p>ご登録いただいたメールアドレスに確認メールを送信しました。<br>
+                    メール内のリンクからQRコードをご確認ください。</p>
+
+                <div class="result-box">
+                    <p>予約ID: <strong id="result-booking-id" class="highlight"></strong></p>
+                </div>
+
+                <a href="reservation.html" class="btn btn-primary">続けて予約する</a>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Scripts -->
+    <script src="../assets/js/config.js"></script>
+    <script src="../assets/js/api.js"></script> <!-- 共通APIラッパーがあると仮定 -->
+    <script src="../assets/js/reservation.js"></script>
+</body>
+
+</html>

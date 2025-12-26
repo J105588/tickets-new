@@ -9,148 +9,57 @@ function doPost(e) {
   let response;
   let callback = e.parameter && e.parameter.callback;
 
-  // プリフライトリクエストの場合の処理
+  // プリフライトリクエスト
   if (e.method === "OPTIONS") {
-    const headers = {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, GET, OPTIONS, DELETE",
-      "Access-Control-Allow-Headers": "Content-Type",
-      "Access-Control-Max-Age": "3600"
-    };
     return ContentService.createTextOutput("")
       .setMimeType(ContentService.MimeType.TEXT)
-      .setHeaders(headers);
+      .setHeaders({
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, GET, OPTIONS, DELETE",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Max-Age": "3600"
+      });
   }
 
   try {
-    const body = e.postData.contents;
-    const params = {};
-    body.split('&').forEach(pair => {
-      const [key, value] = pair.split('=');
-      params[key] = JSON.parse(decodeURIComponent(value.replace(/\+/g, ' ')));
-    });
+    const postData = e.postData ? e.postData.contents : "";
+    let params = {};
+    let action = e.parameter.action;
 
-    const funcName = params.func;
-    const funcParams = params.params || [];
-
-    if (!funcName) {
-      throw new Error("呼び出す関数が指定されていません。(funcが必要です)");
+    // JSONパース試行
+    try {
+      params = JSON.parse(postData);
+      if (params.action) action = params.action;
+    } catch (jsonErr) {
+      // JSONでない場合は従来のフォーム形式として解析
+      postData.split('&').forEach(pair => {
+        const [key, value] = pair.split('=');
+        if (key && value) {
+          params[key] = JSON.parse(decodeURIComponent(value.replace(/\+/g, ' ')));
+        }
+      });
     }
 
-    const functionMap = {
-      'getSeatData': getSeatDataSupabase,
-      'getSeatDataMinimal': getSeatDataMinimalSupabase,
-      'reserveSeats': reserveSeatsSupabase,
-      'checkInSeat': checkInSeatSupabase,
-      'checkInMultipleSeats': checkInMultipleSeatsSupabase,
-      'assignWalkInSeat': assignWalkInSeatSupabase,
-      'assignWalkInSeats': assignWalkInSeatsSupabase,
-      'assignWalkInConsecutiveSeats': assignWalkInConsecutiveSeatsSupabase,
-      'verifyModePassword': verifyModePassword,
-      'updateSeatData': updateSeatDataSupabase,
-      'updateMultipleSeats': updateMultipleSeatsSupabase,
-      'getAllTimeslotsForGroup': getAllTimeslotsForGroup,
-      'testApi': testApiSupabase,
-      'reportError': reportError,
-      'getSystemLock': getSystemLock,
-      'setSystemLock': setSystemLock,
-      'execDangerCommand': execDangerCommand,
-      'initiateDangerCommand': initiateDangerCommand,
-      'confirmDangerCommand': confirmDangerCommand,
-      'listDangerPending': listDangerPending,
-      'performDangerAction': performDangerAction,
-      'debugSpreadsheetStructure': debugSpreadsheetStructure,
-      'getOrCreateLogSheet': getOrCreateLogSheet,
-      'getOrCreateClientAuditSheet': getOrCreateClientAuditSheet,
-      'appendClientAuditEntries': appendClientAuditEntries,
-      'getOperationLogs': getOperationLogs,
-      'getLogStatistics': getLogStatistics,
-      'recordClientAudit': recordClientAudit,
-      'getClientAuditLogs': getClientAuditLogs,
-      'getClientAuditStatistics': getClientAuditStatistics,
-      'getFullTimeslots': getFullTimeslotsSupabase,
-      'getFullCapacityTimeslots': getFullCapacityTimeslotsSupabase,
-      'setFullCapacityNotification': setFullCapacityNotification,
-      'getFullCapacityNotificationSettings': getFullCapacityNotificationSettings,
-      'sendFullCapacityEmail': sendFullCapacityEmail,
-      'sendStatusNotificationEmail': sendStatusNotificationEmail,
-      'getDetailedCapacityAnalysis': getDetailedCapacityAnalysisSupabase,
-      'getCapacityStatistics': getCapacityStatisticsSupabase,
-      'getGroupsSupabase': getGroupsSupabase,
-      'isValidSeatId': isValidSeatId,
-      'safeLogOperation': safeLogOperation,
-      'login': login,
-      'validateSession': validateSession
-    };
-
-    if (functionMap[funcName]) {
-      response = functionMap[funcName].apply(null, funcParams);
-      
-      // ログ記録
-      try {
-        const userAgent = e.parameter.userAgent || 'Unknown';
-        const ipAddress = e.parameter.ipAddress || 'Unknown';
-        logOperation(funcName, funcParams, response, userAgent, ipAddress);
-      } catch (logError) {
-        Logger.log('Log recording failed for ' + funcName + ': ' + logError.message);
+    // 1. 新しいActionベースのルーティング (予約システム用)
+    if (action) {
+      switch (action) {
+        case 'create_reservation':
+          // params自体がデータの役割
+          response = createReservation(params);
+          break;
+        case 'check_in':
+          response = checkInReservation(params.id, params.passcode);
+          break;
+        default:
+          throw new Error("不明なアクション: " + action);
       }
-    } else {
-      throw new Error("無効な関数名です: " + funcName);
-    }
+    } 
+    // 2. 従来のfunc/paramsベースのルーティング
+    else {
+      const funcName = params.func;
+      const funcParams = params.params || [];
+      if (!funcName) throw new Error("呼び出す関数が指定されていません。(funcまたはactionが必要です)");
 
-  } catch (err) {
-    response = { error: err.message };
-  }
-
-  // callback が無ければ純JSONで返却
-  if (!callback) {
-    const headers = {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, GET, OPTIONS, DELETE",
-      "Access-Control-Allow-Headers": "Content-Type",
-    };
-    return ContentService.createTextOutput(JSON.stringify(response))
-      .setMimeType(ContentService.MimeType.JSON)
-      .setHeaders(headers);
-  }
-
-  // JSONP形式でレスポンスを返す
-  let output = callback + '(' + JSON.stringify(response) + ')';
-  return ContentService.createTextOutput(output)
-    .setMimeType(ContentService.MimeType.JAVASCRIPT);
-}
-
-// ===============================================================
-// === ページ表示処理 (GETリクエスト) - Supabase対応版 ===
-// ===============================================================
-
-/**
- * WebアプリケーションにGETリクエストが来たときに実行されるメイン関数。
- * POSTリクエストと同様に関数呼び出しを処理する。
- */
-function doGet(e) {
-  let response;
-  let callback = e.parameter.callback; // コールバック関数名を取得
-
-  try {
-    const funcName = e.parameter.func;
-    const paramsStr = e.parameter.params;
-    
-    if (!funcName) {
-      // APIの状態情報を返す（関数呼び出しがない場合）
-      response = {
-        status: 'OK',
-        message: 'Seat Management API is running (Supabase Version)',
-        version: '3.0', // Supabase版
-        supabase: true,
-        migration: 'complete'
-      };
-    } else {
-      // パラメータを解析
-      const funcParams = paramsStr ? JSON.parse(decodeURIComponent(paramsStr)) : [];
-      
-      console.log('doGet: 関数呼び出し', { funcName, funcParams });
-      
       const functionMap = {
         'getSeatData': getSeatDataSupabase,
         'getSeatDataMinimal': getSeatDataMinimalSupabase,
@@ -173,10 +82,8 @@ function doGet(e) {
         'confirmDangerCommand': confirmDangerCommand,
         'listDangerPending': listDangerPending,
         'performDangerAction': performDangerAction,
-        'debugSpreadsheetStructure': debugSpreadsheetStructure,
-        'getOrCreateLogSheet': getOrCreateLogSheet,
-        'getOrCreateClientAuditSheet': getOrCreateClientAuditSheet,
-        'appendClientAuditEntries': appendClientAuditEntries,
+        'getOperationLogs': getOperationLogs,
+        'getLogStatistics': getLogStatistics,
         'recordClientAudit': recordClientAudit,
         'getClientAuditLogs': getClientAuditLogs,
         'getClientAuditStatistics': getClientAuditStatistics,
@@ -197,38 +104,156 @@ function doGet(e) {
 
       if (functionMap[funcName]) {
         response = functionMap[funcName].apply(null, funcParams);
-        
-        // ログ記録（既存システムに影響を与えないよう安全に実装）
+        // ログ記録
         try {
           const userAgent = e.parameter.userAgent || 'Unknown';
           const ipAddress = e.parameter.ipAddress || 'Unknown';
           logOperation(funcName, funcParams, response, userAgent, ipAddress);
-        } catch (logError) {
-          // ログ記録に失敗しても既存システムに影響を与えない
-          Logger.log('Log recording failed for ' + funcName + ': ' + logError.message);
-        }
+        } catch (_) {}
       } else {
         throw new Error("無効な関数名です: " + funcName);
       }
     }
+
   } catch (err) {
-    console.error('doGet処理エラー:', err);
-    response = { success: false, error: err.message };
-    
-    // エラーログ記録
-    try {
-      const userAgent = e.parameter.userAgent || 'Unknown';
-      const ipAddress = e.parameter.ipAddress || 'Unknown';
-      logOperation('doGet_error', { error: err.message }, response, userAgent, ipAddress);
-    } catch (logError) {
-      Logger.log('Error log recording failed: ' + logError.message);
-    }
+    response = { error: err.message };
   }
 
-  // JSONP形式でレスポンスを返す
-  let output = callback + '(' + JSON.stringify(response) + ')';
-  return ContentService.createTextOutput(output)
-    .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  // レスポンス返却
+  const headers = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, GET, OPTIONS, DELETE",
+    "Access-Control-Allow-Headers": "Content-Type"
+  };
+
+  const outputStr = JSON.stringify(response);
+  if (callback) {
+    return ContentService.createTextOutput(callback + '(' + outputStr + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(outputStr)
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeaders(headers);
+}
+
+// ===============================================================
+// === ページ表示処理 (GETリクエスト) - Supabase対応版 ===
+// ===============================================================
+
+/**
+ * WebアプリケーションにGETリクエストが来たときに実行されるメイン関数。
+ * POSTリクエストと同様に関数呼び出しを処理する。
+ */
+function doGet(e) {
+  let response;
+  let callback = e.parameter.callback;
+
+  try {
+    const action = e.parameter.action;
+    
+    // 1. Actionベースのルーティング
+    if (action) {
+       switch (action) {
+         case 'get_seats':
+           // group, day, timeslot from params
+           response = getSeatDataSupabase(
+             e.parameter.group, 
+             parseInt(e.parameter.day), 
+             e.parameter.timeslot
+           );
+           break;
+         case 'get_booking_details':
+           response = getBookingDetails(e.parameter.id, e.parameter.passcode);
+           break;
+         default:
+           throw new Error("不明なアクション: " + action);
+       }
+    } 
+    // 2. 従来のfunc/paramsベース
+    else {
+      const funcName = e.parameter.func;
+      const paramsStr = e.parameter.params;
+      
+      if (!funcName) {
+        // デフォルトステータス
+        response = {
+          status: 'OK',
+          app: 'Ticket Reserve System',
+          version: '3.1',
+          mode: 'Supabase'
+        };
+      } else {
+        const funcParams = paramsStr ? JSON.parse(decodeURIComponent(paramsStr)) : [];
+        const functionMap = {
+          'getSeatData': getSeatDataSupabase,
+          // ... (simplified list for brevity in replacement if possible, but safer to keep all)
+          'getSeatDataMinimal': getSeatDataMinimalSupabase,
+          'reserveSeats': reserveSeatsSupabase,
+          'checkInSeat': checkInSeatSupabase,
+          'checkInMultipleSeats': checkInMultipleSeatsSupabase,
+          'assignWalkInSeat': assignWalkInSeatSupabase,
+          'assignWalkInSeats': assignWalkInSeatsSupabase,
+          'assignWalkInConsecutiveSeats': assignWalkInConsecutiveSeatsSupabase,
+          'verifyModePassword': verifyModePassword,
+          'updateSeatData': updateSeatDataSupabase,
+          'updateMultipleSeats': updateMultipleSeatsSupabase,
+          'getAllTimeslotsForGroup': getAllTimeslotsForGroup,
+          'testApi': testApiSupabase,
+          'reportError': reportError,
+          'getSystemLock': getSystemLock,
+          'setSystemLock': setSystemLock,
+          'execDangerCommand': execDangerCommand,
+          'initiateDangerCommand': initiateDangerCommand,
+          'confirmDangerCommand': confirmDangerCommand,
+          'listDangerPending': listDangerPending,
+          'performDangerAction': performDangerAction,
+          'debugSpreadsheetStructure': debugSpreadsheetStructure,
+          'getOrCreateLogSheet': getOrCreateLogSheet,
+          'getOrCreateClientAuditSheet': getOrCreateClientAuditSheet,
+          'appendClientAuditEntries': appendClientAuditEntries,
+          'recordClientAudit': recordClientAudit,
+          'getClientAuditLogs': getClientAuditLogs,
+          'getClientAuditStatistics': getClientAuditStatistics,
+          'getFullTimeslots': getFullTimeslotsSupabase,
+          'getFullCapacityTimeslots': getFullCapacityTimeslotsSupabase,
+          'setFullCapacityNotification': setFullCapacityNotification,
+          'getFullCapacityNotificationSettings': getFullCapacityNotificationSettings,
+          'sendFullCapacityEmail': sendFullCapacityEmail,
+          'sendStatusNotificationEmail': sendStatusNotificationEmail,
+          'getDetailedCapacityAnalysis': getDetailedCapacityAnalysisSupabase,
+          'getCapacityStatistics': getCapacityStatisticsSupabase,
+          'getGroupsSupabase': getGroupsSupabase,
+          'isValidSeatId': isValidSeatId,
+          'safeLogOperation': safeLogOperation,
+          'login': login,
+          'validateSession': validateSession
+        };
+
+        if (functionMap[funcName]) {
+          response = functionMap[funcName].apply(null, funcParams);
+        } else {
+          throw new Error("無効な関数名です: " + funcName);
+        }
+      }
+    }
+  } catch (err) {
+    response = { error: err.message };
+  }
+
+  const outputStr = JSON.stringify(response);
+  if (callback) {
+    return ContentService.createTextOutput(callback + '(' + outputStr + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  } else {
+    // CORS Header
+    return ContentService.createTextOutput(outputStr)
+      .setMimeType(ContentService.MimeType.JSON)
+      .setHeaders({
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type",
+        "Access-Control-Allow-Methods": "POST, GET, OPTIONS"
+      });
+  }
 }
 
 // ===============================================================

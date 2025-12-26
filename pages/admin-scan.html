@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>チェックイン (QR読取) | Admin</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/admin-scan.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- HTML5-QRCode Library -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+</head>
+
+<body>
+
+    <header class="app-header">
+        <div class="logo">
+            <i class="fas fa-qrcode"></i> Admin Check-in
+        </div>
+        <button id="btn-change-mode" class="btn btn-sm btn-outline-light">条件変更</button>
+    </header>
+
+    <main class="scan-container">
+
+        <!-- Step 1: Target Selection -->
+        <section id="setup-section">
+            <h2>チェックイン対象設定</h2>
+            <div class="form-group">
+                <label>部活・団体</label>
+                <select id="target-group" class="form-control">
+                    <option value="" disabled selected>選択してください</option>
+                    <option value="演劇部">演劇部</option>
+                    <option value="吹奏楽部">吹奏楽部</option>
+                    <option value="オーケストラ部">オーケストラ部</option>
+                    <option value="音楽部">音楽部</option>
+                    <option value="マーチング">マーチング</option>
+                    <option value="見本演劇">見本演劇 (デモ)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>日程</label>
+                <select id="target-day" class="form-control" disabled>
+                    <option value="1">1日目</option>
+                    <option value="2">2日目</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>時間帯</label>
+                <select id="target-timeslot" class="form-control" disabled>
+                    <option value="A">A (09:00~)</option>
+                </select>
+            </div>
+            <button id="btn-start-scan" class="btn btn-primary btn-block" disabled>スキャン開始</button>
+        </section>
+
+        <!-- Step 2: Scanner & Manual Input -->
+        <section id="scan-section" style="display: none;">
+            <div class="target-info">
+                <strong id="disp-target"></strong> の受付中
+            </div>
+
+            <!-- Tabs -->
+            <div class="scan-tabs">
+                <button class="tab-btn active" data-tab="camera">カメラ読取</button>
+                <button class="tab-btn" data-tab="manual">ID入力</button>
+            </div>
+
+            <!-- Camera Tab -->
+            <div id="tab-camera" class="tab-content active">
+                <div id="reader"></div>
+                <!-- <p class="note">カメラへのアクセスを許可してください</p> -->
+            </div>
+
+            <!-- Manual Tab -->
+            <div id="tab-manual" class="tab-content">
+                <div class="form-group">
+                    <label>予約ID</label>
+                    <input type="number" id="manual-id" class="form-control" placeholder="IDか数字を入力">
+                </div>
+                <!-- パスコードは管理者入力時はスキップ可能とするか、セキュリティのため必須とするか。
+                     ユーザー要件：「QRを読み取る(もしくはIDを手動入力する)」
+                     管理者がID聞いて入力するならパスコードも聞けば良いが、面倒ならIDだけでもレコード特定は可能。
+                     ただ、他人への誤チェックイン防止のため、名前確認ダイアログを出す。
+                -->
+                <div class="form-group">
+                    <label>確認コード (4桁)</label>
+                    <input type="text" id="manual-pass" class="form-control" placeholder="不明な場合は空欄可">
+                    <small>※空欄の場合はデータ照会のみ行います</small>
+                </div>
+                <button id="btn-manual-check" class="btn btn-primary btn-block">照会</button>
+            </div>
+
+            <!-- Result Modal / Status Area -->
+            <div id="scan-result" class="scan-result" style="display: none;">
+                <h3 id="res-title">確認</h3>
+                <div id="res-content"></div>
+                <div class="res-actions">
+                    <button id="btn-confirm-checkin" class="btn btn-success">チェックイン実行</button>
+                    <button id="btn-cancel-checkin" class="btn btn-secondary">キャンセル</button>
+                </div>
+            </div>
+            <div id="success-msg" class="success-msg" style="display: none;">
+                <i class="fas fa-check-circle"></i> <span id="msg-text"></span>
+            </div>
+        </section>
+
+    </main>
+
+    <script src="../assets/js/config.js"></script>
+    <script src="../assets/js/api.js"></script>
+    <script src="../assets/js/admin-scan.js"></script>
+</body>
+
+</html>

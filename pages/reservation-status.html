@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>予約状況確認 | Ticket Reserve</title>
+    <link rel="stylesheet" href="../assets/css/style.css">
+    <link rel="stylesheet" href="../assets/css/reservation-status.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- QR Code Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+
+<body>
+
+    <header class="app-header">
+        <div class="logo">
+            <i class="fas fa-ticket-alt"></i> Ticket Reserve
+        </div>
+    </header>
+
+    <main class="status-container">
+
+        <!-- Login Section -->
+        <section id="login-section">
+            <h2>予約確認</h2>
+            <p>予約IDとパスコードを入力して、QRコードを表示してください。</p>
+
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="booking-id">予約ID</label>
+                    <input type="number" id="booking-id" class="form-control" placeholder="例: 123" required>
+                </div>
+                <div class="form-group">
+                    <label for="passcode">確認コード (4桁)</label>
+                    <input type="password" id="passcode" class="form-control" placeholder="例: 1234" maxlength="4"
+                        required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">確認する</button>
+            </form>
+        </section>
+
+        <!-- Details Section (Hidden by default) -->
+        <section id="details-section" style="display: none;">
+            <div class="status-header">
+                <span id="status-badge" class="badge">予約確定</span>
+                <h2 id="disp-program-name">公演名</h2>
+            </div>
+
+            <div class="qr-area">
+                <div id="qrcode"></div>
+                <p class="qr-note">受付でこのQRコードを提示してください</p>
+                <p class="qr-alt">ID: <strong id="disp-id"></strong></p>
+            </div>
+
+            <div class="details-box">
+                <div class="detail-row">
+                    <span class="label">お名前</span>
+                    <span class="value" id="disp-name"></span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">日時</span>
+                    <span class="value" id="disp-datetime"></span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">座席</span>
+                    <span class="value" id="disp-seats"></span>
+                </div>
+                <div class="detail-row">
+                    <span class="label">所属</span>
+                    <span class="value" id="disp-affiliation"></span>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button onclick="location.reload()" class="btn btn-outline">ログアウト</button>
+            </div>
+        </section>
+
+    </main>
+
+    <script src="../assets/js/config.js"></script>
+    <script src="../assets/js/api.js"></script>
+    <script src="../assets/js/reservation-status.js"></script>
+</body>
+
+</html>
