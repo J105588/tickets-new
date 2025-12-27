@@ -227,6 +227,9 @@ function saveSchedule(data) {
      }
 
   } catch (e) {
+    if (e.message.indexOf('duplicate key value') !== -1 || e.message.indexOf('23505') !== -1) {
+      return { success: false, error: 'この公演（団体・日程・時間帯）は既に登録されています。' };
+    }
     return { success: false, error: e.message };
   }
 }

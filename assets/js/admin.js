@@ -27,6 +27,12 @@ let masterData = {
 // --- Initialization ---
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // 0. Session Check
+    if (!sessionStorage.getItem('admin_session')) {
+        window.location.href = 'admin-login.html';
+        return;
+    }
+
     // 1. Load All Data (Filters + Settings)
     await loadMasterData();
 
