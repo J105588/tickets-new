@@ -170,13 +170,19 @@ function initStep1() {
         showStep(2);
     });
 
-    document.getElementById('btn-back-to-step-1').addEventListener('click', () => {
-        showStep(1);
-    });
+    const btnBack1 = document.getElementById('btn-back-to-step-1');
+    if (btnBack1) {
+        btnBack1.addEventListener('click', () => {
+            showStep(1);
+        });
+    }
 
-    document.getElementById('btn-back-to-step-2').addEventListener('click', () => {
-        showStep(2);
-    });
+    const btnBack2 = document.getElementById('btn-back-to-step-2');
+    if (btnBack2) {
+        btnBack2.addEventListener('click', () => {
+            showStep(2);
+        });
+    }
 }
 
 function checkStep1Validity() {
