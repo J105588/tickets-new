@@ -24,26 +24,51 @@ const targetTimeslot = document.getElementById('target-timeslot');
 
 // Init
 document.addEventListener('DOMContentLoaded', async () => {
-    // 0. Session Check (with Timeout)
+    // 0. Session Check (Idle Timeout)
     const session = sessionStorage.getItem('admin_session');
-    const verifiedAt = sessionStorage.getItem('admin_verified_at');
-    const SESSION_TIMEOUT_MS = 60 * 60 * 1000; // 60 minutes
+    let lastActive = sessionStorage.getItem('admin_last_active');
 
-    if (!session || !verifiedAt) {
+    // Fallback
+    if (session && !lastActive) {
+        lastActive = new Date().getTime().toString();
+        sessionStorage.setItem('admin_last_active', lastActive);
+    }
+
+    const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+
+    if (!session) {
         window.location.href = 'admin-login.html';
         return;
     }
 
     const now = new Date().getTime();
-    const loginTime = new Date(verifiedAt).getTime();
-
-    if (now - loginTime > SESSION_TIMEOUT_MS) {
-        alert('セッション有効期限が切れました。再度ログインしてください。');
+    if (now - parseInt(lastActive) > SESSION_TIMEOUT_MS) {
+        alert('一定時間操作がなかったため、ログアウトしました。');
         sessionStorage.removeItem('admin_session');
         sessionStorage.removeItem('admin_verified_at');
+        sessionStorage.removeItem('admin_last_active');
         window.location.href = 'admin-login.html';
         return;
     }
+
+    // Update activity
+    const updateActivity = () => {
+        sessionStorage.setItem('admin_last_active', new Date().getTime().toString());
+    };
+
+    let activityThrottle = false;
+    ['mousedown', 'keydown', 'touchstart'].forEach(evt => {
+        document.addEventListener(evt, () => {
+            if (!activityThrottle) {
+                updateActivity();
+                activityThrottle = true;
+                setTimeout(() => activityThrottle = false, 10000);
+            }
+        });
+    });
+
+    updateActivity();
+
 
     // 1. Master Data
     await initializeMasterData();
@@ -243,7 +268,8 @@ async function fetchBookingAndConfirm(id, passcode) {
         renderConfirmation(result.data);
     } else {
         // Fallback to error
-        showResultModal('エラー', `<p style="color:var(--danger);text-align:center;font-weight:bold;font-size:1.2rem;">${result.error || 'データが見つかりません'}</p>`);
+        // Fallback to error
+        showResultModal('エラー', `<p style="color:var(--danger);text-align:center;font-weight:bold;font-size:1.2rem;">${result.error || 'データが見つかりません'}</p>`, 'error');
         document.getElementById('btn-confirm-checkin').style.display = 'none';
 
         // Auto-close error after 2s
@@ -305,7 +331,7 @@ function renderConfirmation(booking) {
             </span>
         </div>`;
         btn.style.display = 'none'; // DISABLE CHECKIN for mismatch
-        showResultModal('入場不可', html);
+        showResultModal('入場不可', html, 'error');
         return;
     }
 
@@ -315,10 +341,10 @@ function renderConfirmation(booking) {
     } else if (booking.status === 'cancelled') {
         html += `<div style="color:var(--danger); font-weight:bold; margin-top:10px; font-size:1.2rem; text-align:center;">キャンセルされた予約です</div>`;
         btn.style.display = 'none';
-        showResultModal('エラー', html); // Show failure
+        showResultModal('エラー', html, 'error'); // Show failure
     } else {
         btn.style.display = 'inline-block';
-        showResultModal('予約確認', html);
+        showResultModal('予約確認', html, 'normal');
     }
 }
 
@@ -357,7 +383,7 @@ function renderSuccessState(msg, autoClose) {
     document.getElementById('btn-confirm-checkin').style.display = 'none';
     document.getElementById('btn-cancel-checkin').style.display = 'none';
 
-    showResultModal('', html); // No title needed for big icon
+    showResultModal('', html, 'success'); // No title needed for big icon
 
     if (autoClose) {
         setTimeout(() => {
@@ -370,8 +396,16 @@ function renderSuccessState(msg, autoClose) {
 }
 
 
-function showResultModal(title, contentHtml) {
+function showResultModal(title, contentHtml, type = 'normal') {
     const overlay = document.getElementById('result-overlay');
+    const card = overlay.querySelector('.result-card');
+
+    // Reset classes
+    card.classList.remove('success', 'error', 'warning');
+    if (type !== 'normal') {
+        card.classList.add(type);
+    }
+
     overlay.style.display = 'flex';
     document.getElementById('res-title').innerText = title;
     document.getElementById('res-content').innerHTML = contentHtml;
@@ -380,6 +414,10 @@ function showResultModal(title, contentHtml) {
 function hideResultModal() {
     document.getElementById('result-overlay').style.display = 'none';
     state.currentBooking = null;
+
+    // Reset card classes
+    const card = document.querySelector('#result-overlay .result-card');
+    card.classList.remove('success', 'error', 'warning');
 
     // Restore buttons
     document.getElementById('btn-confirm-checkin').style.display = 'inline-block';

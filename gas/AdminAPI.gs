@@ -222,3 +222,32 @@ function adminCancelReservation(bookingId) {
     return { success: false, error: e.message };
   }
 }
+// ==========================================
+// 管理者用: 予約情報更新 (名前、メール、備考など)
+// ==========================================
+function adminUpdateReservation(bookingId, updates) {
+  try {
+    // updates: { name, email, grade_class, club_affiliation, notes, status? }
+    
+    if (!bookingId) return { success: false, error: 'Booking ID is required' };
+    
+    // updateBookingStatus is for status only. Use generic PATCH for other fields.
+    const endpoint = `bookings?id=eq.${bookingId}`;
+    const result = supabaseIntegration._request(endpoint, {
+      method: 'PATCH',
+      headers: { 
+        'Prefer': 'return=minimal'
+      },
+      body: updates
+    });
+    
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+    
+    return { success: true, message: '予約情報を更新しました', debug_updates: updates };
+    
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}

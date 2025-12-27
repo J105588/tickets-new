@@ -228,7 +228,9 @@ function doGet(e) {
                 email: e.parameter.email,
                 grade_class: e.parameter.grade_class,
                 club_affiliation: e.parameter.club_affiliation,
-                notes: e.parameter.notes
+                club_affiliation: e.parameter.club_affiliation,
+                notes: e.parameter.notes,
+                status: e.parameter.status
              };
              // Remove undefined
              Object.keys(updates).forEach(key => updates[key] === undefined && delete updates[key]);

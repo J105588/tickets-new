@@ -256,7 +256,9 @@ export async function adminUpdateBooking(bookingData) {
             email: bookingData.email,
             grade_class: bookingData.grade_class,
             club_affiliation: bookingData.club_affiliation,
-            notes: bookingData.notes
+            club_affiliation: bookingData.club_affiliation,
+            notes: bookingData.notes,
+            status: bookingData.status
         };
         const result = await jsonpRequest(GAS_API_URLS[0], params);
         return result;

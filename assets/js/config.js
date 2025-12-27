@@ -1,7 +1,7 @@
 // config.js
 // 複数のAPI URL（使用数上限回避のため分散）
 const GAS_API_URLS = [
-  "https://script.google.com/macros/s/AKfycbzyWTemFa5q1RKbontV7pVulRI9TxJLox07pRaVjdBmaZ8w74Nk19wrOqZDRHU3HFj1EQ/exec"
+  "https://script.google.com/macros/s/AKfycbxbLRuJnJmmvowHJfm2fBPQ4no1By2WUuvpXbuEEOz2vpsdYODPWyUx6q3LmznA1ieylw/exec"
   //jxjin2010@gmail.com
   //"https://script.google.com/macros/s/AKfycbwfHVEZwLbCs_sJ3ckyr6vdCLfI3twmiENbBuSOidMUOLAnGwfmGoyvGLcXihJMu8T1/exec",
   //jxjin.ig.school@gmail.com
@@ -11,6 +11,7 @@ const GAS_API_URLS = [
   //nzn.engeki5.b@gmail.com
   //"https://script.google.com/macros/s/AKfycbzlEND5CFpw1zjbuewYt2OxtnOAMFeskfAcig6TOr6uYxzESwUoBuduD_QXVl6OYrNZjw/exec",
   //info.engeki5@gmail.com
+  //"https://script.google.com/macros/s/AKfycbwv2OXw3TBbUEArMCP_8Nh0dRhX4nhKVH-cnOfB057xZCsf-L3GK9uoh1fkD7EV-irAOg/exec"
   //"https://script.google.com/macros/s/AKfycbyfSRWikWG6U1qV_QUT9JkD-Q-1AxIygbjE7tdH00lDkt0-d7pLPjiPPqXlMdHFgBVuig/exec",
   //engeki.enjitsu@gmail.com
   //"https://script.google.com/macros/s/AKfycbz0gcsEHWPSsoM_tQaGJCHO6ga9Qzu2by81EYA4QRPww8m4QsrSQZ8dZ3WMZoga_yqx/exec"

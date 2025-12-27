@@ -312,6 +312,21 @@ input:focus {
     padding: 2rem;
     text-align: center;
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    border-top: 8px solid transparent;
+    /* Default */
+    transition: border-color 0.3s;
+}
+
+.result-card.success {
+    border-top-color: var(--success);
+}
+
+.result-card.error {
+    border-top-color: var(--danger);
+}
+
+.result-card.warning {
+    border-top-color: #f59e0b;
 }
 
 .res-details {

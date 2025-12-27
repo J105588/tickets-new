@@ -27,26 +27,53 @@ let masterData = {
 // --- Initialization ---
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // 0. Session Check (with Timeout)
+    // 0. Session Check (Idle Timeout)
     const session = sessionStorage.getItem('admin_session');
-    const verifiedAt = sessionStorage.getItem('admin_verified_at');
-    const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+    let lastActive = sessionStorage.getItem('admin_last_active');
 
-    if (!session || !verifiedAt) {
+    // Fallback for existing sessions without last_active
+    if (session && !lastActive) {
+        lastActive = new Date().getTime().toString();
+        sessionStorage.setItem('admin_last_active', lastActive);
+    }
+
+    const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes idle timeout
+
+    if (!session) {
         window.location.href = 'admin-login.html';
         return;
     }
 
     const now = new Date().getTime();
-    const loginTime = new Date(verifiedAt).getTime();
-
-    if (now - loginTime > SESSION_TIMEOUT_MS) {
-        alert('セッション有効期限が切れました。再度ログインしてください。');
+    if (now - parseInt(lastActive) > SESSION_TIMEOUT_MS) {
+        alert('一定時間操作がなかったため、ログアウトしました。');
         sessionStorage.removeItem('admin_session');
         sessionStorage.removeItem('admin_verified_at');
+        sessionStorage.removeItem('admin_last_active');
         window.location.href = 'admin-login.html';
         return;
     }
+
+    // Update activity timestamp on user interaction
+    const updateActivity = () => {
+        sessionStorage.setItem('admin_last_active', new Date().getTime().toString());
+    };
+
+    // Throttle updates to avoid excessive storage writes (e.g., every 10s)
+    let activityThrottle = false;
+    ['mousedown', 'keydown', 'touchstart'].forEach(evt => {
+        document.addEventListener(evt, () => {
+            if (!activityThrottle) {
+                updateActivity();
+                activityThrottle = true;
+                setTimeout(() => activityThrottle = false, 10000);
+            }
+        });
+    });
+
+    // Update usage on valid load
+    updateActivity();
+
 
     // 1. Load All Data (Filters + Settings)
     await loadMasterData();
