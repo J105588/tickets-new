@@ -10,7 +10,7 @@ import uiOptimizer from './ui-optimizer.js';
 const urlParams = new URLSearchParams(window.location.search);
 const requestedGroup = urlParams.get('group') || '';
 // DEMOモードで許可外の場合ブロックしてリダイレクト
-DemoMode.guardGroupAccessOrRedirect(requestedGroup, `seats.html?group=${encodeURIComponent(DemoMode.demoGroup)}&day=${urlParams.get('day')||'1'}&timeslot=${urlParams.get('timeslot')||'A'}`);
+DemoMode.guardGroupAccessOrRedirect(requestedGroup, `seats.html?group=${encodeURIComponent(DemoMode.demoGroup)}&day=${urlParams.get('day') || '1'}&timeslot=${urlParams.get('timeslot') || 'A'}`);
 // DEMOモード時は見本演劇を強制
 let GROUP = DemoMode.enforceGroup(requestedGroup || '見本演劇');
 const DAY = urlParams.get('day') || '1';
@@ -35,19 +35,19 @@ let interactionTimeout = null; // 操作終了を検知するためのタイマ�
 const apiEndpoint = apiUrlManager.getCurrentUrl();
 // OptimizedGasAPIはstaticメソッドを使用するため、インスタンス化は不要
 
-  // 初期化
-  window.onload = async () => {
-    loadSidebar();
-    
-    // DEMO/ゲネプロモードアクティブ時に通知
-    try { 
-      if (DemoMode.isActive() || DemoMode.isGeneproActive()) {
-        DemoMode.showNotificationIfNeeded();
-      }
-    } catch (_) {}
+// 初期化
+window.onload = async () => {
+  loadSidebar();
 
-    // オフライン状態インジケーターの初期化
-    initializeOfflineIndicator();
+  // DEMO/ゲネプロモードアクティブ時に通知
+  try {
+    if (DemoMode.isActive() || DemoMode.isGeneproActive()) {
+      DemoMode.showNotificationIfNeeded();
+    }
+  } catch (_) { }
+
+  // オフライン状態インジケーターの初期化
+  initializeOfflineIndicator();
 
   const groupName = isNaN(parseInt(GROUP)) ? GROUP : GROUP + '組';
   const performanceInfo = document.getElementById('performance-info');
@@ -67,7 +67,7 @@ const apiEndpoint = apiUrlManager.getCurrentUrl();
   try {
     const isNormal = !isAdminMode && !isSuperAdminMode && !isWalkinMode;
     document.body.classList.toggle('normal-mode', isNormal);
-  } catch (_) {}
+  } catch (_) { }
 
   // 管理者モードの表示制御
   const adminIndicator = document.getElementById('admin-indicator');
@@ -76,7 +76,7 @@ const apiEndpoint = apiUrlManager.getCurrentUrl();
   const submitButton = document.getElementById('submit-button');
   const checkInSelectedBtn = document.getElementById('check-in-selected-btn');
   const walkinButton = document.getElementById('walkin-button');
-  
+
   if (isSuperAdminMode) {
     if (superAdminIndicator) superAdminIndicator.style.display = 'block';
     if (adminIndicator) adminIndicator.style.display = 'none';
@@ -116,12 +116,12 @@ const apiEndpoint = apiUrlManager.getCurrentUrl();
   try {
     // URL変更をチェック
     checkForUrlChange();
-    
+
     // 現在のモードを取得して管理者権限を判定
     const currentMode = localStorage.getItem('currentMode') || 'normal';
     const isAdminMode = currentMode === 'admin' || IS_ADMIN;
     const isSuperAdminMode = currentMode === 'superadmin';
-    
+
     // オフライン時はキャッシュから復元（サーバーへ取りに行かない）
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       const cached = (window.readCache ? window.readCache(GROUP, DAY, TIMESLOT) : null);
@@ -130,7 +130,7 @@ const apiEndpoint = apiUrlManager.getCurrentUrl();
           seatCount: Object.keys(cached.seatMap).length,
           cacheAge: cached.cachedAt ? Math.round((Date.now() - cached.cachedAt) / 1000) + '秒前' : '不明'
         });
-        
+
         // オフライン時の座席データ復元強化
         const restoredSeatMap = {};
         Object.entries(cached.seatMap).forEach(([seatId, seatData]) => {
@@ -144,15 +144,15 @@ const apiEndpoint = apiUrlManager.getCurrentUrl();
             };
           }
         });
-        
+
         if (Object.keys(restoredSeatMap).length > 0) {
           console.log('[Offline] 座席データ復元完了:', Object.keys(restoredSeatMap).length + '席');
           drawSeatMap(restoredSeatMap);
           updateLastUpdateTime();
-          
+
           // オフライン復元通知を表示
           showOfflineRestoreNotification(Object.keys(restoredSeatMap).length);
-          
+
           const toggleCheckbox = document.getElementById('auto-refresh-toggle-checkbox');
           if (toggleCheckbox) {
             toggleCheckbox.checked = isAutoRefreshEnabled;
@@ -164,14 +164,14 @@ const apiEndpoint = apiUrlManager.getCurrentUrl();
       }
       // キャッシュがない場合のみ以降の処理に進む
     }
-    
+
     console.log('GasAPI.getSeatData呼び出し:', { GROUP: ACTUAL_GROUP, DAY, TIMESLOT: ACTUAL_TIMESLOT, isAdminMode, isSuperAdminMode });
     const seatData = await GasAPI.getSeatData(ACTUAL_GROUP, DAY, ACTUAL_TIMESLOT, isAdminMode, isSuperAdminMode);
-    
+
     // 詳細なデバッグ情報をコンソールに出力
     console.log("===== 座席データ詳細情報 =====");
     console.log("Received seatData:", seatData);
-    
+
     if (seatData.seatMap) {
       console.log("座席マップ構造:", Object.keys(seatData.seatMap));
       console.log("座席データサンプル:", Object.values(seatData.seatMap).slice(0, 3));
@@ -179,7 +179,7 @@ const apiEndpoint = apiUrlManager.getCurrentUrl();
       console.log("座席マップが存在しません");
     }
     console.log("===== 座席データ詳細情報終了 =====");
-    
+
     // エラーハンドリングの改善
     if (!seatData || seatData.success === false) {
       // オフライン委譲レスポンス: キャッシュから復元
@@ -200,7 +200,7 @@ const apiEndpoint = apiUrlManager.getCurrentUrl();
       }
       const errorMsg = seatData?.error || seatData?.message || 'データ読み込みに失敗しました';
       console.error('座席データ読み込み失敗:', errorMsg);
-      
+
       // エラー表示を改善
       const errorContainer = document.getElementById('error-container');
       const errorMessage = document.getElementById('error-message');
@@ -211,32 +211,32 @@ const apiEndpoint = apiUrlManager.getCurrentUrl();
         // エラーコンテナがない場合はアラートで表示
         alert(`座席データの読み込みに失敗しました: ${errorMsg}`);
       }
-      
+
       // エラー時でも基本的なUIは表示
       showLoader(false);
       return;
     }
 
     // オンライン取得成功時はキャッシュに保存
-    try { if (window.writeCache) { window.writeCache(GROUP, DAY, TIMESLOT, seatData); } } catch (_) {}
+    try { if (window.writeCache) { window.writeCache(GROUP, DAY, TIMESLOT, seatData); } } catch (_) { }
     drawSeatMap(seatData.seatMap);
     updateLastUpdateTime();
     updateSelectedSeatsDisplay(); // 初期化時に選択された座席数を更新
-    
+
     // 自動更新設定の初期化
     const toggleCheckbox = document.getElementById('auto-refresh-toggle-checkbox');
     if (toggleCheckbox) {
       toggleCheckbox.checked = isAutoRefreshEnabled;
       toggleCheckbox.addEventListener('change', toggleAutoRefresh);
     }
-    
+
     // 最終更新時間の初期表示
     updateLastUpdateTime();
-    
-      startAutoRefresh();
-} catch (error) {
-  console.error('サーバー通信失敗:', error);
-    
+
+    startAutoRefresh();
+  } catch (error) {
+    console.error('サーバー通信失敗:', error);
+
     // エラー表示を改善
     const errorContainer = document.getElementById('error-container');
     const errorMessage = document.getElementById('error-message');
@@ -286,21 +286,21 @@ function drawSeatMap(seatMap) {
 
   // 受信データから座席の行と列を動的に抽出
   const seatData = extractSeatLayoutFromData(seatMap);
-  
+
   const seatSection = document.createElement('div');
   seatSection.className = 'seat-section';
-  
+
   // 左右に余白を追加して中央基準のスクロールを可能にする（スクロールバー幅を考慮）
   const scrollbarWidth = getScrollbarWidth();
   const viewportWidth = window.innerWidth;
   const containerWidth = container.clientWidth;
-  
+
   // 左側の余白：座席図の左端がスクロールバーの0位置に来るように調整
   const leftPaddingWidth = Math.max(containerWidth * 0.4, 200); // コンテナ幅の40%または最小200px
-  
+
   // 右側の余白：左側と同じ幅にして中央配置を維持
   const rightPaddingWidth = leftPaddingWidth;
-  
+
   const leftPadding = document.createElement('div');
   leftPadding.style.cssText = `
     width: ${leftPaddingWidth}px;
@@ -308,7 +308,7 @@ function drawSeatMap(seatMap) {
     height: 1px;
     flex-shrink: 0;
   `;
-  
+
   const rightPadding = document.createElement('div');
   rightPadding.style.cssText = `
     width: ${rightPaddingWidth}px;
@@ -316,25 +316,25 @@ function drawSeatMap(seatMap) {
     height: 1px;
     flex-shrink: 0;
   `;
-  
+
   // 余白を追加
   seatSection.appendChild(leftPadding);
 
   // 行をソートして描画（A, B, C, D, E, F, G, ...）
   const sortedRows = Object.keys(seatData.rows).sort();
-  
+
   sortedRows.forEach(rowLabel => {
     const rowEl = document.createElement('div');
     rowEl.className = 'seat-row';
-    
+
     // 座席番号でソート
     const sortedSeats = seatData.rows[rowLabel].sort((a, b) => a.seatNumber - b.seatNumber);
-    
+
     sortedSeats.forEach(seat => {
       // 座席要素を作成
       const seatElement = createSeatElement(seat);
       rowEl.appendChild(seatElement);
-      
+
       // 通路を挿入（13,14の間と25,26の間）
       if (seat.seatNumber === 13) {
         const passage = document.createElement('div');
@@ -348,9 +348,9 @@ function drawSeatMap(seatMap) {
         rowEl.appendChild(passage);
       }
     });
-    
+
     seatSection.appendChild(rowEl);
-    
+
     // FとGの間に横の通路を追加
     if (rowLabel === 'F') {
       const horizontalPassage = document.createElement('div');
@@ -359,18 +359,18 @@ function drawSeatMap(seatMap) {
       seatSection.appendChild(horizontalPassage);
     }
   });
-  
+
   // 右側の余白を追加
   seatSection.appendChild(rightPadding);
 
   container.appendChild(seatSection);
-  
+
   // ズーム機能を初期化
   initializeZoomControls();
-  
+
   // カスタムスクロールバーを初期化
   initializeCustomScrollbar();
-  
+
   // 初期スクロール位置を座席図の左端がスクロールバーの0位置に来るように設定
   setTimeout(() => {
     centerSeatMap();
@@ -402,19 +402,19 @@ function centerSeatMap() {
 
   const scrollWidth = container.scrollWidth;
   const clientWidth = container.clientWidth;
-  
+
   if (scrollWidth > clientWidth) {
     // スクロール可能な場合、座席図の左端がスクロールバーの0位置に来るように配置
     const maxScrollLeft = scrollWidth - clientWidth;
-    
+
     // 左側の余白幅を計算（座席セクションの最初の子要素の幅）
     const seatSection = container.querySelector('.seat-section');
     const leftPadding = seatSection ? seatSection.firstElementChild : null;
     const leftPaddingWidth = leftPadding ? leftPadding.offsetWidth : 0;
-    
+
     // 座席図の左端がスクロールバーの0位置に来るようにスクロール位置を設定
     const targetScrollLeft = Math.max(0, Math.min(maxScrollLeft, leftPaddingWidth));
-    
+
     container.scrollLeft = targetScrollLeft;
   }
 }
@@ -422,20 +422,20 @@ function centerSeatMap() {
 // 受信データから座席レイアウトを抽出する関数
 function extractSeatLayoutFromData(seatMap) {
   const rows = {};
-  
+
   // 座席データを解析して行ごとに整理
   Object.values(seatMap).forEach(seatData => {
     const seatId = seatData.id;
     const rowMatch = seatId.match(/^([A-Z]+)(\d+)$/);
-    
+
     if (rowMatch) {
       const rowLabel = rowMatch[1];
       const seatNumber = parseInt(rowMatch[2]);
-      
+
       if (!rows[rowLabel]) {
         rows[rowLabel] = [];
       }
-      
+
       rows[rowLabel].push({
         id: seatId,
         seatNumber: seatNumber,
@@ -447,12 +447,12 @@ function extractSeatLayoutFromData(seatMap) {
       });
     }
   });
-  
+
   // 各列を座席番号順にソート
   Object.keys(rows).forEach(rowLabel => {
     rows[rowLabel].sort((a, b) => a.seatNumber - b.seatNumber);
   });
-  
+
   return { rows };
 }
 
@@ -463,24 +463,24 @@ function initializeZoomControls() {
   const zoomOutBtn = document.getElementById('zoom-out-btn');
   const zoomResetBtn = document.getElementById('zoom-reset-btn');
   const zoomLevelDisplay = document.getElementById('zoom-level');
-  
+
   if (!container || !zoomInBtn || !zoomOutBtn || !zoomResetBtn || !zoomLevelDisplay) {
     console.warn('ズームコントロールの要素が見つかりません');
     return;
   }
-  
+
   // 現在のズームレベル（デフォルト70%）
   let currentZoom = 0.7;
   const minZoom = 0.3;
   const maxZoom = 2.0;
   const zoomStep = 0.1;
-  
+
   // ズームレベルを更新
   function updateZoom(zoom) {
     currentZoom = Math.max(minZoom, Math.min(maxZoom, zoom));
     container.style.setProperty('--seat-scale', currentZoom);
     zoomLevelDisplay.textContent = Math.round(currentZoom * 100) + '%';
-    
+
     // ズーム状態のクラスを更新
     container.classList.remove('zoomed-out', 'zoomed', 'zoomed-in');
     if (currentZoom < 0.6) {
@@ -491,24 +491,24 @@ function initializeZoomControls() {
       container.classList.add('zoomed');
     }
   }
-  
+
   // ボタンイベント
   zoomInBtn.addEventListener('click', () => {
     updateZoom(currentZoom + zoomStep);
   });
-  
+
   zoomOutBtn.addEventListener('click', () => {
     updateZoom(currentZoom - zoomStep);
   });
-  
+
   zoomResetBtn.addEventListener('click', () => {
     updateZoom(0.7); // デフォルトに戻す
   });
-  
+
   // ピンチ操作（タッチデバイス）
   let lastTouchDistance = 0;
   let initialZoom = currentZoom;
-  
+
   container.addEventListener('touchstart', (e) => {
     if (e.touches.length === 2) {
       const touch1 = e.touches[0];
@@ -520,18 +520,18 @@ function initializeZoomControls() {
       initialZoom = currentZoom;
     }
   });
-  
+
   container.addEventListener('touchmove', (e) => {
     if (e.touches.length === 2) {
       e.preventDefault(); // スクロールを防ぐ
-      
+
       const touch1 = e.touches[0];
       const touch2 = e.touches[1];
       const currentDistance = Math.sqrt(
         Math.pow(touch2.clientX - touch1.clientX, 2) +
         Math.pow(touch2.clientY - touch1.clientY, 2)
       );
-      
+
       if (lastTouchDistance > 0) {
         const scale = currentDistance / lastTouchDistance;
         const newZoom = initialZoom * scale;
@@ -539,24 +539,24 @@ function initializeZoomControls() {
       }
     }
   });
-  
+
   container.addEventListener('touchend', () => {
     lastTouchDistance = 0;
   });
-  
+
   // マウスホイールズーム（デスクトップ）
   container.addEventListener('wheel', (e) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? -zoomStep : zoomStep;
     updateZoom(currentZoom + delta);
   });
-  
+
   // ダブルタップズーム（モバイル）
   let lastTapTime = 0;
   container.addEventListener('touchend', (e) => {
     const currentTime = new Date().getTime();
     const tapLength = currentTime - lastTapTime;
-    
+
     if (tapLength < 500 && tapLength > 0) {
       // ダブルタップ検出
       e.preventDefault();
@@ -568,7 +568,7 @@ function initializeZoomControls() {
     }
     lastTapTime = currentTime;
   });
-  
+
   // キーボードショートカット（デスクトップ）
   document.addEventListener('keydown', (e) => {
     if (e.ctrlKey || e.metaKey) {
@@ -589,7 +589,7 @@ function initializeZoomControls() {
       }
     }
   });
-  
+
   // 初期ズームレベルを設定
   updateZoom(currentZoom);
 }
@@ -599,12 +599,12 @@ function initializeCustomScrollbar() {
   const container = document.getElementById('seat-map-container');
   const customScrollbar = document.getElementById('custom-scrollbar');
   const scrollbarThumb = document.getElementById('scrollbar-thumb');
-  
+
   if (!container || !customScrollbar || !scrollbarThumb) {
     console.warn('カスタムスクロールバーの要素が見つかりません');
     return;
   }
-  
+
   // スクロール中のみ表示するためのタイマー管理
   let hideTimer = null;
   const HIDE_DELAY_MS = 800; // スクロール停止から非表示までの遅延
@@ -625,59 +625,59 @@ function initializeCustomScrollbar() {
   let isDragging = false;
   let startX = 0;
   let startScrollLeft = 0;
-  
+
   // スクロールバーの更新（0-100正規化、初期位置50）
   function updateScrollbar() {
     const scrollWidth = container.scrollWidth;
     const clientWidth = container.clientWidth;
     const scrollLeft = container.scrollLeft;
-    
+
     if (scrollWidth <= clientWidth) {
       // スクロール不要な場合は非表示
       hideScrollbar();
       return;
     }
-    
+
     // スクロール発生時は一旦表示
     customScrollbar.style.display = 'block';
-    
+
     // スクロールバーの幅を計算
     const trackWidth = customScrollbar.offsetWidth;
     const thumbWidth = Math.max(30, (clientWidth / scrollWidth) * trackWidth);
     const maxThumbLeft = trackWidth - thumbWidth;
-    
+
     // スクロール位置を0-100の範囲に正規化
     const maxScrollLeft = scrollWidth - clientWidth;
     const normalizedScroll = (scrollLeft / maxScrollLeft) * 100; // 0-100の範囲
-    
+
     // スクロールバーの位置を計算（0-100の範囲をトラック幅にマッピング）
     const thumbLeft = (normalizedScroll / 100) * maxThumbLeft;
-    
+
     scrollbarThumb.style.width = thumbWidth + 'px';
     scrollbarThumb.style.left = Math.max(0, Math.min(maxThumbLeft, thumbLeft)) + 'px';
   }
-  
+
   // スクロールバーをクリックした時の処理（0-100正規化）
   customScrollbar.addEventListener('click', (e) => {
     if (e.target === scrollbarThumb) return;
-    
+
     const trackWidth = customScrollbar.offsetWidth;
     const clickX = e.offsetX;
     const scrollWidth = container.scrollWidth;
     const clientWidth = container.clientWidth;
     const maxScrollLeft = scrollWidth - clientWidth;
     const maxThumbLeft = trackWidth - Math.max(30, (clientWidth / scrollWidth) * trackWidth);
-    
+
     // クリック位置を0-100の範囲に正規化
     const normalizedClick = (clickX / maxThumbLeft) * 100; // 0-100の範囲
     const scrollLeft = (normalizedClick / 100) * maxScrollLeft;
-    
+
     container.scrollLeft = Math.max(0, Math.min(maxScrollLeft, scrollLeft));
 
     // クリック操作時は表示を維持し、少し後に隠す
     showScrollbar();
   });
-  
+
   // スクロールバーのドラッグ開始
   scrollbarThumb.addEventListener('mousedown', (e) => {
     isDragging = true;
@@ -685,29 +685,29 @@ function initializeCustomScrollbar() {
     startScrollLeft = container.scrollLeft;
     e.preventDefault();
   });
-  
+
   // ドラッグ中の処理（0-100正規化）
   document.addEventListener('mousemove', (e) => {
     if (!isDragging) return;
-    
+
     const deltaX = e.clientX - startX;
     const trackWidth = customScrollbar.offsetWidth;
     const scrollWidth = container.scrollWidth;
     const clientWidth = container.clientWidth;
     const maxScrollLeft = scrollWidth - clientWidth;
     const maxThumbLeft = trackWidth - Math.max(30, (clientWidth / scrollWidth) * trackWidth);
-    
+
     // ドラッグ量を0-100の範囲に正規化してスクロール位置に変換
     const normalizedDelta = (deltaX / maxThumbLeft) * 100; // 0-100の範囲
     const scrollDelta = (normalizedDelta / 100) * maxScrollLeft;
     const newScrollLeft = startScrollLeft + scrollDelta;
-    
+
     container.scrollLeft = Math.max(0, Math.min(maxScrollLeft, newScrollLeft));
 
     // ドラッグ中は表示
     showScrollbar();
   });
-  
+
   // ドラッグ終了
   document.addEventListener('mouseup', () => {
     isDragging = false;
@@ -717,7 +717,7 @@ function initializeCustomScrollbar() {
       customScrollbar.classList.remove('visible');
     }, HIDE_DELAY_MS);
   });
-  
+
   // タッチイベント（モバイル対応）
   scrollbarThumb.addEventListener('touchstart', (e) => {
     isDragging = true;
@@ -727,28 +727,28 @@ function initializeCustomScrollbar() {
     // タッチ開始で表示
     showScrollbar();
   });
-  
+
   document.addEventListener('touchmove', (e) => {
     if (!isDragging) return;
-    
+
     const deltaX = e.touches[0].clientX - startX;
     const trackWidth = customScrollbar.offsetWidth;
     const scrollWidth = container.scrollWidth;
     const clientWidth = container.clientWidth;
     const maxScrollLeft = scrollWidth - clientWidth;
     const maxThumbLeft = trackWidth - Math.max(30, (clientWidth / scrollWidth) * trackWidth);
-    
+
     // ドラッグ量を0-100の範囲に正規化してスクロール位置に変換
     const normalizedDelta = (deltaX / maxThumbLeft) * 100; // 0-100の範囲
     const scrollDelta = (normalizedDelta / 100) * maxScrollLeft;
     const newScrollLeft = startScrollLeft + scrollDelta;
-    
+
     container.scrollLeft = Math.max(0, Math.min(maxScrollLeft, newScrollLeft));
     e.preventDefault();
     // タッチ移動中は表示
     showScrollbar();
   });
-  
+
   document.addEventListener('touchend', () => {
     isDragging = false;
     if (hideTimer) clearTimeout(hideTimer);
@@ -756,7 +756,7 @@ function initializeCustomScrollbar() {
       customScrollbar.classList.remove('visible');
     }, HIDE_DELAY_MS);
   });
-  
+
   // 座席図のスクロールイベント
   container.addEventListener('scroll', () => {
     // スクロール発生時は表示
@@ -767,7 +767,7 @@ function initializeCustomScrollbar() {
     }
     updateScrollbar();
   });
-  
+
   // ウィンドウリサイズイベント
   window.addEventListener('resize', () => {
     // リサイズ後に座席図の左端がスクロールバーの0位置に来るように再配置
@@ -776,7 +776,7 @@ function initializeCustomScrollbar() {
       updateScrollbar();
     }, 100);
   });
-  
+
   // 初期位置を座席図の左端がスクロールバーの0位置に来るように設定
   setTimeout(() => {
     centerSeatMap();
@@ -791,19 +791,19 @@ function startAutoRefresh() {
   if (autoRefreshInterval) {
     clearInterval(autoRefreshInterval);
   }
-  
+
   // ユーザーが操作中でない場合のみ自動更新を開始
   if (isAutoRefreshEnabled && isPageVisible && !isUserInteracting) {
     autoRefreshInterval = setInterval(async () => {
       if (isRefreshing || !isPageVisible || isUserInteracting) return; // 操作中は更新しない
-      
+
       isRefreshing = true;
       try {
         // 現在のモードを取得して管理者権限を判定
         const currentMode = localStorage.getItem('currentMode') || 'normal';
         const isAdminMode = currentMode === 'admin' || IS_ADMIN;
         const isSuperAdminMode = currentMode === 'superadmin';
-        
+
         // オフライン時はネットワークに行かずキャッシュのみ
         if (typeof navigator !== 'undefined' && navigator.onLine === false) {
           const cached = (window.readCache ? window.readCache(GROUP, DAY, TIMESLOT) : null);
@@ -812,7 +812,7 @@ function startAutoRefresh() {
               seatCount: Object.keys(cached.seatMap).length,
               cacheAge: cached.cachedAt ? Math.round((Date.now() - cached.cachedAt) / 1000) + '秒前' : '不明'
             });
-            
+
             // オフライン時の座席データ復元強化
             const restoredSeatMap = {};
             Object.entries(cached.seatMap).forEach(([seatId, seatData]) => {
@@ -826,7 +826,7 @@ function startAutoRefresh() {
                 };
               }
             });
-            
+
             if (Object.keys(restoredSeatMap).length > 0) {
               updateSeatMapWithMinimalData(restoredSeatMap);
               updateLastUpdateTime();
@@ -837,7 +837,7 @@ function startAutoRefresh() {
 
         // URL変更をチェック
         checkForUrlChange();
-        
+
         // 最適化: 通常の自動更新時は最小限のデータを取得
         let seatData;
         if (isAdminMode || isSuperAdminMode) {
@@ -847,9 +847,9 @@ function startAutoRefresh() {
           // 通常モードの場合は最小限のデータを取得（高速化）
           seatData = await GasAPI.getSeatDataMinimal(ACTUAL_GROUP, DAY, ACTUAL_TIMESLOT, isAdminMode);
         }
-        
+
         if (seatData.success) {
-          try { if (window.writeCache) { window.writeCache(GROUP, DAY, TIMESLOT, seatData); } } catch (_) {}
+          try { if (window.writeCache) { window.writeCache(GROUP, DAY, TIMESLOT, seatData); } } catch (_) { }
           // 最小限データの場合は既存の座席データとマージ
           if (seatData.seatMap && Object.keys(seatData.seatMap).length > 0) {
             // 既存の座席データを保持しつつ、ステータスのみ更新
@@ -873,11 +873,11 @@ function startAutoRefresh() {
 function updateSeatMapWithMinimalData(minimalSeatMap) {
   // 既存の座席要素を取得
   const existingSeats = document.querySelectorAll('.seat');
-  
+
   existingSeats.forEach(seatEl => {
     const seatId = seatEl.dataset.id;
     const minimalData = minimalSeatMap[seatId];
-    
+
     if (minimalData) {
       // ステータスのみ更新（色とクラス）
       const currentStatus = seatEl.dataset.status;
@@ -887,7 +887,7 @@ function updateSeatMapWithMinimalData(minimalSeatMap) {
 
         // クラスと色を統一更新
         applySeatStatusClasses(seatEl, minimalData.status);
-        
+
         // ステータステキストも更新
         updateSeatStatusText(seatEl, minimalData.status);
       }
@@ -899,31 +899,31 @@ function updateSeatMapWithMinimalData(minimalSeatMap) {
 function updateSeatMapWithCompleteData(completeSeatMap) {
   // 既存の座席要素を取得
   const existingSeats = document.querySelectorAll('.seat');
-  
+
   existingSeats.forEach(seatEl => {
     const seatId = seatEl.dataset.id;
     const completeData = completeSeatMap[seatId];
-    
+
     if (completeData) {
       // ステータスが変更された場合のみ更新
       const currentStatus = seatEl.dataset.status;
       if (currentStatus !== completeData.status) {
         // ステータスを更新
         seatEl.dataset.status = completeData.status;
-        
+
         // クラスと色を統一更新
         applySeatStatusClasses(seatEl, completeData.status);
-        
+
         // ステータステキストを更新
         updateSeatStatusText(seatEl, completeData.status);
       }
-      
+
       // 名前を更新（管理者モードと最高管理者モードで表示）
       updateSeatName(seatEl, completeData);
-      
+
       // その他のデータを更新（最高管理者モード用）
       updateSeatAdditionalData(seatEl, completeData);
-      
+
       // チェックイン可能フラグを更新
       updateSeatCheckinFlag(seatEl, completeData);
     }
@@ -934,11 +934,11 @@ function updateSeatMapWithCompleteData(completeSeatMap) {
 function toggleAutoRefresh() {
   isAutoRefreshEnabled = !isAutoRefreshEnabled;
   const toggleBtn = document.getElementById('auto-refresh-toggle-checkbox');
-  
+
   if (toggleBtn) {
     toggleBtn.checked = isAutoRefreshEnabled;
   }
-  
+
   if (isAutoRefreshEnabled && isPageVisible) {
     startAutoRefresh();
   } else {
@@ -958,17 +958,17 @@ function createSeatElement(seatData) {
   seatIdEl.className = 'seat-id';
   seatIdEl.textContent = seatData.id;
   seat.appendChild(seatIdEl);
-  
+
   // 管理者モードでチェックイン可能な座席を選択可能にする
   const currentMode = localStorage.getItem('currentMode') || 'normal';
   const isAdminMode = currentMode === 'admin' || IS_ADMIN;
-  
+
   if (isAdminMode && (seatData.status === 'to-be-checked-in' || seatData.status === 'reserved')) {
     // チェックイン可能な座席を選択可能にする
     seat.classList.add('checkin-selectable');
     seat.dataset.seatName = seatData.name || '';
   }
-  
+
   // 最高管理者モード用にC、D、E列のデータを保存
   if (seatData.columnC !== undefined) {
     seat.dataset.columnC = seatData.columnC;
@@ -979,12 +979,12 @@ function createSeatElement(seatData) {
   if (seatData.columnE !== undefined) {
     seat.dataset.columnE = seatData.columnE;
   }
-  
+
   // 名前を表示（管理者モードと最高管理者モードで同じ表示）
   if (seatData.name && seatData.status !== 'available') {
     const nameEl = document.createElement('div');
     nameEl.className = 'seat-name';
-    
+
     // 名前が長すぎる場合は省略表示
     if (seatData.name.length > 8) {
       nameEl.textContent = seatData.name.substring(0, 8) + '...';
@@ -992,10 +992,10 @@ function createSeatElement(seatData) {
     } else {
       nameEl.textContent = seatData.name;
     }
-    
+
     seat.appendChild(nameEl);
   }
-  
+
   seat.addEventListener('click', (e) => handleSeatClick(seatData, e));
   return seat;
 }
@@ -1005,7 +1005,7 @@ function handleSeatClick(seatData, event) {
   const currentMode = localStorage.getItem('currentMode') || 'normal';
   const isAdminMode = currentMode === 'admin' || IS_ADMIN;
   const isSuperAdminMode = currentMode === 'superadmin';
-  
+
   if (isSuperAdminMode) {
     // 最高管理者モード：座席データ編集（マルチ選択対応）
     handleSuperAdminSeatClick(seatData, event);
@@ -1021,7 +1021,7 @@ function handleSeatClick(seatData, event) {
 // 最高管理者モードでの座席クリック処理
 function handleSuperAdminSeatClick(seatData, event) {
   console.log('[最高管理者] 座席クリック:', seatData);
-  
+
   // 任意の座席を選択可能
   const seatElement = document.querySelector(`[data-id="${seatData.id}"]`);
   if (!seatElement) {
@@ -1117,7 +1117,7 @@ function showBulkSeatEditModal(seatIds) {
     modal.addEventListener('click', (e) => { if (e.target === modal) { closeBulkSeatEditModal(); } });
   }
   // 一括適用関数を束縛
-  window.applyBulkSeatEdit = async function() {
+  window.applyBulkSeatEdit = async function () {
     const columnC = document.getElementById('bulk-column-c').value;
     const columnD = document.getElementById('bulk-column-d').value;
     const columnE = document.getElementById('bulk-column-e').value;
@@ -1168,7 +1168,7 @@ function showBulkSeatEditModal(seatIds) {
           drawSeatMap(seatData.seatMap);
           updateLastUpdateTime();
         }
-      } catch (_) {}
+      } catch (_) { }
     } catch (error) {
       console.error('一括編集エラー:', error);
       showErrorNotification('一括編集でエラーが発生しました。');
@@ -1179,14 +1179,14 @@ function showBulkSeatEditModal(seatIds) {
       updateBulkEditButtonVisibility();
     }
   };
-  window.closeBulkSeatEditModal = function() {
+  window.closeBulkSeatEditModal = function () {
     const modal = document.getElementById('bulk-seat-edit-modal');
     if (!modal) return;
     try {
       modal.classList.add('closing');
-      setTimeout(() => { try { modal.remove(); } catch(_) {} }, 250);
-    } catch(_) {
-      try { modal.remove(); } catch(_) {}
+      setTimeout(() => { try { modal.remove(); } catch (_) { } }, 250);
+    } catch (_) {
+      try { modal.remove(); } catch (_) { }
     }
   };
 }
@@ -1218,7 +1218,7 @@ function handleAdminSeatClick(seatData) {
 
   // 選択された座席数を表示
   updateSelectedSeatsDisplay();
-  
+
   console.log('チェックイン対象座席:', selectedSeats);
 }
 
@@ -1258,7 +1258,7 @@ function handleNormalSeatClick(seatData) {
 
   // 選択された座席数を表示
   updateSelectedSeatsDisplay();
-  
+
   console.log('選択された座席:', selectedSeats);
 }
 
@@ -1307,7 +1307,7 @@ console.log('[Seats Main] グローバル関数登録完了:', {
 function toggleAutoRefreshSettings() {
   const panel = document.getElementById('auto-refresh-settings-panel');
   const overlay = document.getElementById('auto-refresh-overlay');
-  
+
   if (panel.classList.contains('show')) {
     closeAutoRefreshSettings();
   } else {
@@ -1320,7 +1320,7 @@ function toggleAutoRefreshSettings() {
 function closeAutoRefreshSettings() {
   const panel = document.getElementById('auto-refresh-settings-panel');
   const overlay = document.getElementById('auto-refresh-overlay');
-  
+
   if (panel) panel.classList.remove('show');
   if (overlay) overlay.classList.remove('show');
 }
@@ -1328,33 +1328,33 @@ function closeAutoRefreshSettings() {
 // 手動更新
 async function manualRefresh() {
   if (isRefreshing) return;
-  
+
   isRefreshing = true;
   showLoader(true);
-  
+
   try {
     // 手動更新時は必ず異なるURLを選択
     const oldUrl = apiUrlManager.getCurrentUrl();
     console.log('[Manual Refresh] 更新前URL:', oldUrl);
-    
+
     apiUrlManager.selectRandomUrl();
     const newUrl = apiUrlManager.getCurrentUrl();
     console.log('[Manual Refresh] 更新後URL:', newUrl);
-    
+
     // URL変更をチェック
     console.log('[Manual Refresh] checkForUrlChange を呼び出し');
     checkForUrlChange();
-    
+
     // 手動更新時は直接アニメーションを表示
     if (oldUrl !== newUrl) {
       console.log('[Manual Refresh] 直接アニメーション表示');
       showUrlChangeAnimation(oldUrl, newUrl, 'random');
     }
-    
+
     const currentMode = localStorage.getItem('currentMode') || 'normal';
     const isAdminMode = currentMode === 'admin' || IS_ADMIN;
     const isSuperAdminMode = currentMode === 'superadmin';
-    
+
     // オフライン時はキャッシュから復元
     if (typeof navigator !== 'undefined' && navigator.onLine === false) {
       const cached = (window.readCache ? window.readCache(GROUP, DAY, TIMESLOT) : null);
@@ -1366,11 +1366,11 @@ async function manualRefresh() {
         return;
       }
     }
-    
+
     const seatData = await GasAPI.getSeatData(ACTUAL_GROUP, DAY, ACTUAL_TIMESLOT, isAdminMode, isSuperAdminMode);
-    
+
     if (seatData.success) {
-      try { if (window.writeCache) { window.writeCache(GROUP, DAY, TIMESLOT, seatData); } } catch (_) {}
+      try { if (window.writeCache) { window.writeCache(GROUP, DAY, TIMESLOT, seatData); } } catch (_) { }
       drawSeatMap(seatData.seatMap);
       updateLastUpdateTime();
       alert('座席データを更新しました');
@@ -1414,7 +1414,7 @@ function stopAutoRefresh() {
 function promptForAdminPassword() {
   // サイドバーのモード変更モーダルを表示
   showModeChangeModal();
-  
+
   // 管理者モードを選択状態にする
   setTimeout(() => {
     const adminRadio = document.querySelector('input[name="mode"][value="admin"]');
@@ -1440,14 +1440,14 @@ async function checkInSelected() {
   // 選択された座席の一覧を表示
   const seatList = selectedSeatInfos.map(seat => `${seat.id}：${seat.columnD || '（名前未設定）'}`).join('\n');
   const confirmMessage = `以下の座席をチェックインしますか？\n\n${seatList}`;
-  
+
   if (!confirm(confirmMessage)) {
     return;
   }
 
   // 楽観的更新：即座にUIを更新（チェックイン済みとして表示）
   const seatIds = selectedSeatInfos.map(seat => seat.id);
-  
+
   // 選択された座席を即座にチェックイン済みとして表示
   selectedSeatElements.forEach(seatEl => {
     const seatId = seatEl.dataset.id;
@@ -1459,24 +1459,24 @@ async function checkInSelected() {
       columnD: seatEl.dataset.seatName || '',
       columnE: '済' // チェックイン済みとして設定
     };
-    
+
     // 座席要素を更新
     updateSeatElement(seatEl, seatData);
-    
+
     // 選択状態をクリア
     seatEl.classList.remove('selected-for-checkin');
   });
 
   // 選択表示を更新
   updateSelectedSeatsDisplay();
-  
+
   // ローダーを表示（軽量版）
   showLoader(true);
-  
+
   try {
     // バックグラウンドでAPI呼び出し
     const response = await GasAPI.checkInMultipleSeats(ACTUAL_GROUP, DAY, ACTUAL_TIMESLOT, seatIds);
-    
+
     if (response.success) {
       // 成功時：即座に成功メッセージを表示（ローダーは非表示）
       showLoader(false);
@@ -1486,16 +1486,16 @@ async function checkInSelected() {
       const lines = selectedSeatInfos.map(s => `${s.id}：${s.columnD || '（名前未設定）'}`);
       const message = `チェックインが完了しました（${scopeLabel}）\n\n${lines.join('\n')}`;
       showSuccessNotification(message);
-      
+
       // バックグラウンドで座席データを再取得（サイレント更新）
       setTimeout(async () => {
         try {
           const currentMode = localStorage.getItem('currentMode') || 'normal';
           const isAdminMode = currentMode === 'admin' || IS_ADMIN;
           const isSuperAdminMode = currentMode === 'superadmin';
-          
+
           const seatData = await GasAPI.getSeatData(ACTUAL_GROUP, DAY, ACTUAL_TIMESLOT, isAdminMode, isSuperAdminMode);
-          
+
           if (seatData.success) {
             // サイレント更新：座席マップを再描画
             drawSeatMap(seatData.seatMap);
@@ -1505,42 +1505,42 @@ async function checkInSelected() {
           console.warn('バックグラウンド更新エラー（非致命的）:', error);
         }
       }, 1000); // 1秒後にバックグラウンド更新
-      
+
     } else {
       // オフライン委譲レスポンスの処理
       if (response.error === 'offline_delegate' && response.functionName && response.params) {
         console.log('[チェックイン] オフライン委譲レスポンスを処理中...');
-        
+
         // オフライン同期システムに操作を追加
         if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
           const operationId = window.OfflineSyncV2.addOperation({
             type: response.functionName,
             args: response.params
           });
-          
+
           showLoader(false);
           showSuccessNotification('オフラインでチェックインを受け付けました。オンライン復帰時に自動同期されます。');
-          
+
           // 座席データを再取得してUIを復元
           await refreshSeatData();
           return;
         }
       }
-      
+
       // オフライン委譲レスポンスの処理
       if (response.error === 'offline_delegate' && response.functionName && response.params) {
         console.log('[チェックイン] オフライン委譲レスポンスを処理中...');
-        
+
         // オフライン同期システムに操作を追加
         if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
           const operationId = window.OfflineSyncV2.addOperation({
             type: response.functionName,
             args: response.params
           });
-          
+
           showLoader(false);
           showSuccessNotification('オフラインでチェックインを受け付けました。オンライン復帰時に自動同期されます。');
-          
+
           // 座席データを再取得してUIを復元
           await refreshSeatData();
           return;
@@ -1555,16 +1555,16 @@ async function checkInSelected() {
       success: error.success,
       stack: error.stack
     });
-    
+
     // エラー時：UIを元に戻す
     showLoader(false);
     const errorMessage = error.message || error.error || '不明なエラーが発生しました';
     showErrorNotification(`チェックインエラー：\n${errorMessage}`);
-    
+
     // 座席データを再取得してUIを復元
     await refreshSeatData();
   }
-  
+
   // ユーザー操作終了
   endUserInteraction();
 }
@@ -1583,9 +1583,9 @@ async function confirmReservation() {
 
   // 選択された座席のコピーを作成（API呼び出し用）
   const seatsToReserve = [...selectedSeats];
-  
+
   // 楽観的更新：即座にUIを更新（予約済みとして表示）
-  
+
   // 選択された座席を即座に予約済みとして表示
   selectedSeats.forEach(seatId => {
     const seatEl = document.querySelector(`[data-id="${seatId}"]`);
@@ -1598,7 +1598,7 @@ async function confirmReservation() {
         columnD: '予約中...',
         columnE: ''
       };
-      
+
       // 座席要素を更新
       updateSeatElement(seatEl, seatData);
     }
@@ -1607,29 +1607,29 @@ async function confirmReservation() {
   // 選択をクリア
   selectedSeats = [];
   updateSelectedSeatsDisplay();
-  
+
   // ローダーを表示（軽量版）
   showLoader(true);
-  
+
   try {
     const response = await GasAPI.reserveSeats(GROUP, DAY, ACTUAL_TIMESLOT, seatsToReserve);
-    
+
     if (response.success) {
       // 成功時：即座に成功メッセージを表示（ローダーは非表示）
       showLoader(false);
-      
+
       // 成功通知を表示（非ブロッキング）
       showSuccessNotification(response.message || '予約が完了しました！');
-      
+
       // バックグラウンドで座席データを再取得（サイレント更新）
       setTimeout(async () => {
         try {
           const currentMode = localStorage.getItem('currentMode') || 'normal';
           const isAdminMode = currentMode === 'admin' || IS_ADMIN;
           const isSuperAdminMode = currentMode === 'superadmin';
-          
+
           const seatData = await GasAPI.getSeatData(ACTUAL_GROUP, DAY, ACTUAL_TIMESLOT, isAdminMode, isSuperAdminMode);
-          
+
           if (seatData.success) {
             // サイレント更新：座席マップを再描画
             drawSeatMap(seatData.seatMap);
@@ -1639,42 +1639,42 @@ async function confirmReservation() {
           console.warn('バックグラウンド更新エラー（非致命的）:', error);
         }
       }, 1000); // 1秒後にバックグラウンド更新
-      
+
     } else {
       // オフライン委譲レスポンスの処理
       if (response.error === 'offline_delegate' && response.functionName && response.params) {
         console.log('[予約] オフライン委譲レスポンスを処理中...');
-        
+
         // オフライン同期システムに操作を追加
         if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
           const operationId = window.OfflineSyncV2.addOperation({
             type: response.functionName,
             args: response.params
           });
-          
+
           showLoader(false);
           showSuccessNotification('オフラインで予約を受け付けました。オンライン復帰時に自動同期されます。');
-          
+
           // 座席データを再取得してUIを復元
           await refreshSeatData();
           return;
         }
       }
-      
+
       // オフライン委譲レスポンスの処理
       if (response.error === 'offline_delegate' && response.functionName && response.params) {
         console.log('[予約] オフライン委譲レスポンスを処理中...');
-        
+
         // オフライン同期システムに操作を追加
         if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
           const operationId = window.OfflineSyncV2.addOperation({
             type: response.functionName,
             args: response.params
           });
-          
+
           showLoader(false);
           showSuccessNotification('オフラインで予約を受け付けました。オンライン復帰時に自動同期されます。');
-          
+
           // 座席データを再取得してUIを復元
           await refreshSeatData();
           return;
@@ -1689,16 +1689,16 @@ async function confirmReservation() {
       success: error.success,
       stack: error.stack
     });
-    
+
     // エラー時：UIを元に戻す
     showLoader(false);
     const errorMessage = error.message || error.error || '不明なエラーが発生しました';
     showErrorNotification(`予約エラー：\n${errorMessage}`);
-    
+
     // 座席データを再取得してUIを復元
     await refreshSeatData();
   }
-  
+
   // ユーザー操作終了
   endUserInteraction();
 }
@@ -1706,12 +1706,12 @@ async function confirmReservation() {
 // ユーザー操作の開始を検知
 function startUserInteraction() {
   isUserInteracting = true;
-  
+
   // 既存のタイマーをクリア
   if (interactionTimeout) {
     clearTimeout(interactionTimeout);
   }
-  
+
   // 操作終了を検知するタイマーを設定（5秒後）
   interactionTimeout = setTimeout(() => {
     isUserInteracting = false;
@@ -1720,7 +1720,7 @@ function startUserInteraction() {
       startAutoRefresh();
     }
   }, 5000);
-  
+
   // 操作中は自動更新を停止
   stopAutoRefresh();
 }
@@ -1728,7 +1728,7 @@ function startUserInteraction() {
 // 座席編集モーダルを表示する関数
 function showSeatEditModal(seatData) {
   console.log('[最高管理者] モーダル表示開始:', seatData);
-  
+
   // モーダルのHTMLを作成（最初はshowクラスなし）
   const modalHTML = `
     <div id="seat-edit-modal" class="modal">
@@ -1755,11 +1755,11 @@ function showSeatEditModal(seatData) {
       </div>
     </div>
   `;
-  
+
   // モーダルを表示（アニメーション有効化のため、挿入後にreflowを挟んでshowクラス付与）
   document.body.insertAdjacentHTML('beforeend', modalHTML);
   console.log('[最高管理者] モーダルHTMLを追加');
-  
+
   // アニメーションを開始するため、次のフレームでshowクラスを追加
   requestAnimationFrame(() => {
     const modalEl = document.getElementById('seat-edit-modal');
@@ -1768,7 +1768,7 @@ function showSeatEditModal(seatData) {
       console.log('[最高管理者] アニメーション開始');
     }
   });
-  
+
   // モーダルの背景クリックで閉じる機能を追加
   const modal = document.getElementById('seat-edit-modal');
   if (modal) {
@@ -1791,19 +1791,19 @@ function closeSeatEditModal() {
       // 退出アニメーションを再生
       modal.classList.add('closing');
       console.log('[最高管理者] 閉じるアニメーション開始');
-      
+
       // アニメーション完了後にモーダルを削除
-      setTimeout(() => { 
-        try { 
-          modal.remove(); 
+      setTimeout(() => {
+        try {
+          modal.remove();
           console.log('[最高管理者] モーダル削除完了');
-        } catch (_) {} 
+        } catch (_) { }
       }, 250); // CSSのアニメーション時間と合わせる
     } catch (_) {
       modal.remove();
     }
   }
-  
+
   // 最高管理者モードの座席選択状態をクリア
   document.querySelectorAll('.seat.selected-for-edit').forEach(seat => {
     seat.classList.remove('selected-for-edit');
@@ -1815,25 +1815,27 @@ async function updateSeatData(seatId) {
   const columnC = document.getElementById('column-c').value;
   const columnD = document.getElementById('column-d').value;
   const columnE = document.getElementById('column-e').value;
-  
+
   // 確認ダイアログを表示
   const confirmMessage = `座席 ${seatId} のデータを以下の内容で更新しますか？\n\nC列: ${columnC}\nD列: ${columnD}\nE列: ${columnE}`;
-  
+
   if (!confirm(confirmMessage)) {
     return;
   }
-  
+
   showLoader(true);
-  
+
+  let el = null;
+  let originalData = null;
+
   try {
     // 空欄は現状値を維持
-    const el = document.querySelector(`.seat[data-id="${seatId}"]`);
+    el = document.querySelector(`.seat[data-id="${seatId}"]`);
     const cVal = columnC !== '' ? columnC : (el ? (el.dataset.columnC || '') : '');
     const dVal = columnD !== '' ? columnD : (el ? (el.dataset.columnD || '') : '');
     const eVal = columnE !== '' ? columnE : (el ? (el.dataset.columnE || '') : '');
-    
+
     // 楽観的更新（即座にUIを更新）
-    let originalData = null;
     if (el) {
       originalData = {
         columnC: el.dataset.columnC,
@@ -1841,16 +1843,16 @@ async function updateSeatData(seatId) {
         columnE: el.dataset.columnE,
         status: el.dataset.status
       };
-      
+
       // 一時的にUIを更新
       el.dataset.columnC = cVal;
       el.dataset.columnD = dVal;
       el.dataset.columnE = eVal;
       updateSeatElement(el, { columnC: cVal, columnD: dVal, columnE: eVal });
     }
-    
+
     let response;
-    
+
     // オフライン時は操作をキューに追加
     if (window.ConnectionRecovery && !window.ConnectionRecovery.getConnectionStatus().isOnline) {
       window.ConnectionRecovery.queueOperation({
@@ -1863,7 +1865,7 @@ async function updateSeatData(seatId) {
         columnD: dVal,
         columnE: eVal
       });
-      
+
       // オフライン通知
       if (window.ErrorNotification) {
         window.ErrorNotification.show('オフラインのため、操作をキューに保存しました。接続復旧時に自動実行されます。', {
@@ -1872,12 +1874,12 @@ async function updateSeatData(seatId) {
           duration: 5000
         });
       }
-      
+
       return; // 処理を終了
     }
-    
+
     response = await GasAPI.updateSeatData(GROUP, DAY, ACTUAL_TIMESLOT, seatId, cVal, dVal, eVal);
-    
+
     if (response.success) {
       // 成功通知
       if (window.ErrorNotification) {
@@ -1889,22 +1891,22 @@ async function updateSeatData(seatId) {
       } else {
         alert('座席データを更新しました！');
       }
-      
+
       closeSeatEditModal();
-      
+
       // 最高管理者モードの座席選択状態をクリア
       document.querySelectorAll('.seat.selected-for-edit').forEach(seat => {
         seat.classList.remove('selected-for-edit');
       });
-      
+
       // 座席データを再読み込み（確認のため）
       const currentMode = localStorage.getItem('currentMode') || 'normal';
       const isAdminMode = currentMode === 'admin' || IS_ADMIN;
       const isSuperAdminMode = currentMode === 'superadmin';
-      
+
       try {
         const seatData = await GasAPI.getSeatData(GROUP, DAY, ACTUAL_TIMESLOT, isAdminMode, isSuperAdminMode);
-        
+
         if (seatData.success) {
           drawSeatMap(seatData.seatMap);
           updateLastUpdateTime();
@@ -1912,7 +1914,7 @@ async function updateSeatData(seatId) {
       } catch (refreshError) {
         console.warn('座席データの再読み込みに失敗しましたが、更新は成功しました:', refreshError);
       }
-      
+
     } else {
       // 失敗時は元の状態に戻す
       if (el && originalData) {
@@ -1921,10 +1923,10 @@ async function updateSeatData(seatId) {
         el.dataset.columnE = originalData.columnE;
         updateSeatElement(el, originalData);
       }
-      
+
       // エラー通知
       const errorMessage = response.error || response.message || '不明なエラーが発生しました';
-      
+
       if (window.ErrorNotification) {
         window.ErrorNotification.show(errorMessage, {
           title: '更新エラー',
@@ -1937,7 +1939,7 @@ async function updateSeatData(seatId) {
     }
   } catch (error) {
     console.error('座席データ更新エラー:', error);
-    
+
     // 楽観的更新を元に戻す
     if (el && originalData) {
       el.dataset.columnC = originalData.columnC;
@@ -1945,11 +1947,11 @@ async function updateSeatData(seatId) {
       el.dataset.columnE = originalData.columnE;
       updateSeatElement(el, originalData);
     }
-    
+
     // ネットワークエラーの詳細な処理
     let errorMessage = error.message || '不明なエラーが発生しました';
     let errorType = 'error';
-    
+
     if (error.message && error.message.includes('Load failed')) {
       errorMessage = 'ネットワーク接続エラーが発生しました。インターネット接続を確認して再試行してください。';
       errorType = 'warning';
@@ -1957,7 +1959,7 @@ async function updateSeatData(seatId) {
       errorMessage = 'リクエストがタイムアウトしました。しばらく時間をおいて再試行してください。';
       errorType = 'warning';
     }
-    
+
     if (window.ErrorNotification) {
       window.ErrorNotification.show(errorMessage, {
         title: '通信エラー',
@@ -1979,7 +1981,7 @@ function endUserInteraction() {
     clearTimeout(interactionTimeout);
     interactionTimeout = null;
   }
-  
+
   // 操作終了後、自動更新を再開
   if (isAutoRefreshEnabled && isPageVisible) {
     startAutoRefresh();
@@ -1989,12 +1991,12 @@ function endUserInteraction() {
 // 当日券ページへのナビゲーション
 function navigateToWalkin() {
   const currentMode = localStorage.getItem('currentMode') || 'normal';
-  
+
   if (currentMode !== 'walkin' && currentMode !== 'superadmin') {
     alert('当日券発行には当日券モードまたは最高管理者モードでのログインが必要です。\nサイドバーからモードを変更してください。');
     return;
   }
-  
+
   // 現在のURLパラメータを使用して当日券ページに遷移
   window.location.href = `walkin.html?group=${GROUP}&day=${DAY}&timeslot=${TIMESLOT}`;
 }
@@ -2005,7 +2007,7 @@ function navigateToWalkin() {
 window.navigateToWalkin = navigateToWalkin;
 
 // 選択座席の一括編集を起動（ヘッダーボタンから）
-window.editSelectedSeats = function() {
+window.editSelectedSeats = function () {
   const selected = Array.from(document.querySelectorAll('.seat.selected-for-edit')).map(el => el.dataset.id);
   if (selected.length < 1) {
     alert('編集する座席を選択してください。\nCtrl/Shift キーを押しながらクリックで複数選択できます。');
@@ -2027,28 +2029,28 @@ window.editSelectedSeats = function() {
 // 座席要素を更新する関数（楽観的更新用）
 function updateSeatElement(seatEl, seatData) {
   if (!seatEl || !seatData) return;
-  
+
   // データ属性を更新
   seatEl.dataset.seatName = seatData.name || seatData.columnD || '';
   seatEl.dataset.columnC = seatData.columnC || '';
   seatEl.dataset.columnD = seatData.columnD || '';
   seatEl.dataset.columnE = seatData.columnE || '';
-  
+
   // クラスと色を統一更新
   applySeatStatusClasses(seatEl, seatData.status);
-  
+
   // 座席名を更新
   const nameEl = seatEl.querySelector('.seat-name');
   if (nameEl) {
     nameEl.textContent = seatData.name || '';
   }
-  
+
   // ステータス表示を更新
   const statusEl = seatEl.querySelector('.seat-status');
   if (statusEl) {
     statusEl.textContent = getStatusText(seatData.status);
   }
-  
+
   // 色を更新
   updateSeatColor(seatEl, seatData.status);
 }
@@ -2070,8 +2072,8 @@ function applySeatStatusClasses(seatEl, status) {
   const raw = String(status || '');
   const normalized = normalizeStatus(raw);
   const ALL_CLASSES = [
-    'available','reserved','to-be-checked-in','checked-in','walkin','unavailable','blocked',
-    'seat-available','seat-reserved','seat-to-be-checked-in','seat-checked-in','seat-walkin','seat-unavailable','seat-blocked'
+    'available', 'reserved', 'to-be-checked-in', 'checked-in', 'walkin', 'unavailable', 'blocked',
+    'seat-available', 'seat-reserved', 'seat-to-be-checked-in', 'seat-checked-in', 'seat-walkin', 'seat-unavailable', 'seat-blocked'
   ];
 
   // 既存クラスのうちステータス関連を除去
@@ -2079,7 +2081,7 @@ function applySeatStatusClasses(seatEl, status) {
   // ベースクラス
   seatEl.classList.add('seat');
   // 汎用クラス（従来）
-  seatEl.classList.add(normalized);
+  if (normalized) seatEl.classList.add(normalized);
   // プレフィックス付き（新）
   seatEl.classList.add(`seat-${normalized}`);
   // blocked は unavailable と同義として両方付与
@@ -2110,18 +2112,18 @@ function updateSeatName(seatEl, seatData) {
   const currentMode = localStorage.getItem('currentMode') || 'normal';
   const isAdminMode = currentMode === 'admin' || IS_ADMIN;
   const isSuperAdminMode = currentMode === 'superadmin';
-  
+
   // 管理者モードまたは最高管理者モードで、かつ予約済み以上の座席の場合のみ名前を表示
   if ((isAdminMode || isSuperAdminMode) && seatData.name && seatData.status !== 'available') {
     let nameEl = seatEl.querySelector('.seat-name');
-    
+
     // 名前要素が存在しない場合は作成
     if (!nameEl) {
       nameEl = document.createElement('div');
       nameEl.className = 'seat-name';
       seatEl.appendChild(nameEl);
     }
-    
+
     // 名前を更新
     if (seatData.name.length > 8) {
       nameEl.textContent = seatData.name.substring(0, 8) + '...';
@@ -2142,7 +2144,7 @@ function updateSeatName(seatEl, seatData) {
 function updateSeatAdditionalData(seatEl, seatData) {
   const currentMode = localStorage.getItem('currentMode') || 'normal';
   const isSuperAdminMode = currentMode === 'superadmin';
-  
+
   if (isSuperAdminMode) {
     // C、D、E列のデータを更新
     if (seatData.columnC !== undefined) {
@@ -2161,7 +2163,7 @@ function updateSeatAdditionalData(seatEl, seatData) {
 function updateSeatCheckinFlag(seatEl, seatData) {
   const currentMode = localStorage.getItem('currentMode') || 'normal';
   const isAdminMode = currentMode === 'admin' || IS_ADMIN;
-  
+
   if (isAdminMode && (seatData.status === 'to-be-checked-in' || seatData.status === 'reserved' || seatData.status === 'walkin')) {
     // チェックイン可能な座席を選択可能にする
     seatEl.classList.add('checkin-selectable');
@@ -2199,7 +2201,7 @@ function showSuccessNotification(message) {
   notification.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
   notification.style.zIndex = '10001';
   notification.style.maxWidth = '400px';
-  
+
   notification.innerHTML = `
     <div class="notification-content" style="display: flex; align-items: center; gap: 10px;">
       <span class="notification-icon" style="font-size: 1.2em; color: #28a745;">✓</span>
@@ -2207,10 +2209,10 @@ function showSuccessNotification(message) {
       <button class="notification-close" onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; color: #155724; font-size: 1.2em; cursor: pointer; padding: 0; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: background-color 0.2s;">×</button>
     </div>
   `;
-  
+
   // 通知を表示
   document.body.appendChild(notification);
-  
+
   // 4秒後に自動で消す
   setTimeout(() => {
     if (notification.parentElement) {
@@ -2234,7 +2236,7 @@ function showErrorNotification(message) {
   notification.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
   notification.style.zIndex = '10001';
   notification.style.maxWidth = '400px';
-  
+
   notification.innerHTML = `
     <div class="notification-content" style="display: flex; align-items: center; gap: 10px;">
       <span class="notification-icon" style="font-size: 1.2em; color: #dc3545;">✗</span>
@@ -2242,10 +2244,10 @@ function showErrorNotification(message) {
       <button class="notification-close" onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; color: #721c24; font-size: 1.2em; cursor: pointer; padding: 0; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: background-color 0.2s;">×</button>
     </div>
   `;
-  
+
   // 通知を表示
   document.body.appendChild(notification);
-  
+
   // 5秒後に自動で消す
   setTimeout(() => {
     if (notification.parentElement) {
@@ -2323,7 +2325,7 @@ async function refreshSeatData() {
     const currentMode = localStorage.getItem('currentMode') || 'normal';
     const isAdminMode = currentMode === 'admin' || IS_ADMIN;
     const isSuperAdminMode = currentMode === 'superadmin';
-    
+
     // 手動更新時も最小限のデータで十分な場合は最小限データを使用
     let seatData;
     if (isAdminMode || isSuperAdminMode) {
@@ -2333,7 +2335,7 @@ async function refreshSeatData() {
       // 通常モードの場合は最小限のデータを取得（高速化）
       seatData = await GasAPI.getSeatDataMinimal(GROUP, DAY, ACTUAL_TIMESLOT, isAdminMode);
     }
-    
+
     if (seatData.success) {
       // 最小限データの場合は既存の座席データとマージ
       if (seatData.seatMap && Object.keys(seatData.seatMap).length > 0) {
@@ -2353,7 +2355,7 @@ async function refreshSeatData() {
 // URL変更時のアニメーション通知を表示する関数
 function showUrlChangeAnimation(oldUrl, newUrl, changeType = 'rotation') {
   console.log('[Animation] showUrlChangeAnimation 呼び出し:', { oldUrl, newUrl, changeType });
-  
+
   // 通知要素を作成
   const notification = document.createElement('div');
   notification.className = 'url-change-notification';
@@ -2383,11 +2385,11 @@ function showUrlChangeAnimation(oldUrl, newUrl, changeType = 'rotation') {
   // アイコンとメッセージを設定
   const icon = changeType === 'rotation' ? '↻' : '⚡';
   const message = changeType === 'rotation' ? 'API URL ローテーション' : 'API URL ランダム選択';
-  
+
   // スクリプトIDを抽出（/macros/s/以降の部分）
   const scriptId = newUrl.split('/macros/s/')[1]?.split('/')[0] || 'unknown';
   const displayId = scriptId.substring(0, 8) + '...';
-  
+
   notification.innerHTML = `
     <div style="display: flex; align-items: center; gap: 8px;">
       <span style="font-size: 16px; font-weight: bold;">${icon}</span>
@@ -2470,7 +2472,7 @@ function checkForUrlChange() {
   const currentUrl = apiUrlManager.getCurrentUrl();
   console.log('[URL Change Check] 現在のURL:', currentUrl);
   console.log('[URL Change Check] 前回のURL:', lastKnownUrl);
-  
+
   if (currentUrl !== lastKnownUrl) {
     console.log('[URL Change] 検知:', lastKnownUrl, '→', currentUrl);
     console.log('[URL Change] showUrlChangeAnimation を呼び出し');
@@ -2485,9 +2487,9 @@ function checkForUrlChange() {
 function initializeOfflineIndicator() {
   const indicator = document.getElementById('offline-indicator');
   const progressBar = document.getElementById('sync-progress-bar');
-  
+
   if (!indicator || !progressBar) return;
-  
+
   // オフライン状態の監視
   const updateOfflineStatus = () => {
     const isOnline = navigator.onLine;
@@ -2501,19 +2503,19 @@ function initializeOfflineIndicator() {
       indicator.classList.remove('online');
     }
   };
-  
+
   // 初期状態の設定
   updateOfflineStatus();
-  
+
   // イベントリスナーの設定
   window.addEventListener('online', updateOfflineStatus);
   window.addEventListener('offline', updateOfflineStatus);
-  
+
   // オフライン同期システムの状態監視
   if (window.OfflineSyncV2) {
     const checkSyncStatus = () => {
       const status = window.OfflineSyncV2.getStatus();
-      
+
       if (status.syncInProgress) {
         progressBar.style.display = 'block';
         const progress = progressBar.querySelector('.progress');
@@ -2528,15 +2530,15 @@ function initializeOfflineIndicator() {
         }
       }
     };
-    
+
     // 定期的に状態をチェック
     setInterval(checkSyncStatus, 1000);
-    
-  // 初期状態のチェック
-  checkSyncStatus();
-  
-  // URL変更の定期チェック（30秒ごと）
-  setInterval(checkForUrlChange, 30000);
-}
+
+    // 初期状態のチェック
+    checkSyncStatus();
+
+    // URL変更の定期チェック（30秒ごと）
+    setInterval(checkForUrlChange, 30000);
+  }
 }
 
