@@ -1,5 +1,5 @@
 // sw.js - 静的資産キャッシュとオフライン表示の強化版（PWA更新通知対応）
-const CACHE_NAME = 'tickets-kunieda-v2';
+const CACHE_NAME = 'tickets-kunieda-v3';
 // 自己修復（self-heal）機能のフラグ（デフォルトOFF。クライアントからメッセージでONにできる）
 let SELF_HEAL_ENABLED = false;
 // 最高管理者モードのクライアント（window client id の集合）
@@ -155,8 +155,12 @@ self.addEventListener('fetch', (event) => {
 	if (req.mode === 'navigate') {
 		event.respondWith((async () => {
 			try {
+				// Exclude reservation-status.html from Cache-First to ensure URL params are always fresh from network
+				// and prevent any potential cache key collision issues with ignoreSearch: true
+				const isReservationStatus = req.url.includes('reservation-status.html');
+
 				const cached = await caches.match(req, { ignoreSearch: true });
-				if (cached) return cached;
+				if (cached && !isReservationStatus) return cached;
 
 				// navigation preload があれば先に利用
 				let response = undefined;

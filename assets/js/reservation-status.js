@@ -7,16 +7,32 @@ import { apiUrlManager } from './config.js';
 import { subscribeToSeatUpdates, subscribeToReservationUpdates, getBookingForScan } from './supabase-client.js';
 
 
-document.addEventListener('DOMContentLoaded', () => {
+function initReservationStatus() {
     // 1. Check URL parameters for auto-login
     const params = new URLSearchParams(window.location.search);
     const bookingId = params.get('id');
     const passcode = params.get('pass');
 
+    const idInput = document.getElementById('booking-id');
+    const passInput = document.getElementById('passcode');
+
+    // Reset inputs first to prevent browser autofill/restoration artifacts
+    if (idInput) idInput.value = '';
+    if (passInput) passInput.value = '';
+
     if (bookingId && passcode) {
-        document.getElementById('booking-id').value = bookingId;
-        document.getElementById('passcode').value = passcode;
+        if (idInput) idInput.value = bookingId;
+        if (passInput) passInput.value = passcode;
         fetchBookingDetails(bookingId, passcode);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', initReservationStatus);
+
+// Handle BFCache (Back-Forward Cache) restores
+window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+        initReservationStatus();
     }
 });
 
