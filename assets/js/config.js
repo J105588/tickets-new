@@ -33,8 +33,7 @@ const LOG_SHEET_NAME = 'OPERATION_LOGS'; // ログを記録するシート名
 
 // 満席通知用メールアドレス（ハードコーディング）
 const FULL_CAPACITY_NOTIFICATION_EMAILS = [
-  'jxjin2010@gmail.com',
-  'nzn.engeki5@gmail.com'
+  'jxjin2010@gmail.com'
 ];
 
 // 強化監視システム設定
