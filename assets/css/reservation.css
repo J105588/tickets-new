@@ -569,11 +569,24 @@ p {
     border: none;
     box-shadow: none;
     background: transparent;
-    padding: 20px;
+    padding: 0;
     /* Keep padding for inner spacing */
     margin: 0;
     /* transform removed, handled by variables */
-    display: block;
+    display: inline-block;
+    /* Allow container to shrink to fit content */
+    text-align: left;
+}
+
+/* Force left alignment for seat sections in modal */
+.modal-body .seat-section {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.modal-body .seat-row {
+    margin: 0 !important;
+    justify-content: flex-start !important;
 }
 
 /* Zoom Controls */
