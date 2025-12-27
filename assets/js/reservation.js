@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 let masterGroups = [];
+let masterDates = [];
 
 async function initializeMasterData() {
     // Supabaseからマスターデータ取得
@@ -51,15 +52,18 @@ async function initializeMasterData() {
 
     if (result.success) {
         masterGroups = result.data.groups;
+        masterDates = result.data.dates || [];
         populateGroupSelect();
     } else {
         console.error('Master Data Load Error:', result.error);
-        document.getElementById('group-select').innerHTML = '<option disabled selected>データの読み込みに失敗しました</option>';
+        const el = document.getElementById('group-select');
+        if (el) el.innerHTML = '<option disabled selected>データの読み込みに失敗しました</option>';
     }
 }
 
 function populateGroupSelect() {
     const select = document.getElementById('group-select');
+    if (!select) return; // Prevention for null error
     select.innerHTML = '<option value="" disabled selected>選択してください</option>';
 
     masterGroups.forEach(g => {
