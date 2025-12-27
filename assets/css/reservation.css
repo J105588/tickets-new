@@ -424,6 +424,18 @@ p {
     }
 }
 
+/* Distinct button for Seat Map */
+.btn-seat-map {
+    background: #0ea5e9;
+    /* Sky blue to differentiate from primary */
+    box-shadow: 0 4px 6px rgba(14, 165, 233, 0.2);
+}
+
+.btn-seat-map:hover {
+    background: #0284c7;
+    box-shadow: 0 6px 8px rgba(14, 165, 233, 0.25);
+}
+
 /* Mobile Optimizations */
 @media (max-width: 600px) {
     .reservation-container {
@@ -437,9 +449,10 @@ p {
     }
 
     .seat {
-        width: 38px;
-        height: 38px;
-        margin: 2px;
+        /* Use variables for sizing even on mobile to allow zooming */
+        width: var(--seat-size);
+        height: var(--seat-size);
+        margin: var(--seat-margin);
     }
 
     h2 {
