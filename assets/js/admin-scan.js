@@ -24,6 +24,27 @@ const targetTimeslot = document.getElementById('target-timeslot');
 
 // Init
 document.addEventListener('DOMContentLoaded', async () => {
+    // 0. Session Check (with Timeout)
+    const session = sessionStorage.getItem('admin_session');
+    const verifiedAt = sessionStorage.getItem('admin_verified_at');
+    const SESSION_TIMEOUT_MS = 60 * 60 * 1000; // 60 minutes
+
+    if (!session || !verifiedAt) {
+        window.location.href = 'admin-login.html';
+        return;
+    }
+
+    const now = new Date().getTime();
+    const loginTime = new Date(verifiedAt).getTime();
+
+    if (now - loginTime > SESSION_TIMEOUT_MS) {
+        alert('セッション有効期限が切れました。再度ログインしてください。');
+        sessionStorage.removeItem('admin_session');
+        sessionStorage.removeItem('admin_verified_at');
+        window.location.href = 'admin-login.html';
+        return;
+    }
+
     // 1. Master Data
     await initializeMasterData();
 
