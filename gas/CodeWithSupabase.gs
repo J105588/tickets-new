@@ -735,17 +735,45 @@ function updateSeatDataSupabase(group, day, timeslot, seatId, columnC, columnD, 
       return { success: false, message: '座席データの更新に失敗しました: ' + (updateResult.error || '不明なエラー') };
     }
     
-    // booking_idがある場合、bookingsテーブルのnotesも更新する（連動）
+    // booking_idがある場合、bookingsテーブルも連動して更新する
     if (updateResult.data && updateResult.data.length > 0) {
       const seatData = updateResult.data[0];
       if (seatData.booking_id) {
-         const bookingUpdates = { notes: columnE }; // メモを同期
-         const bookingResult = supabaseIntegration.updateBooking(seatData.booking_id, bookingUpdates);
-         if (!bookingResult.success) {
-           console.error('予約メモの更新に失敗しました:', seatData.booking_id, bookingResult.error);
-           // 致命的ではないので続行
-         } else {
-           Logger.log(`予約メモ更新完了: Booking ID ${seatData.booking_id}`);
+         let bookingUpdates = {};
+         
+         // 1. メモの同期 (E列 -> notes)
+         if (columnE !== undefined) {
+           bookingUpdates.notes = columnE;
+         }
+         
+         // 2. 名前の同期 (D列 -> name)
+         // ※ D列が空でない場合のみ更新（誤消去防止）
+         if (columnD && columnD.trim() !== '') {
+           bookingUpdates.name = columnD;
+         }
+         
+         // 3. ステータスの同期
+         const newStatus = mapColumnCToSupabaseStatus(columnC);
+         if (newStatus === 'checked_in') {
+           bookingUpdates.status = 'checked_in';
+           bookingUpdates.checked_in_at = new Date().toISOString();
+         } else if (newStatus === 'reserved') {
+           // チェックイン取り消し等の場合、confirmedに戻す
+           // ただし、既にcancelledの場合は戻さない方が安全だが、
+           // 「座席編集」で「予約済」を選んだ＝有効な予約にしたい意図と捉える
+           bookingUpdates.status = 'confirmed';
+           bookingUpdates.checked_in_at = null;
+         }
+         
+         // 更新実行
+         if (Object.keys(bookingUpdates).length > 0) {
+           const bookingResult = supabaseIntegration.updateBooking(seatData.booking_id, bookingUpdates);
+           if (!bookingResult.success) {
+             console.error('予約情報の同期に失敗しました:', seatData.booking_id, bookingResult.error);
+             // 致命的ではないので続行（座席側は更新されているため）
+           } else {
+             Logger.log(`予約情報同期完了: Booking ID ${seatData.booking_id}, Updates: ${JSON.stringify(bookingUpdates)}`);
+           }
          }
       }
     }
@@ -788,6 +816,57 @@ function updateMultipleSeatsSupabase(group, day, timeslot, updates) {
     const updateResult = supabaseIntegration.updateMultipleSeats(performanceId, supabaseUpdates);
     if (!updateResult.success) {
       return { success: false, message: '座席データの更新に失敗しました' };
+    }
+    
+    // booking_idごとの更新を集約して同期
+    // 成功した座席データのbooking_idを収集
+    const bookingUpdatesMap = {}; // bookingId -> { notes, name, status... }
+    
+    if (updateResult.data && Array.isArray(updateResult.data)) {
+      updateResult.data.forEach(res => {
+        if (!res.success || !res.data || res.data.length === 0) return;
+        const seat = res.data[0];
+        const bookingId = seat.booking_id;
+        
+        if (bookingId) {
+          // 元の更新リクエストから対応するデータを検索
+          // seatIdでマッチング
+          const originalUpdate = updates.find(u => u.seatId === seat.seat_id);
+          if (originalUpdate) {
+             if (!bookingUpdatesMap[bookingId]) bookingUpdatesMap[bookingId] = {};
+             
+             // メモ同期 (上書き)
+             if (originalUpdate.columnE !== undefined) {
+               bookingUpdatesMap[bookingId].notes = originalUpdate.columnE;
+             }
+             // 名前同期 (上書き, 空でない場合)
+             if (originalUpdate.columnD && originalUpdate.columnD.trim() !== '') {
+               bookingUpdatesMap[bookingId].name = originalUpdate.columnD;
+             }
+             // ステータス同期
+             const s = mapColumnCToSupabaseStatus(originalUpdate.columnC);
+             if (s === 'checked_in') {
+               bookingUpdatesMap[bookingId].status = 'checked_in';
+               bookingUpdatesMap[bookingId].checked_in_at = new Date().toISOString();
+             } else if (s === 'reserved') {
+               bookingUpdatesMap[bookingId].status = 'confirmed';
+               bookingUpdatesMap[bookingId].checked_in_at = null;
+             }
+          }
+        }
+      });
+      
+      // booking更新実行
+      const bookingIds = Object.keys(bookingUpdatesMap);
+      if (bookingIds.length > 0) {
+        Logger.log(`一括更新に伴う予約情報同期: ${bookingIds.length}件の予約`);
+        bookingIds.forEach(bid => {
+           const bUpdate = bookingUpdatesMap[bid];
+           if (Object.keys(bUpdate).length > 0) {
+             supabaseIntegration.updateBooking(bid, bUpdate);
+           }
+        });
+      }
     }
     
     Logger.log(`Supabase複数座席更新完了: ${updates.length}件`);
