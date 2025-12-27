@@ -1048,12 +1048,13 @@ function handleSuperAdminSeatClick(seatData, event) {
   const hasSelection = currentSelected.length > 0;
 
   if (!hasSelection) {
-    // 何も選ばれていない → 単独選択
+    // 何も選ばれていない → ドロワーを即座に開く（単独編集）
+    console.log('[最高管理者] 単独編集ドロワーを開く:', seatData.id);
     document.querySelectorAll('.seat.selected-for-edit').forEach(seat => seat.classList.remove('selected-for-edit'));
     seatElement.classList.add('selected-for-edit');
-    console.log('[最高管理者] 単独選択:', seatData.id);
+    showSeatEditModal(seatData); // ドロワーを表示
   } else {
-    // 既に選択がある → トグル追加/削除（モーダルは開かない）
+    // 既に選択がある → トグル追加/削除（マルチ選択モード）
     seatElement.classList.toggle('selected-for-edit');
     console.log('[最高管理者] トグル選択:', seatData.id, '->', !clickedSelected);
   }
@@ -1725,83 +1726,103 @@ function startUserInteraction() {
   stopAutoRefresh();
 }
 
-// 座席編集モーダルを表示する関数
+// 座席編集ドロワーを表示する関数（旧モーダルを置換）
 function showSeatEditModal(seatData) {
-  console.log('[最高管理者] モーダル表示開始:', seatData);
+  console.log('[最高管理者] ドロワー表示開始:', seatData);
 
-  // モーダルのHTMLを作成（最初はshowクラスなし）
-  const modalHTML = `
-    <div id="seat-edit-modal" class="modal">
-      <div class="modal-content" style="max-width: 500px;">
-        <h3>座席データ編集 - ${seatData.id}</h3>
+  // 既存のドロワー/オーバーレイがあれば削除
+  closeSeatEditModal();
+
+  // ステータス定義
+  const statuses = [
+    { value: '空', label: '空 (Available)' },
+    { value: '予約済', label: '予約済 (Reserved)' },
+    { value: '確保', label: '確保 (Reserved)' },
+    { value: '使用不可', label: '使用不可 (Blocked)' },
+    { value: 'チェックイン済', label: 'チェックイン済 (Checked In)' },
+    { value: '当日券', label: '当日券 (Walk-in)' }
+  ];
+
+  const currentStatus = seatData.columnC || '空';
+
+  // チップのHTML生成
+  const chipsHTML = statuses.map(s => `
+    <div class="status-chip ${s.value === currentStatus ? 'selected' : ''}" 
+         data-value="${s.value}" 
+         onclick="selectStatusChip(this, '${s.value}')">
+      ${s.label}
+    </div>
+  `).join('');
+
+  const drawerHTML = `
+    <div id="seat-edit-overlay" class="seat-edit-overlay" onclick="closeSeatEditModal()"></div>
+    <div id="seat-edit-drawer" class="seat-edit-drawer">
+      <div class="drawer-header">
+        <h3>座席編集 - ${seatData.id}</h3>
+        <button class="btn-close-drawer" onclick="closeSeatEditModal()">&times;</button>
+      </div>
+      <div class="drawer-content">
         <div class="seat-edit-form">
           <div class="form-group">
-            <label for="column-c">C列: ステータス（空、確保、予約済など）</label>
-            <input type="text" id="column-c" value="${seatData.columnC || ''}" placeholder="例: 予約済">
+            <label>ステータス</label>
+            <div class="status-chip-group">
+              ${chipsHTML}
+            </div>
+            <input type="hidden" id="column-c" value="${currentStatus}">
           </div>
           <div class="form-group">
-            <label for="column-d">D列: 予約名・備考</label>
+            <label for="column-d">予約名・備考</label>
             <input type="text" id="column-d" value="${seatData.columnD || ''}" placeholder="例: 田中太郎">
           </div>
+
           <div class="form-group">
-            <label for="column-e">E列: チェックイン状態・その他</label>
-            <input type="text" id="column-e" value="${seatData.columnE || ''}" placeholder="例: 済">
+            <label for="column-e">E列: 備考</label>
+            <input type="text" id="column-e" value="${seatData.columnE || ''}" placeholder="例: メモ">
           </div>
         </div>
-        <div class="modal-buttons">
-          <button class="btn-primary" onclick="updateSeatData('${seatData.id}')">確定</button>
-          <button class="btn-secondary" onclick="closeSeatEditModal()">キャンセル</button>
-        </div>
+      </div>
+      <div class="drawer-footer">
+        <button class="btn-secondary" onclick="closeSeatEditModal()">キャンセル</button>
+        <button class="btn-primary" onclick="updateSeatData('${seatData.id}')">保存</button>
       </div>
     </div>
   `;
 
-  // モーダルを表示（アニメーション有効化のため、挿入後にreflowを挟んでshowクラス付与）
-  document.body.insertAdjacentHTML('beforeend', modalHTML);
-  console.log('[最高管理者] モーダルHTMLを追加');
+  document.body.insertAdjacentHTML('beforeend', drawerHTML);
 
-  // アニメーションを開始するため、次のフレームでshowクラスを追加
+  // アニメーション開始
   requestAnimationFrame(() => {
-    const modalEl = document.getElementById('seat-edit-modal');
-    if (modalEl) {
-      modalEl.classList.add('show');
-      console.log('[最高管理者] アニメーション開始');
-    }
+    const drawer = document.getElementById('seat-edit-drawer');
+    const overlay = document.getElementById('seat-edit-overlay');
+    if (drawer) drawer.classList.add('show');
+    if (overlay) overlay.classList.add('show');
   });
-
-  // モーダルの背景クリックで閉じる機能を追加
-  const modal = document.getElementById('seat-edit-modal');
-  if (modal) {
-    console.log('[最高管理者] モーダル要素を取得:', modal);
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) {
-        closeSeatEditModal();
-      }
-    });
-  } else {
-    console.error('[最高管理者] モーダル要素が見つかりません');
-  }
 }
 
-// 座席編集モーダルを閉じる関数
-function closeSeatEditModal() {
-  const modal = document.getElementById('seat-edit-modal');
-  if (modal) {
-    try {
-      // 退出アニメーションを再生
-      modal.classList.add('closing');
-      console.log('[最高管理者] 閉じるアニメーション開始');
+// ステータスチップ選択処理（グローバルへ）
+window.selectStatusChip = function (el, value) {
+  // 選択状態の更新
+  document.querySelectorAll('.status-chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  // 隠し入力フィールドの更新
+  const input = document.getElementById('column-c');
+  if (input) input.value = value;
+};
 
-      // アニメーション完了後にモーダルを削除
-      setTimeout(() => {
-        try {
-          modal.remove();
-          console.log('[最高管理者] モーダル削除完了');
-        } catch (_) { }
-      }, 250); // CSSのアニメーション時間と合わせる
-    } catch (_) {
-      modal.remove();
-    }
+// 座席編集ドロワーを閉じる関数
+function closeSeatEditModal() {
+  const drawer = document.getElementById('seat-edit-drawer');
+  const overlay = document.getElementById('seat-edit-overlay');
+
+  if (drawer) {
+    drawer.classList.remove('show');
+    if (overlay) overlay.classList.remove('show');
+
+    // アニメーション完了後に削除
+    setTimeout(() => {
+      if (drawer) drawer.remove();
+      if (overlay) overlay.remove();
+    }, 300);
   }
 
   // 最高管理者モードの座席選択状態をクリア
@@ -1814,7 +1835,7 @@ function closeSeatEditModal() {
 async function updateSeatData(seatId) {
   const columnC = document.getElementById('column-c').value;
   const columnD = document.getElementById('column-d').value;
-  const columnE = document.getElementById('column-e').value;
+  const columnE = document.getElementById('column-e').value; // 備考として取得
 
   // 確認ダイアログを表示
   const confirmMessage = `座席 ${seatId} のデータを以下の内容で更新しますか？\n\nC列: ${columnC}\nD列: ${columnD}\nE列: ${columnE}`;
@@ -1905,11 +1926,20 @@ async function updateSeatData(seatId) {
       const isSuperAdminMode = currentMode === 'superadmin';
 
       try {
-        const seatData = await GasAPI.getSeatData(GROUP, DAY, ACTUAL_TIMESLOT, isAdminMode, isSuperAdminMode);
+        // 最高管理者の場合はキャッシュをバイパスして最新データを取得
+        const useCache = !isSuperAdminMode;
+        if (isSuperAdminMode) {
+          console.log('[最高管理者] 最新データを強制取得中...');
+        }
+
+        const seatData = await GasAPI.getSeatData(GROUP, DAY, ACTUAL_TIMESLOT, isAdminMode, isSuperAdminMode, useCache);
 
         if (seatData.success) {
           drawSeatMap(seatData.seatMap);
           updateLastUpdateTime();
+          if (isSuperAdminMode) {
+            console.log('[最高管理者] データ同期完了');
+          }
         }
       } catch (refreshError) {
         console.warn('座席データの再読み込みに失敗しましたが、更新は成功しました:', refreshError);

@@ -82,7 +82,7 @@ class SupabaseIntegration {
 
   // 座席データの取得（既存のデータ構造に合わせた形式）
   getSeats(performanceId, status = null) {
-    let endpoint = `seats?performance_id=eq.${performanceId}&select=*`;
+    let endpoint = `seats?performance_id=eq.${performanceId}&select=*,bookings(notes)`;
     if (status) {
       endpoint += `&status=eq.${status}`;
     }

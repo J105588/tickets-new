@@ -8,17 +8,17 @@ class OptimizedGasAPI {
     return new Promise((resolve, reject) => {
       try {
         // オフライン時はオフライン同期システムに処理を委譲
-        try { 
-          if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) { 
+        try {
+          if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
             if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
               console.log('[Optimized API] オフライン状態を検知、オフライン同期システムに委譲');
               return resolve({ success: false, error: 'offline_delegate', offline: true, functionName, params });
             } else {
               return resolve({ success: false, error: 'offline', offline: true });
             }
-          } 
-        } catch (_) {}
-        
+          }
+        } catch (_) { }
+
         // ネットワーク接続状態をチェック
         if (typeof navigator !== 'undefined' && navigator && !navigator.onLine) {
           console.log('[Optimized API] ネットワーク接続なし、オフライン同期システムに委譲');
@@ -28,25 +28,25 @@ class OptimizedGasAPI {
             return resolve({ success: false, error: 'offline', offline: true });
           }
         }
-        
+
         debugLog(`Optimized API Call: ${functionName}`, params);
 
         const callbackName = 'jsonpCallback_' + functionName + '_' + Date.now();
         const encodedParams = encodeURIComponent(JSON.stringify(params));
         const encodedFuncName = encodeURIComponent(functionName);
         const uaParam = (() => { try { return encodeURIComponent(navigator.userAgent || ''); } catch (_) { return ''; } })();
-        
+
         window[callbackName] = (data) => {
           debugLog(`Optimized API Response: ${functionName}`, data);
           try {
-            try { clearTimeout(timeoutId); } catch (e) {}
+            try { clearTimeout(timeoutId); } catch (e) { }
             delete window[callbackName];
             if (script && script.parentNode) {
               script.parentNode.removeChild(script);
             }
-            
+
             if (data && typeof data === 'object') {
-              try { audit.wrapApiCall(functionName, params, data); } catch (_) {}
+              try { audit.wrapApiCall(functionName, params, data); } catch (_) { }
               resolve(data);
             } else {
               console.warn(`Invalid API response for ${functionName}:`, data);
@@ -61,29 +61,29 @@ class OptimizedGasAPI {
         const urls = Array.isArray(GAS_API_URLS) && GAS_API_URLS.length > 0 ? GAS_API_URLS : [];
         const cacheBuster = `_=${Date.now()}`;
         const formData = `func=${encodedFuncName}&params=${encodedParams}`;
-        
+
         const currentUrl = apiUrlManager.getCurrentUrl();
         let currentUrlIndex = urls.indexOf(currentUrl);
         if (currentUrlIndex === -1) {
           currentUrlIndex = 0;
         }
-        
+
         let fullUrl = `${currentUrl}?callback=${callbackName}&${formData}&userAgent=${uaParam}&${cacheBuster}`;
 
         const script = document.createElement('script');
         script.src = fullUrl;
         script.async = true;
-        
+
         let timeoutId = setTimeout(() => {
           console.error('API call timeout:', { functionName, fullUrl });
           try {
             window[callbackName] = function noop() { /* late JSONP ignored */ };
-            setTimeout(() => { try { delete window[callbackName]; } catch (_) {} }, 60000);
+            setTimeout(() => { try { delete window[callbackName]; } catch (_) { } }, 60000);
             if (script && script.parentNode) {
               script.parentNode.removeChild(script);
             }
-          } catch (e) {}
-          
+          } catch (e) { }
+
           if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
             console.log('[Optimized API] タイムアウト、オフライン同期システムに委譲');
             resolve({ success: false, error: 'offline_delegate', offline: true, functionName, params });
@@ -98,12 +98,12 @@ class OptimizedGasAPI {
             if (Array.isArray(urls) && urls.length > 1) {
               const currentUrl = apiUrlManager.getCurrentUrl();
               const currentUrlIndexInArray = urls.indexOf(currentUrl);
-              
+
               let nextUrlIndex;
               do {
                 nextUrlIndex = Math.floor(Math.random() * urls.length);
               } while (nextUrlIndex === currentUrlIndexInArray && urls.length > 1);
-              
+
               const nextUrl = `${urls[nextUrlIndex]}?callback=${callbackName}&${formData}&userAgent=${uaParam}&${cacheBuster}`;
               console.warn('Failing over to different GAS url:', nextUrl);
               script.src = nextUrl;
@@ -115,7 +115,7 @@ class OptimizedGasAPI {
               script.parentNode.removeChild(script);
             }
             clearTimeout(timeoutId);
-            
+
             if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
               console.log('[Optimized API] エラー、オフライン同期システムに委譲');
               resolve({ success: false, error: 'offline_delegate', offline: true, functionName, params });
@@ -127,7 +127,7 @@ class OptimizedGasAPI {
             resolve({ success: false, error: 'APIエラー処理中に例外が発生しました: ' + e.message });
           }
         };
-        
+
         (document.head || document.body || document.documentElement).appendChild(script);
       } catch (err) {
         console.error('API call exception:', err);
@@ -149,9 +149,13 @@ class OptimizedGasAPI {
   }
 
   // 最適化された座席データ取得
-  static async getSeatData(group, day, timeslot, isAdmin, isSuperAdmin = false) {
+  static async getSeatData(group, day, timeslot, isAdmin, isSuperAdmin = false, useCache = true) {
     const params = [group, day, timeslot, isAdmin, isSuperAdmin];
-    return this._callApiWithCache('getSeatData', params);
+    if (useCache) {
+      return this._callApiWithCache('getSeatData', params);
+    } else {
+      return this._callApi('getSeatData', params);
+    }
   }
 
   // 最適化された座席データ取得（最小限）
@@ -317,5 +321,5 @@ export default OptimizedGasAPI;
 
 // グローバルに公開（後方互換性のため）
 if (typeof window !== 'undefined') {
-  try { window.GasAPI = OptimizedGasAPI; } catch (_) {}
+  try { window.GasAPI = OptimizedGasAPI; } catch (_) { }
 }

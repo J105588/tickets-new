@@ -11,7 +11,7 @@ class PWAUpdateManager {
     async init() {
         if ('serviceWorker' in navigator) {
             try {
-                this.registration = await navigator.serviceWorker.register('./sw.js');
+                this.registration = await navigator.serviceWorker.register('../sw.js', { scope: '../' });
                 this.setupEventListeners();
                 this.checkForUpdates();
             } catch (error) {
@@ -24,7 +24,7 @@ class PWAUpdateManager {
         // Service Workerからのメッセージを監視
         navigator.serviceWorker.addEventListener('message', (event) => {
             const { type, version, timestamp } = event.data;
-            
+
             switch (type) {
                 case 'UPDATE_AVAILABLE':
                     this.handleUpdateAvailable(version, timestamp);
@@ -120,7 +120,7 @@ class PWAUpdateManager {
         // 監査ログに記録
         try {
             if (window.audit && window.audit.log) {
-                window.audit.log('ui', 'pwa_update_notification', { 
+                window.audit.log('ui', 'pwa_update_notification', {
                     action: 'show',
                     timestamp: Date.now()
                 });
@@ -351,7 +351,7 @@ class PWAUpdateManager {
             // 監査ログに記録
             try {
                 if (window.audit && window.audit.log) {
-                    window.audit.log('ui', 'pwa_update_notification', { 
+                    window.audit.log('ui', 'pwa_update_notification', {
                         action: 'apply',
                         timestamp: Date.now()
                     });
@@ -386,7 +386,7 @@ class PWAUpdateManager {
         // 監査ログに記録
         try {
             if (window.audit && window.audit.log) {
-                window.audit.log('ui', 'pwa_update_notification', { 
+                window.audit.log('ui', 'pwa_update_notification', {
                     action: 'dismiss',
                     timestamp: Date.now()
                 });
@@ -452,7 +452,7 @@ class PWAUpdateManager {
     // 手動で更新チェック
     async manualUpdateCheck() {
         await this.checkForUpdates();
-        
+
         // Service Workerに更新チェックを指示
         if (navigator.serviceWorker.controller) {
             navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });

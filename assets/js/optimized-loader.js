@@ -9,7 +9,7 @@ class OptimizedLoader {
       moduleLoadTimes: new Map(),
       totalLoadTime: 0
     };
-    
+
     this.setupDependencies();
     this.initializeCriticalModules();
   }
@@ -34,19 +34,19 @@ class OptimizedLoader {
     // API通信関係を最優先で読み込み
     const apiCriticalModules = ['config', 'api-cache', 'optimized-api'];
     await Promise.all(apiCriticalModules.map(module => this.loadModule(module)));
-    
+
     // エラーハンドリングを次に読み込み
     const errorHandlingModules = ['error-handler'];
     await Promise.all(errorHandlingModules.map(module => this.loadModule(module)));
-    
+
     // セカンダリモジュールを並列読み込み
     const secondaryModules = ['audit-logger', 'ui-optimizer', 'performance-monitor'];
     await Promise.all(secondaryModules.map(module => this.loadModule(module)));
-    
+
     // その他のモジュールを並列読み込み
     const otherModules = ['system-lock', 'sidebar', 'offline-sync-v2', 'pwa-install', 'pwa-update'];
     await Promise.all(otherModules.map(module => this.loadModule(module)));
-    
+
     this.performanceMetrics.totalLoadTime = performance.now() - this.performanceMetrics.loadStart;
     console.log('🚀 モジュール読み込み完了（API通信最優先）:', {
       totalTime: `${this.performanceMetrics.totalLoadTime.toFixed(2)}ms`,
@@ -65,7 +65,7 @@ class OptimizedLoader {
 
     const loadPromise = this._loadModuleInternal(moduleName);
     this.loadingPromises.set(moduleName, loadPromise);
-    
+
     try {
       await loadPromise;
       this.loadedModules.add(moduleName);
@@ -80,7 +80,7 @@ class OptimizedLoader {
 
   async _loadModuleInternal(moduleName) {
     const dependencies = this.dependencies.get(moduleName) || [];
-    
+
     // 依存関係を並列で読み込み
     await Promise.all(dependencies.map(dep => this.loadModule(dep)));
 
@@ -107,7 +107,7 @@ class OptimizedLoader {
     const startTime = performance.now();
     await loader();
     const loadTime = performance.now() - startTime;
-    
+
     console.log(`✅ ${moduleName} loaded in ${loadTime.toFixed(2)}ms`);
   }
 
@@ -120,7 +120,9 @@ class OptimizedLoader {
       }
 
       const script = document.createElement('script');
-      script.src = './offline-sync-v2.js';
+      // Resolve path relative to this module
+      const basePath = new URL('./', import.meta.url).href;
+      script.src = new URL('offline-sync-v2.js', basePath).href;
       script.onload = () => resolve();
       script.onerror = () => reject(new Error('Failed to load offline-sync-v2.js'));
       document.head.appendChild(script);
@@ -136,7 +138,9 @@ class OptimizedLoader {
       }
 
       const script = document.createElement('script');
-      script.src = './pwa-install.js';
+      // Resolve path relative to this module
+      const basePath = new URL('./', import.meta.url).href;
+      script.src = new URL('pwa-install.js', basePath).href;
       script.onload = () => resolve();
       script.onerror = () => reject(new Error('Failed to load pwa-install.js'));
       document.head.appendChild(script);

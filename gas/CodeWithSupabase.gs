@@ -386,7 +386,8 @@ async function getSeatDataSupabase(group, day, timeslot, isAdmin = false, isSupe
         status: mapSupabaseStatusToLegacy(seat.status),
         columnC: mapStatusToColumnC(seat.status),
         columnD: seat.reserved_by || '',
-        columnE: seat.checked_in_at ? '済' : ''
+        // bookingsテーブルのnotesを優先、なければseatsテーブルのnotes
+        columnE: (seat.bookings && seat.bookings.notes) ? seat.bookings.notes : (seat.notes || '')
       };
       
       // 管理者の場合のみ名前を追加
@@ -713,15 +714,40 @@ function updateSeatDataSupabase(group, day, timeslot, seatId, columnC, columnD, 
     const performanceId = performanceResult.data.id;
     
     // 座席データの更新
-    const updates = {
+    // まずはseatsテーブルの更新を試みる（notesカラムがあることを期待）
+    let updates = {
       status: mapColumnCToSupabaseStatus(columnC),
       reserved_by: columnD,
-      checked_in_at: columnE ? new Date().toISOString() : null
+      notes: columnE, 
+      checked_in_at: (mapColumnCToSupabaseStatus(columnC) === 'checked_in') ? new Date().toISOString() : null
     };
     
-    const updateResult = supabaseIntegration.updateSeat(performanceId, seatId, updates);
+    let updateResult = supabaseIntegration.updateSeat(performanceId, seatId, updates);
+    
+    // notesカラムがない場合のエラー対策: 再試行
+    if (!updateResult.success && updateResult.error && updateResult.error.includes('notes')) {
+      console.warn('seatsテーブルにnotesがない可能性があります。notesを除外して再試行します。', seatId);
+      delete updates.notes;
+      updateResult = supabaseIntegration.updateSeat(performanceId, seatId, updates);
+    }
+    
     if (!updateResult.success) {
-      return { success: false, message: '座席データの更新に失敗しました' };
+      return { success: false, message: '座席データの更新に失敗しました: ' + (updateResult.error || '不明なエラー') };
+    }
+    
+    // booking_idがある場合、bookingsテーブルのnotesも更新する（連動）
+    if (updateResult.data && updateResult.data.length > 0) {
+      const seatData = updateResult.data[0];
+      if (seatData.booking_id) {
+         const bookingUpdates = { notes: columnE }; // メモを同期
+         const bookingResult = supabaseIntegration.updateBooking(seatData.booking_id, bookingUpdates);
+         if (!bookingResult.success) {
+           console.error('予約メモの更新に失敗しました:', seatData.booking_id, bookingResult.error);
+           // 致命的ではないので続行
+         } else {
+           Logger.log(`予約メモ更新完了: Booking ID ${seatData.booking_id}`);
+         }
+      }
     }
     
     Logger.log(`Supabase座席データ更新完了: ${seatId}`);

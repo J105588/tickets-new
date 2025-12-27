@@ -13,10 +13,10 @@ class APICache {
     this.cacheTimeout = ENHANCED_MONITORING_CONFIG.cacheTimeout;
     this.retryAttempts = ENHANCED_MONITORING_CONFIG.retryAttempts;
     this.retryDelay = ENHANCED_MONITORING_CONFIG.retryDelay;
-    
+
     // キャッシュクリーンアップの定期実行
     this.startCacheCleanup();
-    
+
     debugLog('[APICache] 初期化完了', {
       maxConcurrent: this.maxConcurrentRequests,
       cacheTimeout: this.cacheTimeout,
@@ -35,14 +35,14 @@ class APICache {
   cleanupExpiredCache() {
     const now = Date.now();
     let cleanedCount = 0;
-    
+
     for (const [key, entry] of this.cache.entries()) {
       if (now - entry.timestamp > this.cacheTimeout) {
         this.cache.delete(key);
         cleanedCount++;
       }
     }
-    
+
     if (cleanedCount > 0) {
       debugLog('[APICache] キャッシュクリーンアップ', { cleanedCount });
     }
@@ -58,13 +58,13 @@ class APICache {
   getFromCache(key) {
     const entry = this.cache.get(key);
     if (!entry) return null;
-    
+
     const now = Date.now();
     if (now - entry.timestamp > this.cacheTimeout) {
       this.cache.delete(key);
       return null;
     }
-    
+
     debugLog('[APICache] キャッシュヒット', { key });
     return entry.data;
   }
@@ -75,7 +75,7 @@ class APICache {
       data: data,
       timestamp: Date.now()
     });
-    
+
     debugLog('[APICache] キャッシュ保存', { key });
   }
 
@@ -88,7 +88,7 @@ class APICache {
         reject,
         timestamp: Date.now()
       });
-      
+
       this.processQueue();
     });
   }
@@ -96,21 +96,21 @@ class APICache {
   // リクエストキューを処理
   async processQueue() {
     if (this.isProcessing || this.requestQueue.length === 0) return;
-    
+
     this.isProcessing = true;
-    
+
     while (this.requestQueue.length > 0 && this.activeRequests < this.maxConcurrentRequests) {
       const request = this.requestQueue.shift();
       this.processRequest(request);
     }
-    
+
     this.isProcessing = false;
   }
 
   // 個別リクエストを処理
   async processRequest(request) {
     this.activeRequests++;
-    
+
     try {
       const result = await this.executeRequest(request);
       request.resolve(result);
@@ -129,12 +129,12 @@ class APICache {
       return result;
     } catch (error) {
       if (attempt < this.retryAttempts) {
-        debugLog('[APICache] リトライ実行', { 
-          attempt, 
+        debugLog('[APICache] リトライ実行', {
+          attempt,
           functionName: request.functionName,
-          error: error.message 
+          error: error.message
         });
-        
+
         await this.delay(this.retryDelay * attempt);
         return this.executeRequest(request, attempt + 1);
       } else {
@@ -151,7 +151,7 @@ class APICache {
   // 最適化されたAPI呼び出し
   async callAPI(functionName, params = [], useCache = true) {
     const cacheKey = this.generateCacheKey(functionName, params);
-    
+
     // キャッシュから取得を試行
     if (useCache) {
       const cachedData = this.getFromCache(cacheKey);
@@ -159,13 +159,13 @@ class APICache {
         return cachedData;
       }
     }
-    
+
     // 既に同じリクエストが処理中の場合は待機
     if (this.pendingRequests.has(cacheKey)) {
       debugLog('[APICache] 重複リクエスト待機', { cacheKey });
       return this.pendingRequests.get(cacheKey);
     }
-    
+
     // 新しいリクエストを作成
     const requestPromise = this.addToQueue({
       functionName,
@@ -173,18 +173,18 @@ class APICache {
       params,
       cacheKey
     });
-    
+
     // リクエストを記録
     this.pendingRequests.set(cacheKey, requestPromise);
-    
+
     try {
       const result = await requestPromise;
-      
+
       // 成功時はキャッシュに保存
       if (useCache && result && result.success !== false) {
         this.setCache(cacheKey, result);
       }
-      
+
       return result;
     } finally {
       // リクエスト完了時に記録から削除
@@ -208,7 +208,7 @@ class APICache {
         return (...params) => apiClass._callApi(functionName, params);
       }
     }
-    
+
     // フォールバック
     return async (...params) => {
       throw new Error(`API function ${functionName} not found`);
@@ -217,12 +217,12 @@ class APICache {
 
   // バッチAPI呼び出し（複数のAPIを同時実行）
   async batchCallAPI(requests) {
-    const promises = requests.map(request => 
+    const promises = requests.map(request =>
       this.callAPI(request.functionName, request.params, request.useCache !== false)
     );
-    
+
     const results = await Promise.allSettled(promises);
-    
+
     return results.map((result, index) => ({
       request: requests[index],
       success: result.status === 'fulfilled',
@@ -236,7 +236,7 @@ class APICache {
     const now = Date.now();
     let validEntries = 0;
     let expiredEntries = 0;
-    
+
     for (const [key, entry] of this.cache.entries()) {
       if (now - entry.timestamp > this.cacheTimeout) {
         expiredEntries++;
@@ -244,7 +244,7 @@ class APICache {
         validEntries++;
       }
     }
-    
+
     return {
       totalEntries: this.cache.size,
       validEntries,
@@ -266,6 +266,62 @@ class APICache {
     this.cache.delete(key);
     debugLog('[APICache] キャッシュキー削除', { key });
   }
+
+  // 関数名に基づくキャッシュのクリア（前方一致）
+  clearFunctionCache(functionName) {
+    let count = 0;
+    for (const key of this.cache.keys()) {
+      if (key.startsWith(functionName + ':')) {
+        this.cache.delete(key);
+        count++;
+      }
+    }
+    if (count > 0) {
+      debugLog('[APICache] 関数キャッシュクリア', { functionName, count });
+    }
+  }
+
+  // リクエストの重複排除とキャッシュ利用
+  async deduplicateRequest(functionName, params, fetcher) {
+    const cacheKey = this.generateCacheKey(functionName, params);
+
+    // キャッシュ確認
+    const cachedData = this.getFromCache(cacheKey);
+    if (cachedData) {
+      return cachedData;
+    }
+
+    // 重複リクエスト確認
+    if (this.pendingRequests.has(cacheKey)) {
+      debugLog('[APICache] 重複リクエスト待機 (dedup)', { cacheKey });
+      return this.pendingRequests.get(cacheKey);
+    }
+
+    // 新規リクエスト
+    // fetcherを実行するPromiseを作成
+    const promise = (async () => {
+      try {
+        // fetcherが提供されている場合はそれを使用、なければgetAPIFunction
+        const result = fetcher ? await fetcher() : await this.executeRequest({
+          functionName,
+          function: this.getAPIFunction(functionName),
+          params
+        });
+
+        // 成功したらキャッシュ
+        if (result && result.success !== false) {
+          this.setCache(cacheKey, result);
+        }
+        return result;
+      } finally {
+        this.pendingRequests.delete(cacheKey);
+      }
+    })();
+
+    this.pendingRequests.set(cacheKey, promise);
+    return promise;
+  }
+
 
   // パフォーマンス統計を取得
   getPerformanceStats() {

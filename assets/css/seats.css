@@ -236,33 +236,36 @@
 
 /* モバイル表示の最適化 */
 @media (max-width: 768px) {
+
     /* カスタムスクロールバーを中央に固定しつつ小さめに */
     .custom-scrollbar {
         bottom: 12px;
         width: 90vw;
         height: 16px;
     }
+
     .custom-scrollbar-thumb {
         min-width: 24px;
     }
+
     .zoom-controls {
         bottom: 10px;
         right: 10px;
         gap: 8px;
     }
-    
+
     .zoom-btn {
         width: 45px;
         height: 45px;
         font-size: 18px;
     }
-    
+
     .zoom-level {
         font-size: 11px;
         padding: 4px 8px;
         min-width: 45px;
     }
-    
+
     /* 座席マップコンテナのタッチ操作を最適化 */
     .seat-map-container {
         touch-action: pan-x pan-y;
@@ -271,33 +274,33 @@
         scrollbar-width: none;
         -ms-overflow-style: none;
     }
-    
+
     /* モバイルでスクロールバーを非表示 */
     .seat-map-container::-webkit-scrollbar {
         display: none;
     }
-    
+
     /* 座席のタッチ操作を改善 */
     .seat {
         min-width: 35px;
         min-height: 35px;
     }
-    
+
     /* 通路のサイズをモバイルに最適化 */
     .vertical-passage {
         min-width: 25px;
         min-height: 35px;
     }
-    
+
     .horizontal-passage {
         min-height: 15px;
     }
-    
+
     /* モバイルでの座席セクションのパディング調整 */
     .seat-section {
         padding: 0 20px;
     }
-    
+
     .seat-row {
         margin: 0 10px;
     }
@@ -645,14 +648,16 @@ input:checked+.slider:before {
 }
 
 .seat.selected-for-checkin {
-    background: #17a2b8; /* チェックイン選択中 */
+    background: #17a2b8;
+    /* チェックイン選択中 */
     color: #fff;
     box-shadow: 0 0 12px 2px #17a2b8;
     transform: translateY(-2px);
 }
 
 .seat.selected-for-edit {
-    background: #8B0000; /* 最高管理者編集選択中 */
+    background: #8B0000;
+    /* 最高管理者編集選択中 */
     color: #fff;
     box-shadow: 0 0 12px 2px #8B0000;
     transform: translateY(-2px);
@@ -782,7 +787,8 @@ input:checked+.slider:before {
     position: absolute;
     top: 15px;
     right: 15px;
-    color: #8B0000; /* 濃い赤色 */
+    color: #8B0000;
+    /* 濃い赤色 */
     font-weight: bold;
     font-size: 14px;
 }
@@ -1000,97 +1006,99 @@ input:checked+.slider:before {
 /* 成功・エラー通知 */
 .success-notification,
 .error-notification {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  z-index: 10000;
-  max-width: 400px;
-  animation: slideInRight 0.3s ease-out;
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    max-width: 400px;
+    animation: slideInRight 0.3s ease-out;
 }
 
 .success-notification {
-  background: linear-gradient(135deg, #28a745, #1e7e34);
-  color: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+    background: linear-gradient(135deg, #28a745, #1e7e34);
+    color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
 }
 
 .error-notification {
-  background: linear-gradient(135deg, #dc3545, #c82333);
-  color: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(220, 53, 69, 0.3);
 }
 
 .notification-content {
-  padding: 16px 20px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
 .notification-icon {
-  font-size: 18px;
-  font-weight: bold;
-  flex-shrink: 0;
+    font-size: 18px;
+    font-weight: bold;
+    flex-shrink: 0;
 }
 
 .notification-message {
-  flex: 1;
-  font-size: 14px;
-  line-height: 1.4;
-  white-space: pre-line;
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.4;
+    white-space: pre-line;
 }
 
 .notification-close {
-  background: none;
-  border: none;
-  color: white;
-  font-size: 18px;
-  cursor: pointer;
-  padding: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: background-color 0.2s;
-  flex-shrink: 0;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.2s;
+    flex-shrink: 0;
 }
 
 .notification-close:hover {
-  background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.2);
 }
 
 @keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(100%);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
 /* レスポンシブ対応 */
 @media (max-width: 768px) {
-  .success-notification,
-  .error-notification {
-    top: 10px;
-    right: 10px;
-    left: 10px;
-    max-width: none;
-  }
-  
-  .notification-content {
-    padding: 12px 16px;
-  }
-  
-  .notification-message {
-    font-size: 13px;
-  }
+
+    .success-notification,
+    .error-notification {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+    }
+
+    .notification-content {
+        padding: 12px 16px;
+    }
+
+    .notification-message {
+        font-size: 13px;
+    }
 }
 
 /* 通常モード（normal-mode）では空席以外をグレーで統一表示 */
@@ -1099,10 +1107,10 @@ body.normal-mode .seat.to-be-checked-in,
 body.normal-mode .seat.checked-in,
 body.normal-mode .seat.unavailable,
 body.normal-mode .seat.walkin {
-  background: #c9cdd1 !important;
-  color: #fff !important;
-  box-shadow: none !important;
-  border-color: transparent !important;
+    background: #c9cdd1 !important;
+    color: #fff !important;
+    box-shadow: none !important;
+    border-color: transparent !important;
 }
 
 body.normal-mode .seat.reserved .seat-name,
@@ -1110,9 +1118,168 @@ body.normal-mode .seat.to-be-checked-in .seat-name,
 body.normal-mode .seat.checked-in .seat-name,
 body.normal-mode .seat.unavailable .seat-name,
 body.normal-mode .seat.walkin .seat-name {
-  color: #fff !important;
-  text-shadow: none !important;
+    color: #fff !important;
+    text-shadow: none !important;
 }
 
-body.normal-mode .seat.available { background: #28a745; }
-body.normal-mode .seat.available:hover { background: #218838; }
+body.normal-mode .seat.available {
+    background: #28a745;
+}
+
+body.normal-mode .seat.available:hover {
+    background: #218838;
+}
+
+
+/* Support for Side Drawer Edit UI */
+.seat-edit-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.seat-edit-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.seat-edit-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 400px;
+    max-width: 90%;
+    height: 100%;
+    background-color: #fff;
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.2);
+    z-index: 2001;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+}
+
+.seat-edit-drawer.show {
+    transform: translateX(0);
+}
+
+.drawer-header {
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8f9fa;
+}
+
+.drawer-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: #333;
+}
+
+.btn-close-drawer {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+    padding: 0 10px;
+}
+
+.drawer-content {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.drawer-footer {
+    padding: 20px;
+    border-top: 1px solid #eee;
+    background: #fff;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* Status Chips */
+.status-chip-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.status-chip {
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 1px solid #ddd;
+    background: #fff;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.status-chip:hover {
+    background-color: #f0f0f0;
+}
+
+.status-chip.selected {
+    border-color: transparent;
+    color: #fff;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Status Colors matching system logic */
+.status-chip[data-value="空"].selected {
+    background-color: #28a745;
+}
+
+.status-chip[data-value="予約済"].selected {
+    background-color: #dc3545;
+}
+
+.status-chip[data-value="確保"].selected {
+    background-color: #fd7e14;
+}
+
+.status-chip[data-value="使用不可"].selected {
+    background-color: #6c757d;
+}
+
+.status-chip[data-value="チェックイン済"].selected {
+    background-color: #007bff;
+}
+
+.status-chip[data-value="当日券"].selected {
+    background-color: #6f42c1;
+}
+
+/* Form adjustments */
+.seat-edit-form .form-group {
+    margin-bottom: 20px;
+}
+
+.seat-edit-form label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: #555;
+}
+
+.seat-edit-form input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
