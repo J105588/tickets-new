@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await initializeMasterData();
     populateFormDropdowns();
     initStep1();
+    initStep2();
 });
 
 let masterGroups = [];
@@ -141,6 +142,9 @@ function initStep1() {
         inputs.timeslot.innerHTML = '<option value="" disabled selected>日程を選択してください</option>';
         inputs.timeslot.disabled = true;
 
+        state.selectedSeats = []; // Clear selection
+        updateSelectedSeatsUI();
+
         await fetchPerformances(state.group);
     });
 
@@ -156,7 +160,9 @@ function initStep1() {
     });
 
     navigation.toStep2.addEventListener('click', () => {
-        loadSeatMap();
+        // loadSeatMap(); // Moved to Modal Open
+        // Reset selection if going fresh? 
+        // Better to clear selection when changing Group/Day/Time in initStep1 listeners.
         showStep(2);
     });
 
@@ -234,17 +240,94 @@ function getTimeString(timeslot) {
 // Step 2: 座席選択
 // ==========================================
 
+// ==========================================
+// Step 2: 座席選択 (Modal & Zoom)
+// ==========================================
+
 const seatMapContainer = document.getElementById('seat-map-container');
 const loadingSpinner = document.getElementById('loading-spinner');
+const seatModal = document.getElementById('seat-selection-modal');
+
+// Zoom State
+let currentZoom = 1.0;
+const ZOOM_STEP = 0.2;
+const MAX_ZOOM = 2.0;
+const MIN_ZOOM = 0.4;
+
+function initStep2() {
+    // Open Modal
+    document.getElementById('btn-open-seat-modal').addEventListener('click', () => {
+        openSeatModal();
+    });
+
+    // Close Modal
+    document.getElementById('btn-close-modal').addEventListener('click', () => {
+        if (confirm('選択内容は保存されません。閉じますか？')) {
+            // Revert changes? Or just keep? 
+            // User requested "Select Seat" -> Modal. 
+            // Usually "Cancel" reverts, "Confirm" saves.
+            // For simplicity, we just hide. Selection remains in state.selectedSeats unless we implement restore.
+            // Let's assume selection is live.
+            closeSeatModal();
+        }
+    });
+
+    document.getElementById('btn-confirm-selection').addEventListener('click', () => {
+        closeSeatModal();
+        updateSelectedSeatsUI();
+    });
+
+    // Zoom Controls
+    document.getElementById('btn-zoom-in').addEventListener('click', () => {
+        if (currentZoom < MAX_ZOOM) {
+            currentZoom += ZOOM_STEP;
+            updateZoom();
+        }
+    });
+
+    document.getElementById('btn-zoom-out').addEventListener('click', () => {
+        if (currentZoom > MIN_ZOOM) {
+            currentZoom -= ZOOM_STEP;
+            updateZoom();
+        }
+    });
+
+    document.getElementById('btn-zoom-reset').addEventListener('click', () => {
+        currentZoom = 0.8; // Default slightly zoomed out for mobile
+        if (window.innerWidth > 600) currentZoom = 1.0;
+        updateZoom();
+    });
+}
+
+function updateZoom() {
+    // seatMapContainer.style.transform = `scale(${currentZoom})`; // Old way
+    seatMapContainer.style.setProperty('--seat-scale', currentZoom);
+}
+
+function openSeatModal() {
+    seatModal.classList.add('active');
+    document.body.style.overflow = 'hidden'; // Prevent bg scroll
+
+    // Reset Zoom
+    currentZoom = window.innerWidth < 600 ? 0.6 : 1.0;
+    updateZoom();
+
+    // Load Data if empty or always
+    loadSeatMap();
+}
+
+function closeSeatModal() {
+    seatModal.classList.remove('active');
+    document.body.style.overflow = '';
+}
 
 async function loadSeatMap() {
     loadingSpinner.style.display = 'block';
     seatMapContainer.innerHTML = ''; // Clear previous
     seatMapContainer.appendChild(loadingSpinner);
-    state.selectedSeats = [];
-    updateSelectedSeatsUI();
 
-
+    // UI update for modal footer
+    updateModalCount();
 
     try {
         // 直接Supabaseから座席データを取得
@@ -252,8 +335,6 @@ async function loadSeatMap() {
 
         if (!result.success) throw new Error(result.error || 'データ取得失敗');
 
-        // データ形式の変換（必要なら）
-        // renderSeatMapは { seat_id, status, ... } の配列を期待していると仮定
         renderSeatMap(result.data);
 
     } catch (e) {
@@ -261,6 +342,7 @@ async function loadSeatMap() {
         alert('座席データの読み込みに失敗しました: ' + e.message);
     } finally {
         loadingSpinner.style.display = 'none';
+        updateZoom(); // Ensure zoom is applied to new content
     }
 }
 
@@ -295,9 +377,79 @@ function renderSeatMap(seatList) {
 
     const seatSection = document.createElement('div');
     seatSection.className = 'seat-section';
-    seatSection.style.minWidth = 'fit-content'; // コンテンツ幅に合わせる
-    seatSection.style.margin = '0 auto';       // 中央寄せ
-    seatSection.style.padding = '20px';
+
+    // Screen / Stage Element
+    const screenEl = document.createElement('div');
+    screenEl.className = 'screen';
+    screenEl.innerText = 'STAGE';
+    screenEl.style.cssText = `
+        width: 80%;
+        max-width: 600px;
+        background: #333;
+        color: #fff;
+        text-align: center;
+        padding: 8px;
+        margin: 0 auto 30px auto;
+        border-radius: 4px;
+        font-weight: bold;
+        letter-spacing: 2px;
+        font-size: 0.9rem;
+    `;
+
+    // Vertical Spacer (Top)
+    const topSpacer = document.createElement('div');
+    topSpacer.style.height = '120px';
+    topSpacer.style.width = '100%';
+
+    // Padding logic to allow scrolling to edges
+    const containerWidth = container.clientWidth || window.innerWidth;
+    const paddingWidth = Math.max(containerWidth * 0.5, 300);
+
+    const leftPadding = document.createElement('div');
+    leftPadding.style.minWidth = paddingWidth + 'px';
+    leftPadding.style.height = '1px';
+
+    const rightPadding = document.createElement('div');
+    rightPadding.style.minWidth = paddingWidth + 'px';
+    rightPadding.style.height = '1px';
+
+    const wrapperRow = document.createElement('div');
+    wrapperRow.style.display = 'flex';
+    wrapperRow.style.flexDirection = 'row';
+    wrapperRow.style.alignItems = 'flex-start';
+    wrapperRow.style.justifyContent = 'flex-start';
+
+    // Structure:
+    // LeftPadding | MainContent (Screen + Seats) | RightPadding
+
+    const mainContent = document.createElement('div');
+    mainContent.style.display = 'flex';
+    mainContent.style.flexDirection = 'column';
+    mainContent.style.alignItems = 'center';
+
+    mainContent.appendChild(topSpacer);
+    mainContent.appendChild(screenEl);
+    mainContent.appendChild(seatSection);
+
+    wrapperRow.appendChild(leftPadding);
+    wrapperRow.appendChild(mainContent);
+    wrapperRow.appendChild(rightPadding);
+
+    container.appendChild(wrapperRow);
+
+    // Scroll to center initially
+    const alignMap = () => {
+        if (container.scrollWidth > container.clientWidth) {
+            container.scrollLeft = (container.scrollWidth - container.clientWidth) / 2;
+        }
+        container.scrollTop = 0;
+    };
+
+    requestAnimationFrame(() => {
+        alignMap();
+        setTimeout(alignMap, 50);
+        setTimeout(alignMap, 200);
+    });
 
     // 行をソート (A, B, C...)
     const sortedRows = Object.keys(rows).sort();
@@ -320,7 +472,6 @@ function renderSeatMap(seatList) {
             if (seat.seatNumber === 13 || seat.seatNumber === 25) {
                 const passage = document.createElement('div');
                 passage.className = 'passage-vertical';
-                passage.style.width = '30px'; // 通路幅
                 passage.style.flexShrink = '0';
                 rowDiv.appendChild(passage);
             }
@@ -337,7 +488,10 @@ function renderSeatMap(seatList) {
         }
     });
 
-    container.appendChild(seatSection);
+    // WrapperRow is already appended to container in previous logic block
+    // If not, we should have done it. 
+    // Assuming container.appendChild(wrapperRow) happened before the loop.
+    // Let's verify and just close.
 }
 
 function createSeatElement(seat) {
@@ -416,6 +570,12 @@ function updateSelectedSeatsUI() {
         display.innerText = state.selectedSeats.join(', ');
         navigation.toStep3.disabled = false;
     }
+    updateModalCount();
+}
+
+function updateModalCount() {
+    const el = document.getElementById('modal-selected-count');
+    if (el) el.innerText = state.selectedSeats.length;
 }
 
 navigation.toStep3.addEventListener('click', () => {

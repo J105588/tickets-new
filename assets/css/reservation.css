@@ -156,8 +156,7 @@ p {
 
 /* Seat Map Container */
 .seat-map-container {
-    max-height: 60vh;
-    min-height: 300px;
+    /* max-height/min-height handled by modal specific rules or default */
     overflow: auto;
     border: 1px solid #e5e7eb;
     margin-bottom: 1.5rem;
@@ -167,29 +166,43 @@ p {
     box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
     -webkit-overflow-scrolling: touch;
     padding: 20px;
-    /* Remove center alignment to allow scrolling */
     display: block;
+    /* Use block to allow scrolling to left edge */
+    /* Remove automatic flex centering which hides overflow */
+
+    /* Zoom Variables */
+    --seat-scale: 1.0;
+    --seat-size: calc(44px * var(--seat-scale));
+    --seat-margin: calc(4px * var(--seat-scale));
+    --font-size: calc(12px * var(--seat-scale));
 }
 
 /* 
    Seat Styling 
 */
+.seat-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
 .seat-row {
     white-space: nowrap;
     margin-bottom: 10px;
+    display: flex;
+    justify-content: center;
 }
 
 .seat {
     display: inline-flex;
     justify-content: center;
     align-items: center;
-    width: 44px;
-    height: 44px;
-    margin: 4px;
-    font-size: 12px;
+    width: var(--seat-size);
+    height: var(--seat-size);
+    margin: var(--seat-margin);
+    font-size: var(--font-size);
     font-weight: 600;
-    border-radius: 8px;
-    /* Slightly softer */
+    border-radius: calc(8px * var(--seat-scale));
     cursor: pointer;
     user-select: none;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -447,5 +460,202 @@ p {
     .header-with-action .btn {
         width: auto;
         align-self: flex-start;
+    }
+}
+
+/* ============================
+   Seat Selection Modal 
+   ============================ */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.2s;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal-container {
+    background: white;
+    width: 95%;
+    max-width: 1000px;
+    height: 90vh;
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+    animation: scaleUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f9fafb;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: var(--text-main);
+}
+
+.btn-icon {
+    background: transparent;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 8px;
+    border-radius: 50%;
+    transition: background 0.2s;
+}
+
+.btn-icon:hover {
+    background: #e5e7eb;
+    color: var(--danger-color);
+}
+
+.modal-body {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    /* Contains the scrollable wrapper */
+    background: #f3f4f6;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Modal specific Seat Map adjustments */
+.modal-body .seat-legend {
+    background: white;
+    border-bottom: 1px solid #e5e7eb;
+    margin: 0;
+    border-radius: 0;
+    z-index: 10;
+    position: relative;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+#seat-map-wrapper {
+    flex: 1;
+    overflow: hidden;
+    /* Wrapper shouldn't scroll, the inner container should */
+    position: relative;
+    padding: 0;
+    /* Removed flex centering that causes clipping */
+}
+
+/* Reset original container styles for modal usage */
+.seat-map-container {
+    height: 100%;
+    /* Fill the wrapper */
+    width: 100%;
+    overflow: auto;
+    /* Handle scrolling here */
+    border: none;
+    box-shadow: none;
+    background: transparent;
+    padding: 20px;
+    /* Keep padding for inner spacing */
+    margin: 0;
+    /* transform removed, handled by variables */
+    display: block;
+}
+
+/* Zoom Controls */
+.zoom-controls {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 20;
+}
+
+.btn-zoom {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: white;
+    border: 1px solid #d1d5db;
+    color: var(--text-main);
+    font-size: 1rem;
+    cursor: pointer;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.btn-zoom:hover {
+    background: #f9fafb;
+    transform: translateY(-1px);
+    color: var(--primary-color);
+}
+
+/* Footer */
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e5e7eb;
+    background: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-selection-info {
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes scaleUp {
+    from {
+        transform: scale(0.95);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Mobile adjust for modal */
+@media (max-width: 600px) {
+    .modal-container {
+        width: 100%;
+        height: 100%;
+        border-radius: 0;
+    }
+
+    .zoom-controls {
+        bottom: 80px;
+        /* Above footer */
     }
 }
