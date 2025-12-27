@@ -1,7 +1,7 @@
 // config.js
 // 複数のAPI URL（使用数上限回避のため分散）
 const GAS_API_URLS = [
-  "https://script.google.com/macros/s/AKfycbxRKQYwzqMsAapLD5jP38OylwCvduXZLgo6mMQf_BMlsKxLxpT2s4GuLGvp-Dy-q8ksGA/exec"
+  "https://script.google.com/macros/s/AKfycbx_arqU03kX0LdV-pMFqrMdCNVFlTi53Rgpc_Vt9zAbBCDCie0E6OHErJv2Hw2JVGT9ig/exec"
   //jxjin2010@gmail.com
   //"https://script.google.com/macros/s/AKfycbwfHVEZwLbCs_sJ3ckyr6vdCLfI3twmiENbBuSOidMUOLAnGwfmGoyvGLcXihJMu8T1/exec",
   //jxjin.ig.school@gmail.com
@@ -20,12 +20,12 @@ const GAS_API_URLS = [
 
 // Supabase設定（直接接続用）
 const SUPABASE_CONFIG = {
-  url: "https://dsmnqpcizmudfkfitrfg.supabase.co", // 例: https://xyz.supabase.co
+  url: "https://dsmnqpcizmudfkfitrfg.supabase.co",
   anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzbW5xcGNpem11ZGZrZml0cmZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5ODc3OTksImV4cCI6MjA3NDU2Mzc5OX0.0BBCmyV_IrZBch-hvPgW5HuG6-zgE7T1Hdvl7a-aB7g" // 公開可能な匿名キー
 };
 
 // ログ記録用スプレッドシートID
-const LOG_SPREADSHEET_ID = '1ZGQ5BTNW_pTDuMvbZgla2B_soisdvtCM2UrnVi_L-5c'; // 実際のスプレッドシートIDに置き換えてください
+const LOG_SPREADSHEET_ID = '1ZGQ5BTNW_pTDuMvbZgla2B_soisdvtCM2UrnVi_L-5c';
 
 // ログ記録用シート名
 const LOG_SHEET_NAME = 'OPERATION_LOGS'; // ログを記録するシート名

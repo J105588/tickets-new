@@ -4,7 +4,7 @@ import audit from './audit-logger.js';
 const sidebarHTML = `
   <div id="sidebar-panel" class="sidebar">
     <a href="javascript:void(0)" class="closebtn" onclick="toggleSidebar()">&times;</a>
-    <a href="index.html">組選択</a>
+    <a href="../index.html">組選択</a>
     <div class="mode-section">
       <div class="mode-title">動作モード</div>
       <div class="current-mode">現在: <span id="current-mode-display">通常モード</span></div>
@@ -58,7 +58,7 @@ function loadSidebar() {
         container.innerHTML = sidebarHTML;
         updateModeDisplay(); // 必要な関数を呼び出す
         updateNavigationAccess(); // ナビゲーションアクセス制限を更新
-        try { applyModeFromUrl(); } catch (_) {}
+        try { applyModeFromUrl(); } catch (_) { }
     }
 }
 
@@ -104,7 +104,7 @@ async function applyModeChange() {
             if (primary) primary.disabled = disabled;
             if (secondary) secondary.disabled = disabled;
             if (passwordInput) passwordInput.disabled = disabled;
-        } catch (_) {}
+        } catch (_) { }
     };
 
     disableModal(true);
@@ -116,7 +116,7 @@ async function applyModeChange() {
             localStorage.setItem('currentMode', selectedMode);
             updateModeDisplay();
             alert('通常モードに切り替えました');
-            try { audit.log('ui', 'mode_change', { from: beforeMode, to: selectedMode, success: true }); } catch (_) {}
+            try { audit.log('ui', 'mode_change', { from: beforeMode, to: selectedMode, success: true }); } catch (_) { }
             closeModeModal();
             // ページをリロードして権限を即時反映
             location.reload();
@@ -135,7 +135,7 @@ async function applyModeChange() {
         if (result.success) {
             localStorage.setItem('currentMode', selectedMode); // 現在のモードを保存
             updateModeDisplay(); // 表示を更新
-            try { audit.log('ui', 'mode_change', { from: beforeMode, to: selectedMode, success: true }); } catch (_) {}
+            try { audit.log('ui', 'mode_change', { from: beforeMode, to: selectedMode, success: true }); } catch (_) { }
             // superadmin トークン設定（閲覧ゲート用）
             if (selectedMode === 'superadmin') {
                 try {
@@ -144,26 +144,26 @@ async function applyModeChange() {
                         t = (Math.random().toString(36).slice(2) + Date.now().toString(36)).slice(0, 24);
                         localStorage.setItem('superadminToken', t);
                     }
-                } catch (_) {}
+                } catch (_) { }
             }
-            
+
             let modeText = '通常モード';
             if (selectedMode === 'admin') modeText = '管理者モード';
             if (selectedMode === 'walkin') modeText = '当日券モード';
             if (selectedMode === 'superadmin') modeText = '最高管理者モード';
-            
+
             alert(`${modeText}に切り替えました`);
             closeModeModal(); // モーダルを閉じる
-            
+
             // ページをリロードして権限を即時反映
             location.reload();
         } else {
             alert('パスワードが間違っています。');
-            try { audit.log('ui', 'mode_change', { from: beforeMode, to: selectedMode, success: false, error: 'auth_failed' }); } catch (_) {}
+            try { audit.log('ui', 'mode_change', { from: beforeMode, to: selectedMode, success: false, error: 'auth_failed' }); } catch (_) { }
         }
     } catch (error) {
         alert(`エラーが発生しました: ${error.message}`);
-        try { audit.log('ui', 'mode_change', { from: localStorage.getItem('currentMode') || 'normal', to: selectedMode, success: false, error: error.message }); } catch (_) {}
+        try { audit.log('ui', 'mode_change', { from: localStorage.getItem('currentMode') || 'normal', to: selectedMode, success: false, error: error.message }); } catch (_) { }
     } finally {
         disableModal(false);
         _isApplyingModeChange = false;
@@ -176,7 +176,7 @@ function updateModeDisplay() {
     if (modeDisplay) {
         const currentMode = localStorage.getItem('currentMode') || 'normal';
         let displayText = '通常モード';
-        
+
         if (currentMode === 'admin') {
             displayText = '管理者モード';
         } else if (currentMode === 'walkin') {
@@ -184,7 +184,7 @@ function updateModeDisplay() {
         } else if (currentMode === 'superadmin') {
             displayText = '最高管理者モード';
         }
-        
+
         modeDisplay.textContent = displayText;
     }
 }
@@ -223,7 +223,7 @@ function updateNavigationAccess() {
     const currentMode = localStorage.getItem('currentMode') || 'normal';
     const walkinNavLink = document.getElementById('walkin-nav-link');
     const logsNavLink = document.getElementById('logs-nav-link');
-    
+
     if (walkinNavLink) {
         if (currentMode === 'walkin' || currentMode === 'superadmin') {
             walkinNavLink.style.display = 'block';
@@ -248,25 +248,25 @@ function updateNavigationAccess() {
 // 当日券ページへのナビゲーション
 function navigateToWalkin() {
     const currentMode = localStorage.getItem('currentMode') || 'normal';
-    
+
     if (currentMode !== 'walkin' && currentMode !== 'superadmin') {
         alert('当日券発行には当日券モードまたは最高管理者モードでのログインが必要です。\nサイドバーからモードを変更してください。');
         return;
     }
-    
+
     // 現在のURLからパラメータを取得
     const urlParams = new URLSearchParams(window.location.search);
     const group = urlParams.get('group');
     const day = urlParams.get('day');
     const timeslot = urlParams.get('timeslot');
-    
+
     if (group && day && timeslot) {
         // 現在のページにパラメータがある場合は、それを使用
         window.location.href = `walkin.html?group=${group}&day=${day}&timeslot=${timeslot}`;
     } else {
         // パラメータがない場合は、組選択ページに戻る
         alert('公演情報が見つかりません。組選択ページから再度お試しください。');
-        window.location.href = 'index.html';
+        window.location.href = '../index.html';
     }
 }
 
@@ -300,7 +300,7 @@ async function applyModeFromUrl() {
     const urlMode = params.get('mode');
     const urlPassword = params.get('password');
     if (!urlMode) return;
-    const allowed = ['normal','admin','walkin','superadmin'];
+    const allowed = ['normal', 'admin', 'walkin', 'superadmin'];
     if (!allowed.includes(urlMode)) return;
     const current = localStorage.getItem('currentMode') || 'normal';
     if (urlMode === current) return;
@@ -324,11 +324,11 @@ async function applyModeFromUrl() {
                         t = (Math.random().toString(36).slice(2) + Date.now().toString(36)).slice(0, 24);
                         localStorage.setItem('superadminToken', t);
                     }
-                } catch (_) {}
+                } catch (_) { }
             }
             updateModeDisplay();
             updateNavigationAccess();
-            try { audit.log('ui','mode_change', { from: current, to: urlMode, via: 'url', success: true }); } catch (_) {}
+            try { audit.log('ui', 'mode_change', { from: current, to: urlMode, via: 'url', success: true }); } catch (_) { }
             // URLから秘匿情報を除去（demoパラメータは保持）
             const { origin, pathname, search, hash } = location;
             const params = new URLSearchParams(search);
@@ -339,28 +339,28 @@ async function applyModeFromUrl() {
             history.replaceState(null, '', newUrl);
             location.reload();
         } else {
-            try { audit.log('ui','mode_change', { from: current, to: urlMode, via: 'url', success: false, error: 'auth_failed' }); } catch (_) {}
+            try { audit.log('ui', 'mode_change', { from: current, to: urlMode, via: 'url', success: false, error: 'auth_failed' }); } catch (_) { }
         }
     } catch (e) {
-        try { audit.log('ui','mode_change', { from: current, to: urlMode, via: 'url', success: false, error: e.message }); } catch (_) {}
+        try { audit.log('ui', 'mode_change', { from: current, to: urlMode, via: 'url', success: false, error: e.message }); } catch (_) { }
     }
 }
 
 // GAS疎通テスト関数をグローバルに登録
-window.testGASConnection = async function() {
-  try {
-    const result = await GasAPI.testGASConnection();
-    if (result.success) {
-      alert('GAS疎通テスト成功！\n\nAPI応答: ' + JSON.stringify(result.data, null, 2));
-      try { audit.log('ui', 'gas_test', { success: true }); } catch (_) {}
-    } else {
-      alert('GAS疎通テスト失敗！\n\nエラー: ' + result.error);
-      try { audit.log('ui', 'gas_test', { success: false, error: result.error || 'unknown' }); } catch (_) {}
+window.testGASConnection = async function () {
+    try {
+        const result = await GasAPI.testGASConnection();
+        if (result.success) {
+            alert('GAS疎通テスト成功！\n\nAPI応答: ' + JSON.stringify(result.data, null, 2));
+            try { audit.log('ui', 'gas_test', { success: true }); } catch (_) { }
+        } else {
+            alert('GAS疎通テスト失敗！\n\nエラー: ' + result.error);
+            try { audit.log('ui', 'gas_test', { success: false, error: result.error || 'unknown' }); } catch (_) { }
+        }
+    } catch (error) {
+        alert('GAS疎通テストでエラーが発生しました！\n\nエラー: ' + error.message);
+        try { audit.log('ui', 'gas_test', { success: false, error: error.message }); } catch (_) { }
     }
-  } catch (error) {
-    alert('GAS疎通テストでエラーが発生しました！\n\nエラー: ' + error.message);
-    try { audit.log('ui', 'gas_test', { success: false, error: error.message }); } catch (_) {}
-  }
 };
 
 export { loadSidebar, toggleSidebar, showModeChangeModal, closeModeModal, applyModeChange };

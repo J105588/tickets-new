@@ -147,6 +147,12 @@ function doPost(e) {
  * WebアプリケーションにGETリクエストが来たときに実行されるメイン関数。
  * POSTリクエストと同様に関数呼び出しを処理する。
  */
+// POSTリクエストもdoGetで処理（CORS対応のため、レスポンス形式はdoGet内で統一）
+function doPost(e) {
+  return doGet(e);
+}
+
+
 function doGet(e) {
   let response;
   let callback = e.parameter.callback;
@@ -262,6 +268,56 @@ function doGet(e) {
                }
             }
             break;
+
+          case 'get_all_schedules':
+             response = getAllSchedules();
+             break;
+
+          case 'save_schedule':
+             var schedData = {
+                 id: e.parameter.id,
+                 group_name: e.parameter.group_name,
+                 day: e.parameter.day,
+                 timeslot: e.parameter.timeslot
+             };
+             // Remove undefined
+             if(!schedData.id) delete schedData.id;
+             response = saveSchedule(schedData);
+             break;
+
+          case 'delete_schedule':
+             // スケジュール（公演）を削除
+             var delId = e.parameter.id ? parseInt(e.parameter.id) : null;
+             if (!delId) {
+                response = { success: false, error: 'ID is required' };
+             } else {
+                response = deleteSchedule(delId);
+             }
+             break;
+
+          case 'admin_manage_master':
+             // マスタデータ管理 (Save/Delete)
+             var table = e.parameter.table;
+             var op = e.parameter.op; // 'save' or 'delete'
+             var dataStr = e.parameter.data;
+             var data = dataStr ? JSON.parse(dataStr) : {};
+
+             if (op === 'delete') {
+                 if (!data.id) { response = { success: false, error: 'ID required for delete' }; }
+                 else { response = deleteMaster(table, data.id); }
+             } else if (op === 'save') {
+                 if (table === 'groups') response = saveGroup(data);
+                 else if (table === 'event_dates') response = saveEventDate(data);
+                 else if (table === 'time_slots') response = saveTimeSlot(data);
+                 else response = { success: false, error: 'Unknown table' };
+             } else {
+                 response = { success: false, error: 'Unknown op' };
+             }
+             break;
+            
+          case 'migrate_timeslots':
+            response = migrateTimeslotsToNewFormat();
+            break;
            
          default:
            throw new Error("不明なアクション: " + action);
@@ -324,7 +380,9 @@ function doGet(e) {
           'isValidSeatId': isValidSeatId,
           'safeLogOperation': safeLogOperation,
           'login': login,
-          'validateSession': validateSession
+          'validateSession': validateSession,
+          'get_master_data': getMasterData,
+          'get_all_schedules': getAllSchedules
         };
 
         if (functionMap[funcName]) {

@@ -4,206 +4,588 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>予約管理画面 | 市川学園座席管理システム</title>
-    <link rel="stylesheet" href="../assets/css/styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <title>予約管理ダッシュボード | Ticket System</title>
+    <!-- Reset & Base CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="../assets/css/admin.css">
-    <link rel="stylesheet" href="../assets/css/seats.css">
     <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script>
-        // Auth Check
-        if (!sessionStorage.getItem('admin_session')) {
-            window.location.href = 'admin-login.html';
-        }
-    </script>
     <style>
-        /* Force Modal Styles (Inline to bypass cache) */
+        :root {
+            --primary: #4f46e5;
+            --primary-dark: #4338ca;
+            --secondary: #64748b;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text: #1e293b;
+            --border: #e2e8f0;
+            --danger: #ef4444;
+            --success: #10b981;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        /* Filter Bar */
+        .filter-bar {
+            background: var(--surface);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        select,
+        input {
+            padding: 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        button:hover {
+            background: var(--primary-dark);
+        }
+
+        button.btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        button.btn-outline:hover {
+            background: #f1f5f9;
+        }
+
+        button.btn-danger {
+            background: var(--danger);
+        }
+
+        /* Table */
+        .table-container {
+            flex: 1;
+            overflow: auto;
+            padding: 1rem 2rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--surface);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+
+        th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: var(--secondary);
+            position: sticky;
+            top: 0;
+        }
+
+        tr:hover {
+            background: #f8fafc;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .status-confirmed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        /* 予約済 */
+        .status-checked-in {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        /* 引換済 */
+        .status-cancelled {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* キャンセル */
+
+        /* Modal */
         .modal {
-            display: none !important;
+            display: none;
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             background: rgba(0, 0, 0, 0.5);
-            z-index: 9999;
             justify-content: center;
             align-items: center;
-            opacity: 0;
-            transition: opacity 0.3s ease;
+            z-index: 1000;
         }
 
         .modal.active {
-            display: flex !important;
-            opacity: 1 !important;
-            visibility: visible !important;
+            display: flex;
         }
 
         .modal-content {
-            background: white;
+            background: var(--surface);
             padding: 2rem;
-            border-radius: 16px;
-            width: 90%;
-            max-width: 600px;
-            max-height: 90vh;
-            overflow-y: auto;
-            position: relative;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-            transform: scale(0.95);
-            transition: transform 0.3s ease;
-        }
-
-        .modal.active .modal-content {
-            transform: scale(1);
+            border-radius: 8px;
+            width: 100%;
+            max-width: 500px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
         }
 
         .modal-header {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .modal-body .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .modal-body label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--secondary);
+        }
+
+        .modal-body input,
+        .modal-body textarea,
+        .modal-body select {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            border-top: 1px solid var(--border);
+            padding-top: 1rem;
+        }
+
+        /* Tabs */
+        .tab-content {
+            display: none;
+            width: 100%;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-weight: 600;
+            color: var(--secondary);
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        /* Section Cards */
+        .section-card {
+            background: var(--surface);
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            margin-bottom: 2rem;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .section-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1.5rem;
-            border-bottom: 1px solid #e5e7eb;
-            padding-bottom: 1rem;
+            background: #f8fafc;
         }
 
-        .close-btn {
-            font-size: 1.5rem;
-            cursor: pointer;
-            background: none;
-            border: none;
+        .section-title {
+            font-weight: 600;
+        }
+
+        /* Loader */
+        #loading {
+            display: none;
+            margin: 2rem auto;
+            text-align: center;
+            color: var(--secondary);
         }
     </style>
 </head>
 
-
 <body>
 
-    <nav class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <span>市川学園座席管理システム</span>
-            <button class="mobile-menu-btn" onclick="toggleSidebar()" style="display:none;font-size:1rem;">✕</button>
+    <header>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <button class="btn-outline" onclick="location.href='../index.html'"><i class="fas fa-home"></i>
+                Home</button>
+            <h1>予約管理 & 設定 (Admin)</h1>
         </div>
-        <ul class="nav-links">
-            <li><a href="#" class="active"><i class="fas fa-list"></i> 予約管理</a></li>
-            <li><a href="admin-settings.html"><i class="fas fa-cog"></i> 設定・マスタ</a></li>
-            <li><a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> ログアウト</a></li>
-        </ul>
-    </nav>
-
-    <main class="main-content">
-        <div class="page-header">
-            <div style="display:flex; align-items:center;">
-                <button class="mobile-menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
-                <h1 class="page-title">予約管理</h1>
-            </div>
-            <div style="margin-left: auto; display: flex; align-items: center; gap: 10px;">
-                <div style="display: flex; align-items: center; font-size: 0.9rem;">
-                    <input type="checkbox" id="auto-refresh-toggle" style="margin-right: 5px;">
-                    <label for="auto-refresh-toggle" style="cursor: pointer; user-select: none;">自動更新</label>
-                </div>
-                <button class="btn btn-primary" onclick="refreshData()"><i class="fas fa-sync"></i> 更新</button>
-            </div>
+        <div class="header-controls">
+            <button class="tab-btn active" onclick="switchTab('dashboard')">予約管理</button>
+            <button class="tab-btn" onclick="switchTab('settings')">マスタ設定</button>
+            <div style="width:20px;"></div>
+            <label id="refresh-label"><input type="checkbox" id="auto-refresh"> 自動更新</label>
+            <button onclick="logout()">ログアウト</button>
         </div>
+    </header>
 
+    <!-- TAB: DASHBOARD -->
+    <div id="tab-dashboard" class="tab-content active">
         <div class="filter-bar">
             <div class="filter-group">
-                <label for="filter-group">公演 (団体)</label>
-                <select id="filter-group" class="form-select">
-                    <option value="">すべて</option>
-                    <!-- JS populated -->
+                <label for="filter-group">団体:</label>
+                <select id="filter-group">
+                    <option value="">全て</option>
                 </select>
             </div>
             <div class="filter-group">
-                <label for="filter-date">日程</label>
-                <select id="filter-date" class="form-select">
-                    <option value="">すべて</option>
-                    <option value="1">1日目</option>
-                    <option value="2">2日目</option>
+                <label for="filter-day">日程:</label>
+                <select id="filter-day">
+                    <option value="">全て</option>
+                    <!-- Dynamically populated -->
                 </select>
             </div>
             <div class="filter-group">
-                <label for="filter-year">学年</label>
-                <select id="filter-year" class="form-select">
-                    <option value="">すべて</option>
-                    <option value="1">1年</option>
-                    <option value="2">2年</option>
-                    <option value="3">3年</option>
-                    <option value="4">4年</option>
-                    <option value="5">5年</option>
-                    <option value="6">6年</option>
+                <label for="filter-timeslot">時間帯:</label>
+                <select id="filter-timeslot">
+                    <option value="">全て</option>
                 </select>
             </div>
-            <button class="btn btn-primary" style="width: auto; padding: 0.5rem 1.5rem;"
-                onclick="applyFilters()">検索</button>
+            <div class="filter-group">
+                <input type="text" id="filter-search" placeholder="名前・予約IDで検索..." aria-label="名前・予約IDで検索">
+            </div>
+            <button onclick="applyFilters()">検索</button>
         </div>
 
+        <div id="loading"><i class="fas fa-spinner fa-spin"></i> 読み込み中...</div>
+
         <div class="table-container">
-            <table>
+            <table id="reservation-table">
                 <thead>
                     <tr>
                         <th>ID</th>
                         <th>名前</th>
-                        <th>所属</th>
-                        <th>公演/日時</th>
+                        <th>メール</th>
+                        <th>団体・時間</th>
                         <th>座席</th>
                         <th>ステータス</th>
                         <th>操作</th>
                     </tr>
                 </thead>
-                <tbody id="reservation-table-body">
-                    <tr>
-                        <td colspan="7" style="text-align:center;">データを取得中...</td>
-                    </tr>
-                </tbody>
+                <tbody></tbody>
             </table>
         </div>
-    </main>
+    </div>
 
-    <!-- Detail Modal -->
-    <div id="detail-modal" class="modal">
+    <!-- TAB: SETTINGS -->
+    <div id="tab-settings" class="tab-content">
+        <div class="container" style="padding: 2rem; max-width: 1200px; margin: 0 auto;">
+
+            <div style="display:flex; justify-content:flex-end; margin-bottom:1rem;">
+                <button class="btn-primary" onclick="loadMasterData()"><i class="fas fa-sync"></i> データ再読み込み</button>
+            </div>
+
+            <!-- SCHEDULES -->
+            <div class="section-card">
+                <div class="section-header">
+                    <span class="section-title">スケジュール管理 (Schedule)</span>
+                    <button class="btn-primary btn-sm" onclick="openScheduleModal()">+ 追加</button>
+                </div>
+                <div class="table-responsive">
+                    <table id="table-schedules">
+                        <thead>
+                            <tr>
+                                <th>団体名</th>
+                                <th>日程</th>
+                                <th>時間帯</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- GROUPS -->
+            <div class="section-card">
+                <div class="section-header">
+                    <span class="section-title">団体マスタ (Groups)</span>
+                    <button class="btn-primary btn-sm" onclick="openGroupModal()">+ 追加</button>
+                </div>
+                <div class="table-responsive">
+                    <table id="table-groups">
+                        <thead>
+                            <tr>
+                                <th style="width:50px">Order</th>
+                                <th>Name</th>
+                                <th>Status</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- DATES -->
+            <div class="section-card">
+                <div class="section-header">
+                    <span class="section-title">日程マスタ (Event Dates)</span>
+                    <button class="btn-primary btn-sm" onclick="openDateModal()">+ 追加</button>
+                </div>
+                <div class="table-responsive">
+                    <table id="table-dates">
+                        <thead>
+                            <tr>
+                                <th style="width:50px">Order</th>
+                                <th>Label (e.g. Day 1)</th>
+                                <th>Status</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals (Admin Dashboard) -->
+    <!-- existing modal-edit is preserved below -->
+    <!-- Schedule Modal -->
+    <div id="modal-schedule" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 style="margin:0;">予約詳細</h2>
-                <button id="btn-close-detail-modal" class="close-btn">&times;</button>
+                <span>スケジュール編集</span>
+                <button class="btn-outline" style="border:none;" onclick="closeModal('modal-schedule')">&times;</button>
             </div>
-            <div id="modal-body">
-                <!-- Content -->
+            <div class="modal-body">
+                <input type="hidden" id="schedule-id">
+                <div class="form-group">
+                    <label for="schedule-group-id">団体</label>
+                    <select id="schedule-group-id"></select>
+                </div>
+                <div class="form-group">
+                    <label for="schedule-day">公演日 (Day)</label>
+                    <select id="schedule-day"></select>
+                </div>
+                <div class="form-group">
+                    <label for="schedule-timeslot">時間帯 (Time)</label>
+                    <input type="text" id="schedule-timeslot" placeholder="例: 10:00">
+                </div>
+                <div class="form-group">
+                    <label for="schedule-max-seats">座席数上限 (Optional)</label>
+                    <input type="number" id="schedule-max-seats" min="1">
+                </div>
             </div>
-            <div class="action-bar">
-                <button id="btn-edit-toggle" class="btn btn-secondary">編集</button>
-                <button id="btn-save-changes" class="btn btn-primary" style="display:none;">保存</button>
-                <button id="btn-resend-email" class="btn btn-secondary">メール再送</button>
-                <button id="btn-seat-change" class="btn btn-secondary">座席変更</button>
-                <button id="btn-cancel-res" class="btn btn-danger">予約取消</button>
+            <div class="modal-footer">
+                <button class="btn-danger" id="btn-delete-schedule">削除</button>
+                <button class="btn-outline" onclick="closeModal('modal-schedule')">閉じる</button>
+                <button onclick="saveSchedule()">保存</button>
             </div>
         </div>
     </div>
 
-    <!-- Seat Selection Modal -->
-    <div id="seat-modal" class="modal">
-        <div class="modal-content" style="max-width: 900px; width: 95%;">
+    <!-- Group Modal -->
+    <div id="modal-group" class="modal">
+        <div class="modal-content">
             <div class="modal-header">
-                <h2 style="margin:0;">座席変更</h2>
-                <button id="btn-close-seat-modal" class="close-btn">&times;</button>
+                <span>団体編集</span>
+                <button class="btn-outline" style="border:none;" onclick="closeModal('modal-group')">&times;</button>
             </div>
-            <p>新しい座席を選択してください。</p>
-
-            <div id="seat-map-container"
-                style="overflow:auto; max-height:60vh; border:1px solid #ddd; padding:10px; background:white;">
-                <!-- Seat Map Rendered Here -->
-                <div style="text-align:center; padding:20px;">読み込み中...</div>
+            <div class="modal-body">
+                <input type="hidden" id="group-id">
+                <div class="form-group">
+                    <label for="group-name">団体名</label>
+                    <input type="text" id="group-name">
+                </div>
+                <div class="form-group">
+                    <label for="group-order">表示順</label>
+                    <input type="number" id="group-order" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="group-status">ステータス</label>
+                    <select id="group-status">
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
             </div>
-
-            <div style="margin-top:1rem; display:flex; justify-content:space-between; align-items:center;">
-                <div>選択中: <strong id="new-seats-display">-</strong></div>
-                <button id="btn-submit-seat-change" class="btn btn-primary">変更を確定</button>
+            <div class="modal-footer">
+                <button class="btn-danger" id="btn-delete-group">削除</button>
+                <button class="btn-outline" onclick="closeModal('modal-group')">閉じる</button>
+                <button onclick="saveGroup()">保存</button>
             </div>
         </div>
     </div>
 
-    <!-- Scripts -->
+    <!-- Date Modal -->
+    <div id="modal-date" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>日程編集</span>
+                <button class="btn-outline" style="border:none;" onclick="closeModal('modal-date')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="date-id">
+                <div class="form-group">
+                    <label for="date-label">日程ラベル (例: Day 1, 9/20)</label>
+                    <input type="text" id="date-label">
+                </div>
+                <div class="form-group">
+                    <label for="date-order">表示順</label>
+                    <input type="number" id="date-order" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="date-status">ステータス</label>
+                    <select id="date-status">
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-danger" id="btn-delete-date">削除</button>
+                <button class="btn-outline" onclick="closeModal('modal-date')">閉じる</button>
+                <button onclick="saveDate()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timeslot Modal Removed as Unused -->
+
+    <!-- EDIT MODAL (EXISTING) -->
+    <div id="modal-edit" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>予約詳細・編集</span>
+                <button onclick="closeModal('modal-edit')" class="btn-outline"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-id">
+                <div class="form-group">
+                    <label for="edit-name">予約者名</label>
+                    <input type="text" id="edit-name">
+                </div>
+                <div class="form-group">
+                    <label for="edit-email">メール</label>
+                    <input type="email" id="edit-email">
+                </div>
+                <div class="form-group">
+                    <label for="edit-grade">学年・クラス</label>
+                    <input type="text" id="edit-grade">
+                </div>
+                <div class="form-group">
+                    <label for="edit-club">所属</label>
+                    <input type="text" id="edit-club">
+                </div>
+                <div class="form-group">
+                    <label for="edit-notes">メモ</label>
+                    <textarea id="edit-notes" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="edit-status">ステータス</label>
+                    <select id="edit-status">
+                        <option value="confirmed">予約済 (Confirmed)</option>
+                        <option value="checked_in">引換済 (Checked In)</option>
+                        <option value="cancelled">キャンセル (Cancelled)</option>
+                    </select>
+                </div>
+
+                <div style="border-top:1px solid #eee; margin:1rem 0; padding-top:1rem;">
+                    <button class="btn-primary" style="width:100%" id="btn-save-changes"
+                        onclick="saveChanges()">変更を保存</button>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; margin-top:1rem;">
+                    <button class="btn-outline" id="btn-resend-email" onclick="resendEmail()">メール再送</button>
+                    <button class="btn-danger" id="btn-cancel-reservation">キャンセル処理</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="../assets/js/config.js"></script>
+    <script type="module" src="../assets/js/supabase-client.js"></script>
     <script type="module" src="../assets/js/admin.js"></script>
 </body>
 

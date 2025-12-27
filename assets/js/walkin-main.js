@@ -10,7 +10,7 @@ import { loadSidebar, toggleSidebar, showModeChangeModal, applyModeChange, close
 const urlParams = new URLSearchParams(window.location.search);
 const requestedGroup = urlParams.get('group') || '';
 // ガード：DEMOモード時に見本演劇以外は拒否
-DemoMode.guardGroupAccessOrRedirect(requestedGroup, `walkin.html?group=${encodeURIComponent(DemoMode.demoGroup)}&day=${urlParams.get('day')||'1'}&timeslot=${urlParams.get('timeslot')||'A'}`);
+DemoMode.guardGroupAccessOrRedirect(requestedGroup, `walkin.html?group=${encodeURIComponent(DemoMode.demoGroup)}&day=${urlParams.get('day') || '1'}&timeslot=${urlParams.get('timeslot') || 'A'}`);
 // DEMOモード時は見本演劇を強制
 let GROUP = DemoMode.enforceGroup(requestedGroup);
 const DAY = urlParams.get('day');
@@ -36,7 +36,7 @@ function updateReservationUI(seats) {
   try {
     reservedSeatEl.innerHTML = '';
     reservedSeatEl.style.display = 'none';
-  } catch (_) {}
+  } catch (_) { }
   reservationResult.classList.add('show');
 }
 
@@ -59,17 +59,17 @@ window.onload = async () => {
     if (window.systemLockReady && typeof window.systemLockReady.then === 'function') {
       await window.systemLockReady;
     }
-  } catch (_) {}
-  
+  } catch (_) { }
+
   // サイドバー読み込み
   loadSidebar();
   // DEMO/ゲネプロモードアクティブ時に通知
-  try { 
+  try {
     if (DemoMode.isActive() || DemoMode.isGeneproActive()) {
       DemoMode.showNotificationIfNeeded();
     }
-  } catch (_) {}
-  
+  } catch (_) { }
+
   // 表示情報設定
   const groupName = isNaN(parseInt(GROUP)) ? GROUP : GROUP + '組';
   const displayTimeslot = DemoMode.isGeneproActive() ? DISPLAY_TIMESLOT : TIMESLOT;
@@ -78,15 +78,15 @@ window.onload = async () => {
     座席が確保されました<br>
     ${groupName} ${DAY}日目 ${displayTimeslot}
   `;
-  
+
   // 当日券モードのアクセス制限をチェック
   const hasAccess = checkWalkinModeAccess();
-  
+
   // アクセス権限がない場合は、以降の処理をスキップ
   if (!hasAccess) {
     return;
   }
-  
+
   // モード変更時のイベントリスナーを追加
   window.addEventListener('storage', (e) => {
     if (e.key === 'currentMode') {
@@ -138,27 +138,27 @@ window.onload = async () => {
 // 当日券モードのアクセス制限をチェックする関数
 function checkWalkinModeAccess() {
   const currentMode = localStorage.getItem('currentMode');
-  
+
   if (currentMode !== 'walkin' && currentMode !== 'superadmin') {
     // アクセス権限がない場合は、座席選択ページにリダイレクト
     const urlParams = new URLSearchParams(window.location.search);
     const group = urlParams.get('group');
     const day = urlParams.get('day');
     const timeslot = urlParams.get('timeslot');
-    
+
     if (group && day && timeslot) {
       // 座席選択ページにリダイレクト
       window.location.href = `seats.html?group=${group}&day=${day}&timeslot=${timeslot}`;
     } else {
       // パラメータがない場合は組選択ページにリダイレクト
-      window.location.href = 'index.html';
+      window.location.href = '../index.html';
     }
-    
+
     // リダイレクト前にメッセージを表示
     alert('当日券発行には当日券モードまたは最高管理者モードでのログインが必要です。\n座席選択ページに移動します。');
     return false;
   }
-  
+
   // アクセス権限がある場合は、ボタンを有効化
   const walkinBtn = document.getElementById('walkin-open-modal-btn');
   if (walkinBtn) {
@@ -166,7 +166,7 @@ function checkWalkinModeAccess() {
     walkinBtn.textContent = '当日券を発行する';
     walkinBtn.classList.remove('disabled-mode');
   }
-  
+
   return true;
 }
 
@@ -209,17 +209,17 @@ async function issueWalkinConsecutive() {
 
   try {
     const response = await GasAPI.assignWalkInConsecutiveSeats(ACTUAL_GROUP, DAY, ACTUAL_TIMESLOT, num);
-    
+
     // オフライン委譲レスポンスの処理
     if (response.error === 'offline_delegate' && response.functionName && response.params) {
       if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
-        const operationId = window.OfflineSyncV2.addOperation({ 
-          type: response.functionName, 
-          args: response.params 
+        const operationId = window.OfflineSyncV2.addOperation({
+          type: response.functionName,
+          args: response.params
         });
         showLoader(false);
         showSuccessNotification('オフラインで当日券を受け付けました。オンライン復帰時に自動同期されます。');
-        
+
         // オフライン時の仮の座席表示（実際の座席は同期後に確定）
         reservedSeatEl.textContent = `オフライン処理中 (ID: ${operationId})`;
         reservationResult.classList.add('show');
@@ -237,7 +237,7 @@ async function issueWalkinConsecutive() {
       updateReservationUI(seats);
       return;
     }
-    
+
     if (response.success) {
       showLoader(false);
       const seats = extractSeatsFromResponse(response);
@@ -288,13 +288,13 @@ async function issueWalkinAnywhere() {
     // オフライン委譲レスポンスの処理
     if (response.error === 'offline_delegate' && response.functionName && response.params) {
       if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
-        const operationId = window.OfflineSyncV2.addOperation({ 
-          type: response.functionName, 
-          args: response.params 
+        const operationId = window.OfflineSyncV2.addOperation({
+          type: response.functionName,
+          args: response.params
         });
         showLoader(false);
         showSuccessNotification('オフラインで当日券を受け付けました。オンライン復帰時に自動同期されます。');
-        
+
         // オフライン時の仮の座席表示（実際の座席は同期後に確定）
         reservedSeatEl.textContent = `オフライン処理中 (ID: ${operationId})`;
         reservationResult.classList.add('show');
@@ -395,7 +395,7 @@ function showSuccessNotification(message) {
   notification.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
   notification.style.zIndex = '10001';
   notification.style.maxWidth = '400px';
-  
+
   notification.innerHTML = `
     <div class="notification-content" style="display: flex; align-items: center; gap: 10px;">
       <span class="notification-icon" style="font-size: 1.2em; color: #28a745;">✓</span>
@@ -403,10 +403,10 @@ function showSuccessNotification(message) {
       <button class="notification-close" onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; color: #155724; font-size: 1.2em; cursor: pointer; padding: 0; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: background-color 0.2s;">×</button>
     </div>
   `;
-  
+
   // 通知を表示
   document.body.appendChild(notification);
-  
+
   // 4秒後に自動で消す
   setTimeout(() => {
     if (notification.parentElement) {
@@ -430,7 +430,7 @@ function showErrorNotification(message) {
   notification.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
   notification.style.zIndex = '10001';
   notification.style.maxWidth = '400px';
-  
+
   notification.innerHTML = `
     <div class="notification-content" style="display: flex; align-items: center; gap: 10px;">
       <span class="notification-icon" style="font-size: 1.2em; color: #dc3545;">✗</span>
@@ -438,10 +438,10 @@ function showErrorNotification(message) {
       <button class="notification-close" onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; color: #721c24; font-size: 1.2em; cursor: pointer; padding: 0; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: background-color 0.2s;">×</button>
     </div>
   `;
-  
+
   // 通知を表示
   document.body.appendChild(notification);
-  
+
   // 5秒後に自動で消す
   setTimeout(() => {
     if (notification.parentElement) {

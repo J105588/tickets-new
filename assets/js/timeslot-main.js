@@ -1,201 +1,206 @@
 // timeslot-main.js
-
-// 必要なモジュールをインポートします
-import GasAPI from './api.js';
+import GasAPI from './optimized-api.js'; // Updated import
 import { DemoMode } from './config.js';
 import { loadSidebar, toggleSidebar } from './sidebar.js';
-// timeslot-schedules.jsから getAllTimeslotsForGroup を提供すると仮定します。
-// もしファイル名や関数名が違う場合は、ここを修正してください。
-import { getAllTimeslotsForGroup } from './timeslot-schedules.js';
-import * as timeSlotConfig from './timeslot-schedules.js';
 
-// --- 初期化処理 (ページの読み込み時に自動で実行されます) ---
+// --- Global State ---
+let availableSchedules = [];
+let masterDates = [];
+let masterTimeslots = [];
 
 (async () => {
-  try {
-    if (window.systemLockReady && typeof window.systemLockReady.then === 'function') {
-      await window.systemLockReady;
-    }
-  } catch (_) {}
-  // DEMOモードでクエリが無い最初のURLなら demo=1 を付与
-  try { DemoMode.ensureDemoParamInLocation(); } catch (_) {}
-  // DEMO/ゲネプロモードアクティブ時に通知
-  try { 
-    if (DemoMode.isActive() || DemoMode.isGeneproActive()) {
-      DemoMode.showNotificationIfNeeded();
-    }
-  } catch (_) {}
+  // Demo / Init checks
+  try { if (window.systemLockReady && typeof window.systemLockReady.then === 'function') await window.systemLockReady; } catch (_) { }
+  try { DemoMode.ensureDemoParamInLocation(); } catch (_) { }
+  try { if (DemoMode.isActive() || DemoMode.isGeneproActive()) DemoMode.showNotificationIfNeeded(); } catch (_) { }
 
   const urlParams = new URLSearchParams(window.location.search);
   const requestedGroup = urlParams.get('group') || '';
-  // ガード：DEMOモード時に見本演劇以外が指定された場合は拒否
+
+  // Demo Guard
   const ok = DemoMode.guardGroupAccessOrRedirect(requestedGroup, `timeslot.html?group=${encodeURIComponent(DemoMode.demoGroup)}`);
   if (!ok) return;
-  // DEMOモード時は見本演劇を強制
-  const group = DemoMode.enforceGroup(requestedGroup);
+  const groupName = DemoMode.enforceGroup(requestedGroup);
 
-  // 公演名をページのタイトル部分に表示
-  document.getElementById('group-name').textContent = group;
-
-  // サイドバーを読み込んでページに配置
+  document.getElementById('group-name').textContent = groupName;
   loadSidebar();
 
-  // 時間帯データを読み込んで表示
-  loadTimeslots(group);
+  // Load Data
+  await loadDynamicSchedule(groupName);
 
-  // オフラインインジケーター初期化（軽量処理で他機能に影響なし）
-  initializeOfflineIndicator();
-
-  // --- グローバル関数の登録 ---
-  // HTMLの onclick="..." から呼び出せるように、関数をwindowオブジェクトに登録します。
+  // Globals
   window.toggleSidebar = toggleSidebar;
   window.selectTimeslot = selectTimeslot;
 })();
 
-// --- 関数定義 ---
+import { fetchMasterDataFromSupabase, fetchPerformancesFromSupabase } from './supabase-client.js';
 
-/**
- * ユーザーが時間帯を選択したときに呼び出される関数
- * @param {number | string} day - 日 (例: 1)
- * @param {string} timeslot - 時間帯 (例: 'A')
- */
-function selectTimeslot(day, timeslot) {
-  // URLから管理者モードかどうかを判断
-  const urlParams = new URLSearchParams(window.location.search);
-  let group = urlParams.get('group');
-  group = DemoMode.enforceGroup(group || '');
-  const isAdmin = urlParams.get('admin') === 'true';
-  
-  // 現在のモードをLocalStorageから取得
-  const currentMode = localStorage.getItem('currentMode') || 'normal';
+// ... (existing imports)
 
-  // 権限ガード：通常モードでは時間帯を開けません
-  if (currentMode === 'normal') {
-    try { alert('権限がありません：通常モードでは時間帯を開けません。サイドバーのモード変更から管理者/当日券/最高管理者を選択してください。'); } catch (_) {}
-    return;
-  }
-  
-  let targetPage = 'seats.html';
-  let additionalParams = '';
+async function loadDynamicSchedule(groupName) {
+  const container = document.getElementById('timeslot-container');
+  container.innerHTML = '<div class="loading"><div class="spinner"></div><p>データ読み込み中...</p></div>';
 
-  // 管理者モードなら、移動先のURLにもadmin=trueパラメータを付与
-  if (isAdmin) {
-    additionalParams = '&admin=true';
-  }
+  let mData = null;
+  let sData = null;
 
-  // DEMOモード中は demo=1 を付与（初回起動後の遷移で保持）
-  if (DemoMode.isActive()) {
-    additionalParams += '&demo=1';
-  }
-
-  // walkinモードの場合はwalkin.htmlにリダイレクト
-  if (currentMode === 'walkin') {
-    targetPage = 'walkin.html';
-  }
-
-  const url = `${targetPage}?group=${encodeURIComponent(group)}&day=${day}&timeslot=${timeslot}${additionalParams}`;
-  window.location.href = url;
-}
-
-/**
- * 指定された組の時間帯データを取得し、ページに表示する関数
- * @param {string} group - 組名 (例: '1', '見本演劇')
- */
-async function loadTimeslots(group) {
-  const timeslotContainer = document.getElementById('timeslot-container');
-  timeslotContainer.innerHTML = '<div class="loading">時間帯データを読み込み中...</div>';
-
+  // 1. Try Direct Supabase Fetch
   try {
-    //const timeslots = await GasAPI.getAllTimeslotsForGroup(group); // ★削除: GAS APIの呼び出しを削除
-    const timeslots = timeSlotConfig.getAllTimeslotsForGroup(group); // ★追加: timeslot-schedules.jsから直接データを取得
+    const [mRes, pRes] = await Promise.all([
+      fetchMasterDataFromSupabase(),
+      fetchPerformancesFromSupabase(groupName)
+    ]);
 
-    if (!timeslots || timeslots.length === 0) {
-      timeslotContainer.innerHTML = '<p>時間帯データが見つかりませんでした。</p>';
+    if (mRes.success && pRes.success) {
+      console.log('Fetched schedule from Supabase directly');
+      mData = mRes.data;
+      sData = pRes.data; // This is filtered performances for the group
+    }
+  } catch (e) {
+    console.warn('Supabase direct fetch failed:', e);
+  }
+
+  // 2. Fallback to GAS API
+  if (!mData || !sData) {
+    console.log('Falling back to GAS API for schedule...');
+    try {
+      const [mRes, sRes] = await Promise.all([
+        GasAPI.getMasterData(),
+        GasAPI._callApi('get_all_schedules', [])
+      ]);
+
+      if (mRes.success && sRes.success) {
+        mData = mRes.data;
+        // Filter all schedules manually since GAS returns everything
+        sData = (sRes.data || []).filter(s => s.group_name === groupName);
+      } else {
+        console.error('GAS fetch failed', mRes.error, sRes.error);
+      }
+    } catch (e) {
+      console.error('GAS execution error:', e);
+    }
+  }
+
+  if (mData && sData) {
+    masterDates = mData.dates || [];
+    masterTimeslots = mData.timeslots || [];
+    availableSchedules = sData;
+
+    if (availableSchedules.length === 0) {
+      container.innerHTML = '<div class="no-data">現在、予約可能な公演はありません。</div>';
       return;
     }
 
-    timeslotContainer.innerHTML = ''; // Clear loading message
-
-    // 時間割データを「日」ごとにグループ分けする
-    const timeslotsByDay = timeslots.reduce((acc, ts) => {
-      (acc[ts.day] = acc[ts.day] || []).push(ts);
-      return acc;
-    }, {});
-
-    // 表示するHTMLを生成
-    let html = '';
-    for (const day in timeslotsByDay) {
-      html += `
-        <div class="timeslot-section">
-          <h2>${getDayName(day)}</h2>
-          <div class="grid-container">
-      `;
-      
-      for (const ts of timeslotsByDay[day]) {
-        // javascript:void(0) は、リンクをクリックしてもページ遷移しないためのおまじない
-        html += `<a class="grid-item timeslot-item" href="javascript:void(0)" onclick="selectTimeslot('${ts.day}', '${ts.timeslot}')">${ts.displayName}</a>`;
-      }
-      
-      html += `
-          </div>
-        </div>
-      `;
-    }
-    
-    timeslotContainer.innerHTML = html;
-
-  } catch (error) {
-    console.error('時間帯データの読み込みエラー:', error);
-    timeslotContainer.innerHTML = '<p>時間帯データの読み込みに失敗しました。</p>';
+    renderDynamicUI(container);
+  } else {
+    container.innerHTML = '<div class="error">スケジュール情報の取得に失敗しました。</div>';
   }
 }
 
-// オフライン状態インジケーターの制御（軽量版）
-function initializeOfflineIndicator() {
-  const indicator = document.getElementById('offline-indicator');
-  const progressBar = document.getElementById('sync-progress-bar');
-  if (!indicator || !progressBar) return;
+function renderDynamicUI(container) {
+  container.innerHTML = '';
 
-  const updateOfflineStatus = () => {
-    const isOnline = navigator.onLine;
-    if (isOnline) {
-      indicator.style.display = 'none';
-      indicator.textContent = 'オンライン';
-      indicator.classList.add('online');
-    } else {
-      indicator.style.display = 'block';
-      indicator.textContent = 'オフライン';
-      indicator.classList.remove('online');
+  // Group by Day
+  // Day in schedule is an ID (e.g. 1, 2) or label? 
+  // In our admin logic, we saved it as integer ID.
+  // MasterData.dates has id, date_label.
+
+  // Map schedules to Days
+  const schedulesByDay = {};
+  availableSchedules.forEach(s => {
+    if (!schedulesByDay[s.day]) schedulesByDay[s.day] = [];
+    schedulesByDay[s.day].push(s);
+  });
+
+  // Render Logic: Iterate Master Dates (to keep order) and check if we have schedules
+  const sortedDates = masterDates
+    .filter(d => d.is_active !== false)
+    .sort((a, b) => a.display_order - b.display_order);
+
+  if (sortedDates.length === 0) {
+    // Fallback if no master dates but we have schedules (legacy support)
+    // Just Use keys from schedulesByDay
+    Object.keys(schedulesByDay).forEach(dayId => {
+      renderDaySection(container, dayId, `Day ${dayId}`, schedulesByDay[dayId]);
+    });
+    return;
+  }
+
+  sortedDates.forEach(date => {
+    const daySchedules = schedulesByDay[date.id];
+    if (daySchedules && daySchedules.length > 0) {
+      renderDaySection(container, date.id, date.date_label, daySchedules);
     }
-  };
+  });
+}
 
-  updateOfflineStatus();
-  window.addEventListener('online', updateOfflineStatus);
-  window.addEventListener('offline', updateOfflineStatus);
+function renderDaySection(container, dayId, dayLabel, schedules) {
+  const section = document.createElement('section');
+  section.className = 'timeslot-section';
 
-  if (window.OfflineSyncV2) {
-    const checkSyncStatus = () => {
-      const status = window.OfflineSyncV2.getStatus();
-      if (status.syncInProgress) {
-        progressBar.style.display = 'block';
-        const progress = progressBar.querySelector('.progress');
-        if (progress) progress.style.width = '100%';
-      } else {
-        progressBar.style.display = 'none';
-        const progress = progressBar.querySelector('.progress');
-        if (progress) progress.style.width = '0%';
-      }
+  const h2 = document.createElement('h2');
+  h2.className = 'day-title';
+  h2.textContent = dayLabel;
+  section.appendChild(h2);
+
+  const grid = document.createElement('div');
+  grid.className = 'grid-container';
+
+  // Sort schedules by timeslot code/time
+  // We need to resolve timeslot code order.
+  // Map timeslot code to MasterTimeslot object for sorting
+  const enriched = schedules.map(s => {
+    const ts = masterTimeslots.find(t => t.slot_code === s.timeslot);
+    return {
+      ...s,
+      start_time: ts ? ts.start_time : s.timeslot // Fallback
     };
-    setInterval(checkSyncStatus, 1000);
-    checkSyncStatus();
-  }
+  });
+
+  enriched.sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
+
+  enriched.forEach(s => {
+    const btn = document.createElement('a');
+    btn.className = 'grid-item';
+    btn.href = 'javascript:void(0)';
+
+    // Find timeslot details for label
+    const ts = masterTimeslots.find(t => t.slot_code === s.timeslot);
+    // Display only Time Range
+    const timeLabel = ts ? `${ts.start_time} - ${ts.end_time}` : s.timeslot;
+
+    btn.textContent = timeLabel;
+    btn.onclick = (e) => {
+      e.preventDefault();
+      selectTimeslot(dayId, s.timeslot);
+    };
+    grid.appendChild(btn);
+  });
+
+  section.appendChild(grid);
+  container.appendChild(section);
 }
 
-/**
- * 数字の日付を「N日目」という文字列に変換するヘルパー関数
- * @param {number | string} day 
- * @returns {string}
- */
-function getDayName(day) {
-  return day == 1 ? '1日目' : '2日目';
+function selectTimeslot(day, timeslot) {
+  const urlParams = new URLSearchParams(window.location.search);
+  let group = urlParams.get('group');
+  if (DemoMode.isActive()) group = DemoMode.enforceGroup(group);
+
+  // Check mode
+  const isAdmin = urlParams.get('admin') === 'true';
+  const currentMode = localStorage.getItem('currentMode') || 'normal';
+
+  if (currentMode === 'normal') {
+    alert('権限がありません：通常モードでは時間帯を開けません。');
+    return;
+  }
+
+  let targetPage = 'seats.html';
+  let params = `?group=${encodeURIComponent(group)}&day=${day}&timeslot=${encodeURIComponent(timeslot)}`;
+  if (isAdmin) params += '&admin=true';
+  if (DemoMode.isActive()) params += '&demo=1';
+
+  if (currentMode === 'walkin') targetPage = 'walkin.html';
+
+  window.location.href = targetPage + params;
 }

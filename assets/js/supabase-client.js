@@ -4,7 +4,7 @@
  * 依存: config.js, @supabase/supabase-js (CDN)
  */
 
-import { SUPABASE_CONFIG } from './config.js';
+import { SUPABASE_CONFIG, GAS_API_URLS } from './config.js';
 
 // シングルトンインスタンス
 let supabaseInstance = null;
@@ -69,6 +69,21 @@ export async function fetchMasterGroups() {
     const { data, error } = await sb.from('groups').select('*').eq('is_active', true).order('display_order');
     if (error) {
         console.error(error);
+        return [];
+    }
+    return data;
+}
+
+export async function fetchMasterTimeslots(groupName = null) {
+    const sb = getSupabase();
+    if (!sb) return [];
+
+    // If groupName provided, might need filtering, but currently master timeslots are global or we filter by convention.
+    // For now returning all timeslots.
+    const { data, error } = await sb.from('time_slots').select('*').order('display_order');
+
+    if (error) {
+        console.error('fetchMasterTimeslots error:', error);
         return [];
     }
     return data;
@@ -213,91 +228,173 @@ export async function getBookingForScan(id) {
     }
 }
 
-// --- Admin RPC Wrappers (Added for Refactor) ---
+// --- Admin API Wrappers (GAS JSONP) ---
 
 export async function adminGetReservations(filters) {
-    const sb = getSupabase();
-    if (!sb) return { success: false, error: 'System Error' };
-
     try {
-        const { data, error } = await sb.rpc('admin_get_reservations', {
-            p_group: filters.group || null,
-            p_day: filters.day ? parseInt(filters.day) : null,
-            p_timeslot: filters.timeslot || null,
-            p_status: filters.status || null,
-            p_search: filters.search || null,
-            p_year: filters.year ? parseInt(filters.year) : null
-        });
-        if (error) throw error;
-        return data;
+        const params = {
+            action: 'admin_get_reservations',
+            ...filters
+        };
+        // Ensure numbers are strings or handle in GAS
+        if (filters.day) params.day = filters.day;
+        if (filters.year) params.year = filters.year;
+
+        const result = await jsonpRequest(GAS_API_URLS[0], params);
+        return result;
     } catch (e) {
-        console.error('RPC Error:', e);
         return { success: false, error: e.message };
     }
 }
 
 export async function adminUpdateBooking(bookingData) {
-    const sb = getSupabase();
-    if (!sb) return { success: false, error: 'System Error' };
-
     try {
-        const { data, error } = await sb.rpc('admin_update_booking', {
-            p_id: parseInt(bookingData.id),
-            p_name: bookingData.name,
-            p_email: bookingData.email,
-            p_grade_class: bookingData.grade_class,
-            p_club_affiliation: bookingData.club_affiliation,
-            p_notes: bookingData.notes,
-            p_status: bookingData.status // Added
-        });
-        if (error) throw error;
-        return data;
+        const params = {
+            action: 'admin_update_reservation',
+            id: bookingData.id,
+            name: bookingData.name,
+            email: bookingData.email,
+            grade_class: bookingData.grade_class,
+            club_affiliation: bookingData.club_affiliation,
+            notes: bookingData.notes
+        };
+        const result = await jsonpRequest(GAS_API_URLS[0], params);
+        return result;
     } catch (e) {
         return { success: false, error: e.message };
     }
 }
 
 export async function adminCancelBooking(id) {
-    const sb = getSupabase();
-    if (!sb) return { success: false, error: 'System Error' };
-
     try {
-        const { data, error } = await sb.rpc('admin_cancel_booking', { p_id: parseInt(id) });
-        if (error) throw error;
-        return data;
+        const params = {
+            action: 'admin_cancel_reservation',
+            id: id
+        };
+        const result = await jsonpRequest(GAS_API_URLS[0], params);
+        return result;
     } catch (e) {
         return { success: false, error: e.message };
     }
 }
 
-export async function adminSwapSeats(bookingId, newSeatIds) {
-    const sb = getSupabase();
-    if (!sb) return { success: false, error: 'System Error' };
-
+export async function adminResendEmail(id) {
     try {
-        const { data, error } = await sb.rpc('admin_swap_seats', {
-            p_booking_id: parseInt(bookingId),
-            p_new_seat_ids_str: newSeatIds.join(',')
-        });
-        if (error) throw error;
-        return data;
+        const params = {
+            action: 'admin_resend_email',
+            id: id
+        };
+        const result = await jsonpRequest(GAS_API_URLS[0], params);
+        return result;
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
+export async function adminSwapSeats(id, newSeats) {
+    try {
+        const params = {
+            action: 'admin_change_seats',
+            id: id,
+            seats: Array.isArray(newSeats) ? newSeats.join(',') : newSeats
+        };
+        const result = await jsonpRequest(GAS_API_URLS[0], params);
+        return result;
     } catch (e) {
         return { success: false, error: e.message };
     }
 }
 
 export async function adminManageMaster(table, op, recordData) {
-    const sb = getSupabase();
-    if (!sb) return { success: false, error: 'System Error' };
-
     try {
-        const { data, error } = await sb.rpc('admin_manage_master', {
-            p_table: table,
-            p_op: op,
-            p_data: recordData
-        });
-        if (error) throw error;
-        return data;
+        const params = {
+            action: 'admin_manage_master',
+            table: table,
+            op: op, // 'save' or 'delete'
+            data: JSON.stringify(recordData) // Pass complete object as string
+        };
+
+        const result = await jsonpRequest(GAS_API_URLS[0], params);
+        return result;
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
+
+// GAS API Wrapper for Schedule Management (Since complex join updates/saves are better handled in GAS for now)
+// Note: config.js exports GAS_API_URLS. supabase-client.js imports SUPABASE_CONFIG. Let's add GAS_API_URLS to imports.
+
+/**
+ * JSONP Helper
+ * @param {string} url Base URL
+ * @param {Object} params Query parameters
+ * @returns {Promise<Object>}
+ */
+function jsonpRequest(url, params = {}) {
+    return new Promise((resolve, reject) => {
+        const callbackName = 'gasCallback_' + Math.round(100000 * Math.random());
+        const script = document.createElement('script');
+
+        window[callbackName] = (data) => {
+            delete window[callbackName];
+            document.body.removeChild(script);
+            resolve(data);
+        };
+
+        script.onerror = (err) => {
+            delete window[callbackName];
+            document.body.removeChild(script);
+            reject(new Error('JSONP request failed'));
+        };
+
+        // Construct query string
+        const queryParams = new URLSearchParams(params);
+        queryParams.set('callback', callbackName);
+        queryParams.set('t', Date.now()); // Cache buster
+
+        script.src = `${url}?${queryParams.toString()}`;
+        document.body.appendChild(script);
+    });
+}
+
+export async function adminFetchSchedules() {
+    try {
+        const result = await jsonpRequest(GAS_API_URLS[0], { action: 'get_all_schedules' });
+        return result;
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
+export async function adminManageSchedule(scheduleData) {
+    try {
+        // save_schedule uses data in query params for JSONP
+        const params = {
+            action: 'save_schedule',
+            group_name: scheduleData.group_name,
+            day: scheduleData.day,
+            timeslot: scheduleData.timeslot
+        };
+        if (scheduleData.id) {
+            params.id = scheduleData.id;
+        }
+
+        const result = await jsonpRequest(GAS_API_URLS[0], params);
+        return result;
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
+export async function adminDeleteSchedule(id) {
+    try {
+        const params = {
+            action: 'delete_schedule',
+            id: id
+        };
+        const result = await jsonpRequest(GAS_API_URLS[0], params);
+        return result;
     } catch (e) {
         return { success: false, error: e.message };
     }

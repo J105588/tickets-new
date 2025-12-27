@@ -1,275 +1,290 @@
 /**
  * admin-settings.js
- * マスタデータ設定画面の制御 (Full CRUD via RPC)
+ * (GAS API版 - 完全リライト)
  */
 
-import { fetchMasterDataFromSupabase, adminManageMaster } from './supabase-client.js';
+import {
+    fetchMasterDataFromSupabase,
+    adminFetchSchedules,
+    adminManageSchedule,
+    adminDeleteSchedule,
+    adminManageMaster
+} from './supabase-client.js';
 
 let masterData = {
     groups: [],
     dates: [],
-    timeslots: []
+    timeslots: [],
+    schedules: []
 };
 
-document.addEventListener('DOMContentLoaded', () => {
-    fetchMasterData();
-
-    // Form Submit
-    document.getElementById('settings-form').addEventListener('submit', handleSave);
-
-    // Mobile Support
-    window.toggleSidebar = function () {
-        document.getElementById('sidebar').classList.toggle('active');
-    };
-
-    window.logout = function () {
-        sessionStorage.removeItem('admin_session');
-        window.location.href = 'admin-login.html';
-    };
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadAllData();
 });
 
-async function fetchMasterData() {
-    const loader = document.getElementById('loading');
-    loader.style.display = 'block';
+async function loadAllData() {
+    // Show loading
+    // const loader = document.getElementById('loading'); // if exists
 
-    const result = await fetchMasterDataFromSupabase();
+    const [mRes, sRes] = await Promise.all([
+        fetchMasterDataFromSupabase(),
+        adminFetchSchedules()
+    ]);
 
-    if (result.success) {
-        masterData = result.data;
-        renderAll();
-        loader.style.display = 'none';
-        document.getElementById('main-content').style.display = 'block';
+    if (mRes.success) {
+        masterData.groups = mRes.data.groups || [];
+        masterData.dates = mRes.data.dates || [];
+        masterData.timeslots = mRes.data.timeslots || [];
     } else {
-        alert('データ読み込み失敗: ' + result.error);
-        loader.innerText = 'エラーが発生しました';
+        alert('マスタデータ取得エラー: ' + mRes.error);
     }
-}
 
-function renderAll() {
+    if (sRes.success) {
+        masterData.schedules = sRes.data || [];
+    } else {
+        console.error('Schedules fetch error:', sRes.error);
+    }
+
     renderGroups();
-    renderDates();
-    renderSlots();
+    renderTimeslots();
+    renderSchedules();
 }
 
 // --- Renderers ---
 
 function renderGroups() {
-    const tbody = document.querySelector('#groups-table tbody');
+    const tbody = document.querySelector('#table-groups tbody');
+    if (!tbody) return;
     tbody.innerHTML = '';
 
-    // Sort by display_order
+    // Sort
     const sorted = [...masterData.groups].sort((a, b) => a.display_order - b.display_order);
 
     sorted.forEach(g => {
         const tr = document.createElement('tr');
+        const statusBadge = g.is_active
+            ? '<span class="badge badge-active">有効</span>'
+            : '<span class="badge badge-inactive">無効</span>';
+
         tr.innerHTML = `
-            <td>${g.id}</td>
             <td>${g.display_order}</td>
             <td>${g.name}</td>
-            <td><span class="${g.is_active ? 'status-active' : 'status-inactive'}">${g.is_active ? '有効' : '無効'}</span></td>
-            <td><button class="btn btn-sm btn-outline-secondary" onclick="openGroupModal(${g.id})">編集</button></td>
+            <td>${statusBadge}</td>
+            <td>
+                <button class="btn-sm" onclick="openGroupModal(${g.id})">編集</button>
+                <button class="btn-danger btn-sm" onclick="deleteItem('groups', ${g.id})">削除</button>
+            </td>
         `;
         tbody.appendChild(tr);
     });
 }
 
-function renderDates() {
-    const tbody = document.querySelector('#dates-table tbody');
+function renderTimeslots() {
+    const tbody = document.querySelector('#table-timeslots tbody');
+    if (!tbody) return;
     tbody.innerHTML = '';
-    const sorted = [...masterData.dates].sort((a, b) => a.display_order - b.display_order);
 
-    sorted.forEach(d => {
+    const sorted = [...masterData.timeslots].sort((a, b) => {
+        // Sort by start_time string
+        return (a.start_time || '').localeCompare(b.start_time || '');
+    });
+
+    sorted.forEach(t => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${d.id}</td>
-            <td>${d.display_order}</td>
-            <td>${d.date_label}</td>
-            <td><span class="${d.is_active ? 'status-active' : 'status-inactive'}">${d.is_active ? '有効' : '無効'}</span></td>
-            <td><button class="btn btn-sm btn-outline-secondary" onclick="openDateModal(${d.id})">編集</button></td>
+            <td><strong>${t.slot_code}</strong></td>
+            <td>${t.start_time || ''} - ${t.end_time || ''}</td>
+            <td>
+                <button class="btn-sm" onclick="openTimeslotModal(${t.id})">編集</button>
+                <button class="btn-danger btn-sm" onclick="deleteItem('time_slots', ${t.id})">削除</button>
+            </td>
         `;
         tbody.appendChild(tr);
     });
 }
 
-function renderSlots() {
-    const tbody = document.querySelector('#slots-table tbody');
+function renderSchedules() {
+    const tbody = document.querySelector('#table-schedules tbody');
+    if (!tbody) return;
     tbody.innerHTML = '';
-    const sorted = [...masterData.timeslots].sort((a, b) => a.display_order - b.display_order);
+
+    const sorted = [...masterData.schedules].sort((a, b) => {
+        if (a.day !== b.day) return a.day - b.day;
+        return a.group_name.localeCompare(b.group_name);
+    });
 
     sorted.forEach(s => {
         const tr = document.createElement('tr');
+        // s.timeslot is code string
         tr.innerHTML = `
-            <td>${s.id}</td>
-            <td>${s.display_order}</td>
-            <td>${s.slot_code}</td>
-            <td>${s.start_time} - ${s.end_time}</td>
-            <td><button class="btn btn-sm btn-outline-secondary" onclick="openSlotModal(${s.id})">編集</button></td>
+            <td>${s.group_name}</td>
+            <td>${s.day}日目</td>
+            <td><span class="badge">${s.timeslot}</span></td>
+            <td>
+                <button class="btn-sm" onclick="openScheduleModal('${s.id}')">編集</button>
+                <button class="btn-danger btn-sm" onclick="deleteScheduleEntry(${s.id})">削除</button>
+            </td>
         `;
         tbody.appendChild(tr);
     });
 }
 
+// --- Modals & Actions ---
 
-// --- Modals ---
+window.closeModal = (id) => {
+    document.getElementById(id).classList.remove('active');
+};
 
-function openModal(title, type, id = null) {
-    document.getElementById('modal-title').innerText = title;
-    document.getElementById('edit-id').value = id || '';
-    document.getElementById('edit-type').value = type;
-    document.getElementById('settings-modal').classList.add('active');
+// Groups
+window.openGroupModal = (id = null) => {
+    const modal = document.getElementById('modal-group');
+    const item = id ? masterData.groups.find(g => g.id === id) : {};
 
-    const delBtn = document.getElementById('btn-delete');
-    if (id) {
-        delBtn.style.display = 'inline-block';
-    } else {
-        delBtn.style.display = 'none';
+    document.getElementById('group-id').value = id || '';
+    document.getElementById('group-name').value = item.name || '';
+    document.getElementById('group-order').value = item.display_order || 10;
+
+    // Check if active selector exists or if we should use boolean
+    const activeSel = document.getElementById('group-active');
+    if (activeSel) {
+        activeSel.value = item.is_active === false ? 'false' : 'true';
     }
-}
 
-window.closeSettingsModal = function () {
-    document.getElementById('settings-modal').classList.remove('active');
+    modal.classList.add('active');
 };
 
-window.openGroupModal = function (id = null) {
-    openModal(id ? '団体編集' : '団体追加', 'groups', id);
-    const item = id ? masterData.groups.find(g => g.id == id) : {};
-
-    const html = `
-        <div class="form-group">
-            <label>順序 (Display Order)</label>
-            <input type="number" id="inp-order" class="form-control" value="${item.display_order || 10}">
-        </div>
-        <div class="form-group">
-            <label>団体名 (Name)</label>
-            <input type="text" id="inp-name" class="form-control" value="${item.name || ''}" required>
-        </div>
-        <div class="form-group">
-            <label>状態 (Status)</label>
-            <select id="inp-active" class="form-select">
-                <option value="true" ${item.is_active !== false ? 'selected' : ''}>有効</option>
-                <option value="false" ${item.is_active === false ? 'selected' : ''}>無効</option>
-            </select>
-        </div>
-    `;
-    document.getElementById('modal-fields').innerHTML = html;
-};
-
-window.openDateModal = function (id = null) {
-    openModal(id ? '日程編集' : '日程追加', 'event_dates', id);
-    const item = id ? masterData.dates.find(d => d.id == id) : {};
-
-    const html = `
-        <div class="form-group">
-            <label>順序</label>
-            <input type="number" id="inp-order" class="form-control" value="${item.display_order || 1}">
-        </div>
-        <div class="form-group">
-            <label>日程ラベル (例: "1日目 (9/23)")</label>
-            <input type="text" id="inp-label" class="form-control" value="${item.date_label || ''}" required>
-        </div>
-        <div class="form-group">
-            <label>状態</label>
-            <select id="inp-active" class="form-select">
-                <option value="true" ${item.is_active !== false ? 'selected' : ''}>有効</option>
-                <option value="false" ${item.is_active === false ? 'selected' : ''}>無効</option>
-            </select>
-        </div>
-    `;
-    document.getElementById('modal-fields').innerHTML = html;
-};
-
-window.openSlotModal = function (id = null) {
-    openModal(id ? '時間帯編集' : '時間帯追加', 'time_slots', id);
-    const item = id ? masterData.timeslots.find(s => s.id == id) : {};
-
-    const html = `
-        <div class="form-group">
-            <label>順序</label>
-            <input type="number" id="inp-order" class="form-control" value="${item.display_order || 1}">
-        </div>
-        <div class="form-group">
-            <label>コード (A, B, C...)</label>
-            <input type="text" id="inp-code" class="form-control" value="${item.slot_code || ''}" required>
-        </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-            <div class="form-group">
-                <label>開始時間 (HH:MM)</label>
-                <input type="text" id="inp-start" class="form-control" value="${item.start_time || '09:00'}">
-            </div>
-            <div class="form-group">
-                <label>終了時間 (HH:MM)</label>
-                <input type="text" id="inp-end" class="form-control" value="${item.end_time || '10:00'}">
-            </div>
-        </div>
-    `;
-    document.getElementById('modal-fields').innerHTML = html;
-};
-
-
-// --- Handlers ---
-
-async function handleSave(e) {
-    e.preventDefault();
-    const id = document.getElementById('edit-id').value;
-    const type = document.getElementById('edit-type').value; // 'groups', 'event_dates', 'time_slots'
-    const op = id ? 'update' : 'add';
-
+window.saveGroup = async () => {
+    const id = document.getElementById('group-id').value;
     const data = {
-        id: id,
-        display_order: document.getElementById('inp-order')?.value,
+        name: document.getElementById('group-name').value,
+        display_order: parseInt(document.getElementById('group-order').value),
+        is_active: document.getElementById('group-active').value === 'true'
     };
+    if (id) data.id = parseInt(id);
 
-    // Type specific fields
-    if (type === 'groups') {
-        data.name = document.getElementById('inp-name').value;
-        data.is_active = document.getElementById('inp-active').value === 'true';
-    } else if (type === 'event_dates') {
-        data.date_label = document.getElementById('inp-label').value;
-        data.is_active = document.getElementById('inp-active').value === 'true';
-    } else if (type === 'time_slots') {
-        data.slot_code = document.getElementById('inp-code').value;
-        data.start_time = document.getElementById('inp-start').value;
-        data.end_time = document.getElementById('inp-end').value;
-    }
+    if (!data.name) return alert('名前は必須です');
 
-    // Call RPC
-    const btn = document.getElementById('btn-save');
-    btn.disabled = true;
-    btn.innerText = '保存中...';
-
-    const res = await adminManageMaster(type, op, data);
-
+    const res = await adminManageMaster('groups', 'save', data);
     if (res.success) {
-        closeSettingsModal();
-        fetchMasterData(); // Refresh UI
+        alert('保存しました');
+        closeModal('modal-group');
+        loadAllData();
     } else {
         alert('エラー: ' + res.error);
     }
+};
 
-    btn.disabled = false;
-    btn.innerText = '保存';
-}
+// Timeslots
+window.openTimeslotModal = (id = null) => {
+    const modal = document.getElementById('modal-timeslot');
+    // find strict equality for number, or loose for string id
+    const item = id ? masterData.timeslots.find(t => t.id == id) : {};
 
-window.handleDelete = async function () {
-    const id = document.getElementById('edit-id').value;
-    const type = document.getElementById('edit-type').value;
-    if (!id) return;
+    document.getElementById('slot-id').value = id || '';
+    document.getElementById('slot-code').value = item.slot_code || '';
+    document.getElementById('slot-start').value = item.start_time || '';
+    document.getElementById('slot-end').value = item.end_time || '';
 
-    if (!confirm('本当に削除しますか？\n（関連する予約データがある場合エラーになる可能性があります）')) return;
+    modal.classList.add('active');
+};
 
-    const btn = document.getElementById('btn-delete');
-    btn.disabled = true;
-    btn.innerText = '削除中...';
+window.saveTimeslot = async () => {
+    const id = document.getElementById('slot-id').value;
+    const data = {
+        slot_code: document.getElementById('slot-code').value,
+        start_time: document.getElementById('slot-start').value,
+        end_time: document.getElementById('slot-end').value,
+        display_order: 10 // default
+    };
+    if (id) data.id = parseInt(id);
 
-    const res = await adminManageMaster(type, 'delete', { id: id });
+    if (!data.slot_code) return alert('コードは必須です');
 
+    const res = await adminManageMaster('time_slots', 'save', data);
     if (res.success) {
-        closeSettingsModal();
-        fetchMasterData();
+        alert('保存しました');
+        closeModal('modal-timeslot');
+        loadAllData();
     } else {
         alert('エラー: ' + res.error);
     }
+};
 
-    btn.disabled = false;
-    btn.innerText = '削除';
+// Schedules
+window.openScheduleModal = (id = null) => {
+    const modal = document.getElementById('modal-schedule');
+    // Populate dropdowns first
+    const selGroup = document.getElementById('sched-group');
+    const selTimeslot = document.getElementById('sched-timeslot');
+
+    selGroup.innerHTML = '';
+    masterData.groups.forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = g.name;
+        opt.textContent = g.name;
+        selGroup.appendChild(opt);
+    });
+
+    selTimeslot.innerHTML = '';
+    masterData.timeslots.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.slot_code;
+        opt.textContent = `${t.slot_code} (${t.start_time}-${t.end_time})`;
+        selTimeslot.appendChild(opt);
+    });
+
+    // Determine values
+    let item = {};
+    if (id) {
+        item = masterData.schedules.find(s => s.id == id);
+    }
+
+    document.getElementById('sched-id').value = item?.id || '';
+    if (item && item.group_name) selGroup.value = item.group_name;
+    document.getElementById('sched-day').value = item?.day || '1';
+    if (item && item.timeslot) selTimeslot.value = item.timeslot;
+
+    modal.classList.add('active');
+};
+
+window.saveSchedule = async () => {
+    const id = document.getElementById('sched-id').value;
+    const data = {
+        group_name: document.getElementById('sched-group').value,
+        day: parseInt(document.getElementById('sched-day').value),
+        timeslot: document.getElementById('sched-timeslot').value
+    };
+    if (id) data.id = parseInt(id);
+
+    const res = await adminManageSchedule(data);
+    if (res.success) {
+        alert('保存しました');
+        closeModal('modal-schedule');
+        loadAllData();
+    } else {
+        alert('エラー: ' + res.error);
+    }
+};
+
+window.deleteScheduleEntry = async (id) => {
+    if (!confirm('本当に削除しますか？\n（関連する座席データも削除されます）')) return;
+    const res = await adminDeleteSchedule(id);
+    if (res.success) {
+        alert('削除しました');
+        loadAllData();
+    } else {
+        alert('エラー: ' + res.error);
+    }
+};
+
+// Generic Delete for Master
+window.deleteItem = async (table, id) => {
+    if (!confirm('本当に削除しますか？')) return;
+    const res = await adminManageMaster(table, 'delete', { id: id });
+    if (res.success) {
+        alert('削除しました');
+        loadAllData();
+    } else {
+        alert('エラー: ' + res.error);
+    }
 };

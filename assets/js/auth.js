@@ -20,22 +20,22 @@ function getAuthSession() {
   }
 }
 
- function setAuthSessionToken(token, userId) {
-   const session = { token, userId: userId || null, issuedAt: authNow() };
-   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
-   localStorage.setItem(AUTH_LAST_ACTIVITY_KEY, String(authNow()));
- }
+function setAuthSessionToken(token, userId) {
+  const session = { token, userId: userId || null, issuedAt: authNow() };
+  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+  localStorage.setItem(AUTH_LAST_ACTIVITY_KEY, String(authNow()));
+}
 
 function clearAuthSession() {
-  try { localStorage.removeItem(AUTH_STORAGE_KEY); } catch (_) {}
-  try { localStorage.removeItem(AUTH_LAST_ACTIVITY_KEY); } catch (_) {}
+  try { localStorage.removeItem(AUTH_STORAGE_KEY); } catch (_) { }
+  try { localStorage.removeItem(AUTH_LAST_ACTIVITY_KEY); } catch (_) { }
 }
 
 function recordActivity() {
-  try { localStorage.setItem(AUTH_LAST_ACTIVITY_KEY, String(authNow())); } catch (_) {}
+  try { localStorage.setItem(AUTH_LAST_ACTIVITY_KEY, String(authNow())); } catch (_) { }
 }
 
- async function isSessionActive() {
+async function isSessionActive() {
   const session = getAuthSession();
   if (!session) return false;
   try {
@@ -55,11 +55,11 @@ function recordActivity() {
   }
 }
 
- async function enforceAuthOrRedirect() {
+async function enforceAuthOrRedirect() {
   if (!(await isSessionActive())) {
     clearAuthSession();
     if (!location.pathname.endsWith('index.html') && location.pathname !== '/' && location.pathname !== '') {
-      location.replace('index.html');
+      location.replace('../index.html');
       return false;
     }
     return false;
@@ -69,18 +69,18 @@ function recordActivity() {
 
 function startInactivityWatcher() {
   const reset = () => recordActivity();
-  ['click','keydown','scroll','mousemove','touchstart','visibilitychange'].forEach(evt => {
-    try { window.addEventListener(evt, reset, { passive: true }); } catch (_) {}
+  ['click', 'keydown', 'scroll', 'mousemove', 'touchstart', 'visibilitychange'].forEach(evt => {
+    try { window.addEventListener(evt, reset, { passive: true }); } catch (_) { }
   });
   setInterval(async () => {
     if (!(await isSessionActive())) {
       clearAuthSession();
-      location.replace('index.html');
+      location.replace('../index.html');
     }
   }, 60 * 1000);
 }
 
- function mountLoginUI() {
+function mountLoginUI() {
   if (document.getElementById('auth-login-modal')) return;
   const wrapper = document.createElement('div');
   wrapper.id = 'auth-login-modal';
@@ -106,10 +106,10 @@ function startInactivityWatcher() {
   try {
     document.documentElement.style.overflow = 'hidden';
     document.body.style.overflow = 'hidden';
-  } catch (_) {}
+  } catch (_) { }
 
   let isSubmitting = false;
-   const onSubmit = async () => {
+  const onSubmit = async () => {
     if (isSubmitting) return;
     const user = document.getElementById('auth-user-id');
     const pass = document.getElementById('auth-password');
@@ -124,7 +124,7 @@ function startInactivityWatcher() {
       return;
     }
     // ローディング状態に
-    try { if (btn) { btn.disabled = true; btn.textContent = 'ログイン中...'; btn.style.opacity = '0.7'; btn.style.cursor = 'not-allowed'; } } catch (_) {}
+    try { if (btn) { btn.disabled = true; btn.textContent = 'ログイン中...'; btn.style.opacity = '0.7'; btn.style.cursor = 'not-allowed'; } } catch (_) { }
     isSubmitting = true;
     // サーバ側ログイン
     try {
@@ -144,26 +144,26 @@ function startInactivityWatcher() {
       return;
     } finally {
       // 成否にかかわらずボタンの状態を戻す（成功時は直後に閉じる）
-      try { if (btn) { btn.disabled = false; btn.textContent = 'ログイン'; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; } } catch (_) {}
+      try { if (btn) { btn.disabled = false; btn.textContent = 'ログイン'; btn.style.opacity = '1'; btn.style.cursor = 'pointer'; } } catch (_) { }
       isSubmitting = false;
     }
     // ログインUIを閉じる（スクロールを元に戻す）
     try {
       document.documentElement.style.overflow = prevHtmlOverflow || '';
       document.body.style.overflow = prevBodyOverflow || '';
-    } catch (_) {}
+    } catch (_) { }
     // ログインUIを閉じる
-    try { document.getElementById('auth-login-modal')?.remove(); } catch (_) {}
+    try { document.getElementById('auth-login-modal')?.remove(); } catch (_) { }
     recordActivity();
     startInactivityWatcher();
   };
 
-  try { document.getElementById('auth-login-btn')?.addEventListener('click', onSubmit); } catch (_) {}
+  try { document.getElementById('auth-login-btn')?.addEventListener('click', onSubmit); } catch (_) { }
   try {
     document.getElementById('auth-password')?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') onSubmit();
     });
-  } catch (_) {}
+  } catch (_) { }
 }
 
 async function ensureAuthenticatedOnIndex() {
@@ -176,11 +176,11 @@ async function ensureAuthenticatedOnIndex() {
   mountLoginUI();
   try {
     await showOpeningCeremony();
-  } catch (_) {}
+  } catch (_) { }
 }
 
 // ページ読み込み時に適用
- (async () => {
+(async () => {
   try {
     const path = location.pathname;
     const isIndex = path.endsWith('index.html') || path === '/' || path === '';
@@ -194,8 +194,8 @@ async function ensureAuthenticatedOnIndex() {
         startInactivityWatcher();
       }
     }
-  } catch (_) {}
- })();
+  } catch (_) { }
+})();
 
 // 公開API（必要に応じて使用）
 window.AppAuth = {
@@ -273,7 +273,7 @@ async function showOpeningCeremony() {
       try {
         document.documentElement.style.overflow = 'hidden';
         document.body.style.overflow = 'hidden';
-      } catch (_) {}
+      } catch (_) { }
 
       const runNoMotion = () => {
         overlay.style.opacity = '1';
@@ -288,11 +288,11 @@ async function showOpeningCeremony() {
           overlay.style.transition = 'opacity 800ms ease';
           overlay.style.opacity = '0';
           setTimeout(() => {
-            try { overlay.remove(); } catch (_) {}
+            try { overlay.remove(); } catch (_) { }
             try {
               document.documentElement.style.overflow = prevHtmlOverflow || '';
               document.body.style.overflow = prevBodyOverflow || '';
-            } catch (_) {}
+            } catch (_) { }
             resolve();
           }, 820);
         } catch (_) {

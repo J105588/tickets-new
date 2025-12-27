@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Database Migration Tool</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+        }
+
+        .log-area {
+            background: #f0f0f0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            height: 300px;
+            overflow-y: scroll;
+            white-space: pre-wrap;
+            margin-top: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Database Migration Tool</h1>
+    <p>Migrate Performance Timeslots from "A" to Time Format (e.g. "10:00").</p>
+    <button id="migrate-btn" onclick="runMigration()">Run Migration</button>
+    <div id="logs" class="log-area">Logs will appear here...</div>
+
+    <script type="module">
+        import { GAS_API_URLS } from './assets/js/config.js';
+
+        // JSONP Callback needs to be global
+        window.handleMigrationResult = function (result) {
+            const logArea = document.getElementById('logs');
+            const btn = document.getElementById('migrate-btn');
+
+            if (result.success) {
+                logArea.textContent += '\n[SUCCESS] Migration completed!\n\nLogs:\n';
+                if (result.logs) logArea.textContent += result.logs.join('\n');
+            } else {
+                logArea.textContent += '\n[ERROR] Migration failed:\n' + (result.error || JSON.stringify(result));
+            }
+
+            btn.disabled = false;
+        };
+
+        window.runMigration = function () {
+            const btn = document.getElementById('migrate-btn');
+            const logArea = document.getElementById('logs');
+            btn.disabled = true;
+            logArea.textContent = 'Starting migration via JSONP...\n';
+
+            const script = document.createElement('script');
+            const apiUrl = GAS_API_URLS[0];
+            const callbackName = 'handleMigrationResult';
+
+            // Add params. Note: JSONP is always GET.
+            // action=migrate_timeslots 
+            const url = `${apiUrl}?action=migrate_timeslots&callback=${callbackName}&t=${Date.now()}`;
+
+            script.src = url;
+            script.onerror = function () {
+                logArea.textContent += '\n[FATAL ERROR] Script load error. Check console for details.';
+                btn.disabled = false;
+            };
+
+            document.body.appendChild(script);
+        };
+    </script>
+</body>
+
+</html>

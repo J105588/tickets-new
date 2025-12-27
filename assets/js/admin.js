@@ -1,266 +1,313 @@
 /**
  * admin.js
- * 予約管理ダッシュボードのロジック (Supabase RPC版)
+ * 予約管理 + 設定管理 (Single Unified Dashboard)
+ * GAS API版
  */
 
-import { apiUrlManager } from './config.js'; // Still needed for admin_resend_email (GAS)
 import {
-    fetchMasterGroups,
+    fetchMasterDataFromSupabase,
     adminGetReservations,
     adminUpdateBooking,
     adminCancelBooking,
-    adminSwapSeats,
-    fetchSeatsFromSupabase
+    adminResendEmail,
+    adminFetchSchedules,     // New
+    adminManageSchedule,     // New
+    adminDeleteSchedule,     // New
+    adminManageMaster        // New
 } from './supabase-client.js';
 
 let currentReservations = [];
-let selectedBooking = null;
+let masterData = {
+    groups: [],
+    dates: [],
+    timeslots: [],
+    schedules: []
+};
+
+// --- Initialization ---
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // マスタデータ読み込み
-    await loadFilterOptions();
-    // 初期検索
+    // 1. Load All Data (Filters + Settings)
+    await loadMasterData();
+
+    // 2. Setup Helpers
+    window.switchTab = switchTab;
+    window.logout = logout;
+
+    // 3. Initial Search
     applyFilters();
-
-    // Event Listeners for Static Modal Buttons
-    document.getElementById('btn-close-detail-modal').addEventListener('click', closeModal);
-    document.getElementById('btn-edit-toggle').addEventListener('click', toggleEditMode);
-    document.getElementById('btn-save-changes').addEventListener('click', saveChanges);
-    document.getElementById('btn-resend-email').addEventListener('click', resendEmail);
-    document.getElementById('btn-seat-change').addEventListener('click', promptSeatChange);
-    document.getElementById('btn-cancel-res').addEventListener('click', confirmCancel);
-
-    // Auto Refresh Toggle
-    document.getElementById('auto-refresh-toggle').addEventListener('change', (e) => {
-        if (e.target.checked) {
-            startAutoRefresh();
-        } else {
-            stopAutoRefresh();
-        }
-    });
-
-    document.getElementById('btn-close-seat-modal').addEventListener('click', closeSeatModal);
-    document.getElementById('btn-submit-seat-change').addEventListener('click', submitSeatChange);
 });
 
-let refreshInterval = null;
+// --- Data Loading ---
 
-function startAutoRefresh() {
-    if (refreshInterval) clearInterval(refreshInterval);
-    refreshInterval = setInterval(() => {
-        applyFilters(true); // true = isBackground
-    }, 5000);
-}
+async function loadMasterData() {
+    const loader = document.getElementById('loading');
+    if (loader) loader.style.display = 'block';
 
-function stopAutoRefresh() {
-    if (refreshInterval) {
-        clearInterval(refreshInterval);
-        refreshInterval = null;
+    const [mRes, sRes] = await Promise.all([
+        fetchMasterDataFromSupabase(),
+        adminFetchSchedules()
+    ]);
+
+    if (mRes.success) {
+        masterData.groups = mRes.data.groups || [];
+        masterData.dates = mRes.data.dates || [];
+        masterData.timeslots = mRes.data.timeslots || [];
+    } else {
+        alert('マスタデータ取得失敗: ' + mRes.error);
     }
+
+    if (sRes.success) {
+        masterData.schedules = sRes.data || [];
+    } else {
+        console.error('Schedules fetch error', sRes.error);
+    }
+
+    // Update UI
+    applyFilterOptions();
+    renderSettingsTables();
+
+    if (loader) loader.style.display = 'none';
 }
 
-// フィルタオプションの読み込み
-async function loadFilterOptions() {
+function applyFilterOptions() {
+    // 1. Groups Filter
     const groupSelect = document.getElementById('filter-group');
-    const groups = await fetchMasterGroups();
-
-    groups.forEach(g => {
-        const opt = document.createElement('option');
-        opt.value = g.name;
-        opt.innerText = g.name;
-        groupSelect.appendChild(opt);
-    });
-}
-
-// データ検索
-window.applyFilters = function (isBackground = false) {
-    const group = document.getElementById('filter-group').value;
-    const day = document.getElementById('filter-date').value;
-    const year = document.getElementById('filter-year').value;
-
-    fetchReservations({ group, day, year }, isBackground);
-};
-
-window.refreshData = function () {
-    applyFilters(false);
-};
-
-async function fetchReservations(filters, isBackground = false) {
-    const tbody = document.getElementById('reservation-table-body');
-
-    // Only show loading if NOT background refresh
-    if (!isBackground) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">読み込み中...</td></tr>';
+    if (groupSelect) {
+        groupSelect.innerHTML = '<option value="">全ての団体</option>';
+        masterData.groups.forEach(g => {
+            if (g.is_active) {
+                const opt = document.createElement('option');
+                opt.value = g.name;
+                opt.innerText = g.name;
+                groupSelect.appendChild(opt);
+            }
+        });
     }
 
-    // RPC Call
-    const result = await adminGetReservations(filters);
+    // 2. Days Filter (DB Driven)
+    const daySelect = document.getElementById('filter-day');
+    if (daySelect) {
+        daySelect.innerHTML = '<option value="">全て</option>';
+        masterData.dates.forEach(d => {
+            if (d.is_active !== false) { // Default true
+                const opt = document.createElement('option');
+                // Assuming d.id is 1, 2 or we use date_label.
+                // Filter usually expects "1" or "2" (day number).
+                // If masterData.dates has 'day_num' or 'id' effectively mapping to day number:
+                // Let's assume ID is the day number for simplicity if not specified, 
+                // OR check if there is a 'day_number' column. 
+                // Previous code hardcoded value="1", value="2".
+                // We will use d.id as the value for now, assuming IDs 1, 2...
+                opt.value = d.id;
+                opt.innerText = d.date_label || `Day ${d.id}`;
+                daySelect.appendChild(opt);
+            }
+        });
+    }
+
+    // 3. Timeslots Filter
+    const timeSelect = document.getElementById('filter-timeslot');
+    if (timeSelect) {
+        timeSelect.innerHTML = '<option value="">全ての時間帯</option>';
+        // Sort timeslots
+        const sorted = [...masterData.timeslots].sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
+        sorted.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t.slot_code;
+            opt.innerText = `${t.slot_code} (${t.start_time}-${t.end_time})`;
+            timeSelect.appendChild(opt);
+        });
+    }
+}
+
+// --- Dashboard Logic ---
+
+window.applyFilters = async function (isBackground = false) {
+    const group = document.getElementById('filter-group').value;
+    const day = document.getElementById('filter-day').value;
+    const timeslot = document.getElementById('filter-timeslot').value;
+    const search = document.getElementById('filter-search').value;
+
+    if (!isBackground) {
+        const loading = document.getElementById('loading');
+        if (loading) loading.style.display = 'block';
+        document.getElementById('reservation-table').style.opacity = '0.5';
+    }
+
+    const result = await adminGetReservations({ group, day, timeslot, search });
+
+    if (!isBackground) {
+        const loading = document.getElementById('loading');
+        if (loading) loading.style.display = 'none';
+        document.getElementById('reservation-table').style.opacity = '1';
+    }
 
     if (result.success) {
-        currentReservations = result.data; // array
-        renderTable(currentReservations);
+        currentReservations = result.data;
+        renderReservationTable(currentReservations);
     } else {
-        if (!isBackground) {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">エラー: ${result.error}</td></tr>`;
-        } else {
-            console.error('Auto-refresh failed:', result.error);
-        }
+        if (!isBackground) alert('データ取得エラー: ' + result.error);
     }
-}
+};
 
-function renderTable(data) {
-    const tbody = document.getElementById('reservation-table-body');
+function renderReservationTable(data) {
+    const tbody = document.querySelector('#reservation-table tbody');
+    if (!tbody) return;
     tbody.innerHTML = '';
 
-    if (!data || data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">予約が見つかりません</td></tr>';
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:2rem;">該当する予約はありません</td></tr>';
         return;
     }
 
-    data.forEach(item => {
-        const perf = item.performances || {};
-        // RPC aggregates seats as array of objects {seat_id: "A1"}
-        const seats = item.seats ? item.seats.map(s => s.seat_id).join(', ') : '-';
-
+    data.forEach(r => {
         const tr = document.createElement('tr');
+        let statusClass = '';
+        let statusText = r.status;
+        if (r.status === 'confirmed') { statusClass = 'status-confirmed'; statusText = '予約済'; }
+        else if (r.status === 'checked_in') { statusClass = 'status-checked-in'; statusText = '引換済'; }
+        else if (r.status === 'cancelled') { statusClass = 'status-cancelled'; statusText = 'キャンセル'; }
+
+        const seats = r.seats ? r.seats.map(s => s.seat_id).join(', ') : '-';
+        const p = r.performances || r.performance; // Handle both just in case
+        const groupInfo = `${p ? p.group_name : '-'} <br> <span style="font-size:0.8em; color:#666;">Day ${p ? p.day : '-'} ${p ? p.timeslot : '-'}</span>`;
+
         tr.innerHTML = `
-            <td>#${item.id}</td>
-            <td>
-                <div style="font-weight:600">${item.name}</div>
-                <div style="font-size:0.85rem; color:#666">${item.email}</div>
-            </td>
-            <td>
-                <div>${item.grade_class || '-'}</div>
-                <div style="font-size:0.85rem; color:#666">${item.club_affiliation || ''}</div>
-            </td>
-            <td>
-                <div>${perf.group_name || '-'}</div>
-                <div style="font-size:0.85rem; color:#666">${perf.day}日目 ${perf.timeslot}</div>
-            </td>
+            <td>${r.id} <br> <span style="font-size:0.8em; color:#888;">${r.reservation_id || ''}</span></td>
+            <td>${r.name}</td>
+            <td>${r.email}</td>
+            <td>${groupInfo}</td>
             <td>${seats}</td>
-            <td>${getStatusBadge(item.status)}</td>
+            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
             <td>
-                <button class="btn-icon action-edit-btn" type="button"><i class="fas fa-edit"></i></button>
+                <button class="btn-outline btn-sm" onclick="openEditModal(${r.id})">詳細/編集</button>
             </td>
         `;
-
-        // Direct Event Attachment
-        const editBtn = tr.querySelector('.action-edit-btn');
-        if (editBtn) {
-            editBtn.addEventListener('click', () => {
-                openDetail(item.id);
-            });
-        }
-
         tbody.appendChild(tr);
     });
 }
 
-function getStatusBadge(status) {
-    switch (status) {
-        case 'confirmed': return '<span class="badge bg-green">予約済</span>';
-        case 'checked_in': return '<span class="badge bg-blue">入場済</span>';
-        case 'cancelled': return '<span class="badge bg-red">キャンセル</span>';
-        default: return `<span class="badge">${status}</span>`;
-    }
+// --- Settings Logic (Merged) ---
+
+function renderSettingsTables() {
+    renderGroups();
+    renderDates();
+    // renderTimeslots(); // Removed
+    renderSchedules();
 }
 
-// 詳細モーダル
-function openDetail(id) {
-    console.log('openDetail called with ID:', id);
-    selectedBooking = currentReservations.find(r => r.id == id);
+function renderGroups() {
+    const tbody = document.querySelector('#table-groups tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    const sorted = [...masterData.groups].sort((a, b) => a.display_order - b.display_order);
 
-    if (!selectedBooking) {
-        console.error('Booking not found in currentReservations for ID:', id);
-        return;
-    }
-    const perf = selectedBooking.performances || {};
-    const seats = selectedBooking.seats ? selectedBooking.seats.map(s => s.seat_id).join(', ') : '-';
-    const notes = selectedBooking.notes || '';
+    sorted.forEach(g => {
+        const tr = document.createElement('tr');
+        const statusBadge = g.is_active ? '<span class="badge badge-active">有効</span>' : '<span class="badge badge-inactive">無効</span>';
+        tr.innerHTML = `
+            <td>${g.display_order}</td>
+            <td>${g.name}</td>
+            <td>${statusBadge}</td>
+            <td>
+                <button class="btn-sm" onclick="openGroupModal(${g.id})">編集</button>
+                <button class="btn-danger btn-sm" onclick="deleteItem('groups', ${g.id})">削除</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
 
-    // Status Options
-    const statusOptions = `
-        <option value="confirmed" ${selectedBooking.status === 'confirmed' ? 'selected' : ''}>予約済 (confirmed)</option>
-        <option value="checked_in" ${selectedBooking.status === 'checked_in' ? 'selected' : ''}>入場済 (checked_in)</option>
-        <option value="cancelled" ${selectedBooking.status === 'cancelled' ? 'selected' : ''}>キャンセル (cancelled)</option>
-    `;
+function renderDates() {
+    const tbody = document.querySelector('#table-dates tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    const sorted = [...masterData.dates].sort((a, b) => a.display_order - b.display_order);
 
-    // Render as inputs but disabled initially
-    const html = `
-        <div class="detail-grid" style="display:grid; grid-template-columns: 1fr 2fr; gap: 10px; margin-bottom: 20px;">
-            <div style="color:#666; display:flex; align-items:center;">ID</div>
-            <div style="font-weight:bold">#${selectedBooking.id} <small>(${selectedBooking.passcode})</small></div>
-            
-            <label for="edit-status" style="color:#666; display:flex; align-items:center;">ステータス</label>
-            <select id="edit-status" class="form-select" disabled>
-                ${statusOptions}
-            </select>
-            
-            <label for="edit-name" style="color:#666; display:flex; align-items:center;">氏名</label>
-            <input type="text" id="edit-name" class="form-control" value="${selectedBooking.name}" disabled>
-            
-            <label for="edit-email" style="color:#666; display:flex; align-items:center;">メール</label>
-            <input type="email" id="edit-email" class="form-control" value="${selectedBooking.email}" disabled>
-            
-            <label for="edit-grade" style="color:#666; display:flex; align-items:center;">学年・クラス</label>
-            <input type="text" id="edit-grade" class="form-control" value="${selectedBooking.grade_class || ''}" disabled placeholder="例: 1-1">
-            
-            <label for="edit-club" style="color:#666; display:flex; align-items:center;">所属（部活等）</label>
-            <input type="text" id="edit-club" class="form-control" value="${selectedBooking.club_affiliation || ''}" disabled>
-            
-            <hr style="grid-column: 1/-1; width:100%; border:0; border-top:1px solid #eee; margin:10px 0;">
-            
-            <div style="color:#666">公演</div>
-            <div>${perf.group_name} (${perf.day}日目 ${perf.timeslot})</div>
-            
-            <div style="color:#666">座席</div>
-            <div>${seats}</div>
-            
-            <label for="edit-notes" style="color:#666; display:flex; align-items:center;">メモ</label>
-            <textarea id="edit-notes" class="form-control" disabled rows="3">${notes}</textarea>
-        </div>
-    `;
+    sorted.forEach(d => {
+        const tr = document.createElement('tr');
+        const statusBadge = d.is_active !== false ? '<span class="badge badge-active">有効</span>' : '<span class="badge badge-inactive">無効</span>';
+        tr.innerHTML = `
+            <td>${d.display_order}</td>
+            <td>${d.date_label}</td>
+            <td>${statusBadge}</td>
+            <td>
+                <button class="btn-sm" onclick="openDateModal(${d.id})">編集</button>
+                <button class="btn-danger btn-sm" onclick="deleteItem('event_dates', ${d.id})">削除</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
 
-    document.getElementById('modal-body').innerHTML = html;
+function renderSchedules() {
+    const tbody = document.querySelector('#table-schedules tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    const sorted = [...masterData.schedules].sort((a, b) => {
+        if (a.day !== b.day) return a.day - b.day;
+        // Try to sort by time if possible
+        if (a.timeslot !== b.timeslot) return a.timeslot.localeCompare(b.timeslot);
+        return a.group_name.localeCompare(b.group_name);
+    });
 
-    // reset buttons
-    const editBtn = document.getElementById('btn-edit-toggle');
-    editBtn.style.display = 'inline-block';
-    editBtn.innerText = '編集';
-    document.getElementById('btn-save-changes').style.display = 'none';
+    sorted.forEach(s => {
+        const tr = document.createElement('tr');
+        // Timeslot is now just a string
+        const timeDisplay = s.timeslot;
 
-    document.getElementById('detail-modal').classList.add('active');
+        tr.innerHTML = `
+            <td>${s.group_name}</td>
+            <td>${s.day} (ID:${s.day})</td>
+            <td><span class="badge">${timeDisplay}</span></td>
+            <td>
+                <button class="btn-sm" onclick="openScheduleModal('${s.id}')">編集</button>
+                <button class="btn-danger btn-sm" onclick="deleteScheduleEntry(${s.id})">削除</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// --- Modals (Common) ---
+
+window.closeModal = function (id) {
+    document.getElementById(id).classList.remove('active');
 };
 
-function closeModal() {
-    document.getElementById('detail-modal').classList.remove('active');
-    selectedBooking = null;
-    // Reset edit mode state
-    const nameInput = document.getElementById('edit-name');
-    if (nameInput) nameInput.disabled = true;
-};
+// --- Modals (Dashboard) ---
 
-// 編集モード切替
-function toggleEditMode() {
-    const inputs = document.querySelectorAll('#modal-body input, #modal-body textarea, #modal-body select');
-    // Check first input disabled state
-    const isEditing = !inputs[0].disabled;
+let selectedBooking = null;
 
-    if (isEditing) {
-        // Now canceling edit -> revert
-        openDetail(selectedBooking.id);
-    } else {
-        // Enable editing
-        inputs.forEach(input => input.disabled = false);
-        document.getElementById('edit-name').focus();
-        document.getElementById('btn-edit-toggle').innerText = 'キャンセル';
-        document.getElementById('btn-save-changes').style.display = 'inline-block';
-    }
-};
-
-async function saveChanges() {
+window.openEditModal = function (id) {
+    selectedBooking = currentReservations.find(r => r.id === id);
     if (!selectedBooking) return;
 
+    document.getElementById('edit-id').value = selectedBooking.id;
+    document.getElementById('edit-name').value = selectedBooking.name;
+    document.getElementById('edit-email').value = selectedBooking.email;
+    document.getElementById('edit-grade').value = selectedBooking.grade_class || '';
+    document.getElementById('edit-club').value = selectedBooking.club_affiliation || '';
+    document.getElementById('edit-notes').value = selectedBooking.notes || '';
+    document.getElementById('edit-status').value = selectedBooking.status;
+
+    const btnCancel = document.getElementById('btn-cancel-reservation');
+    if (selectedBooking.status === 'cancelled') {
+        btnCancel.disabled = true;
+        btnCancel.textContent = 'キャンセル済';
+        btnCancel.onclick = null;
+    } else {
+        btnCancel.disabled = false;
+        btnCancel.textContent = 'キャンセル処理';
+        btnCancel.onclick = () => handleCancel(selectedBooking.id);
+    }
+
+    document.getElementById('modal-edit').classList.add('active');
+};
+
+window.saveChanges = async function () {
+    if (!selectedBooking) return;
     const updates = {
         id: selectedBooking.id,
         name: document.getElementById('edit-name').value,
@@ -270,286 +317,242 @@ async function saveChanges() {
         notes: document.getElementById('edit-notes').value,
         status: document.getElementById('edit-status').value
     };
-
     if (!updates.name) return alert('名前は必須です');
 
     const btn = document.getElementById('btn-save-changes');
     btn.innerText = '保存中...';
     btn.disabled = true;
 
-    // Direct RPC
     const res = await adminUpdateBooking(updates);
-
     if (res.success) {
         alert('保存しました');
-        closeModal();
-        refreshData();
+        closeModal('modal-edit');
+        applyFilters();
     } else {
         alert('保存失敗: ' + res.error);
-        btn.innerText = '変更を保存';
-        btn.disabled = false;
     }
+    btn.innerText = '変更を保存';
+    btn.disabled = false;
 };
 
-// アクション: メール再送 (これだけはGAS APIを使う)
-function resendEmail() {
-    if (!selectedBooking) return;
-    if (!confirm('確認メールを再送しますか？')) return;
-
-    const btn = document.getElementById('btn-resend-email');
-    const org = btn.innerText;
-    btn.innerText = '送信中...';
-    btn.disabled = true;
-
-    // Call GAS via JSONP
-    const url = apiUrlManager.getCurrentUrl();
-    fetchJsonp(url, { action: 'admin_resend_email', id: selectedBooking.id }, (res) => {
-        alert(res.success ? 'メールを再送しました' : '送信失敗: ' + res.error);
-        btn.innerText = org;
-        btn.disabled = false;
-    });
-};
-
-async function confirmCancel() {
-    if (!selectedBooking) return;
-    if (selectedBooking.status === 'cancelled') return alert('既にキャンセルされています');
-    if (!confirm('本当に予約を取り消しますか？\n（強制キャンセル）')) return;
-
-    // RPC Force Cancel
-    const res = await adminCancelBooking(selectedBooking.id);
-
+async function handleCancel(id) {
+    if (!confirm('本当にキャンセルしますか？')) return;
+    const res = await adminCancelBooking(id);
     if (res.success) {
         alert('キャンセルしました');
-        closeModal();
-        refreshData();
+        closeModal('modal-edit');
+        applyFilters();
     } else {
-        alert('失敗: ' + res.error);
+        alert('エラー: ' + res.error);
     }
-};
+}
 
-// --- Seat Change Logic (Adapted from reservation.js) ---
-
-let selectedNewSeats = [];
-
-function openSeatChangeModal() {
+window.resendEmail = function () {
     if (!selectedBooking) return;
-    const perf = selectedBooking.performances;
-
-    document.getElementById('seat-modal').classList.add('active');
-    document.getElementById('seat-map-container').innerHTML = '<div style="text-align:center; padding:20px;">座席データ読み込み中...</div>';
-
-    // Initialize with current seats
-    if (selectedBooking.seats) {
-        selectedNewSeats = selectedBooking.seats.map(s => s.seat_id);
-    } else {
-        selectedNewSeats = [];
-    }
-    updateNewSeatsUI();
-
-    fetchSeatsFromSupabase(perf.group_name, perf.day, perf.timeslot)
-        .then(res => {
-            if (res.success) {
-                renderSeatMap(res.data);
-            } else {
-                document.getElementById('seat-map-container').innerHTML = `<div style="color:red;text-align:center;">エラー: ${res.error}</div>`;
-            }
-        });
-};
-
-function closeSeatModal() {
-    document.getElementById('seat-modal').classList.remove('active');
-};
-
-function renderSeatMap(seatsData) {
-    const container = document.getElementById('seat-map-container');
-    container.innerHTML = '';
-
-    const rows = {};
-    // Store original seat IDs for permission check
-    const originalSeatIds = selectedBooking.seats ? selectedBooking.seats.map(s => s.seat_id) : [];
-
-    seatsData.forEach(seat => {
-        const id = seat.seat_id;
-        const match = id.match(/^([A-Z]+)(\d+)$/);
-        if (match) {
-            const rowLabel = match[1];
-            const seatNumber = parseInt(match[2]);
-            if (!rows[rowLabel]) rows[rowLabel] = [];
-            rows[rowLabel].push({ ...seat, seatNumber, id });
-        }
+    if (!confirm('確認メールを再送しますか？')) return;
+    const btn = document.getElementById('btn-resend-email');
+    btn.innerText = '送信中...';
+    // Use JSONP wrapper (assuming implemented in client or adminResendEmail wrapper uses it)
+    // adminResendEmail in supabase-client.js uses jsonpRequest
+    adminResendEmail(selectedBooking.id).then(res => {
+        alert(res.success ? 'メールを再送しました' : '送信失敗: ' + res.error);
+        btn.innerText = 'メール再送';
     });
-
-    const seatSection = document.createElement('div');
-    seatSection.className = 'seat-section';
-    seatSection.style.minWidth = 'fit-content';
-    seatSection.style.margin = '0 auto';
-
-    const sortedRows = Object.keys(rows).sort();
-    sortedRows.forEach(rowLabel => {
-        const rowDiv = document.createElement('div');
-        rowDiv.className = 'seat-row';
-        rowDiv.style.display = 'flex';
-        rowDiv.style.justifyContent = 'center';
-        rowDiv.style.marginBottom = '10px';
-
-        const sortedSeats = rows[rowLabel].sort((a, b) => a.seatNumber - b.seatNumber);
-
-        sortedSeats.forEach(seat => {
-            const seatEl = document.createElement('div');
-            // Base Class
-            seatEl.className = `seat ${seat.status}`;
-
-            const isOriginal = originalSeatIds.includes(seat.id);
-            const isSelected = selectedNewSeats.includes(seat.id);
-
-            // Visual State Logic
-            if (isSelected) {
-                seatEl.classList.add('selected');
-                seatEl.classList.add('my-seat-selection');
-            } else if (isOriginal) {
-                // Was original, but currently deselected -> Show as "ghost"
-                seatEl.style.border = '2px dashed blue';
-                seatEl.style.backgroundColor = '#fff';
-                seatEl.style.color = '#333';
-                seatEl.style.opacity = '1';
-                seatEl.style.cursor = 'pointer';
-            }
-
-            seatEl.innerText = seat.id;
-            seatEl.dataset.id = seat.id;
-
-            // Interaction Logic
-            // Clickable if: Available OR Originally Mine OR Currently Selected
-            const isInteractable = (seat.status === 'available') || isOriginal || isSelected;
-
-            if (isInteractable) {
-                seatEl.style.cursor = 'pointer';
-                seatEl.onclick = () => handleSeatClick(seat, seatEl);
-            } else {
-                seatEl.style.cursor = 'default';
-                seatEl.style.opacity = '0.5';
-            }
-
-            rowDiv.appendChild(seatEl);
-
-            if (seat.seatNumber === 13 || seat.seatNumber === 25) {
-                const p = document.createElement('div');
-                p.style.width = '30px';
-                rowDiv.appendChild(p);
-            }
-        });
-        seatSection.appendChild(rowDiv);
-
-        if (rowLabel === 'F') {
-            const p = document.createElement('div'); p.style.height = '30px';
-            seatSection.appendChild(p);
-        }
-    });
-    container.appendChild(seatSection);
-}
-
-function handleSeatClick(seat, el) {
-    const id = seat.id;
-    const originalSeatIds = selectedBooking.seats ? selectedBooking.seats.map(s => s.seat_id) : [];
-
-    if (selectedNewSeats.includes(id)) {
-        // Deselect
-        selectedNewSeats = selectedNewSeats.filter(s => s !== id);
-        el.classList.remove('selected');
-        el.classList.remove('my-seat-selection');
-
-        // If it was original, restore "ghost" styling immediately
-        if (originalSeatIds.includes(id)) {
-            el.style.backgroundColor = '#fff';
-            el.style.color = '#333';
-            el.style.border = '2px dashed blue';
-            el.style.opacity = '1';
-        }
-    } else {
-        // Select
-        // Allow if available OR if it is one of the original seats
-        if (seat.status !== 'available' && !originalSeatIds.includes(id)) return;
-
-        selectedNewSeats.push(id);
-        el.classList.add('selected');
-        el.classList.add('my-seat-selection');
-
-        // Remove ghost styling override
-        el.style.backgroundColor = '';
-        el.style.color = '';
-        el.style.border = '';
-    }
-    updateNewSeatsUI();
-}
-
-function updateNewSeatsUI() {
-    const disp = document.getElementById('new-seats-display');
-    disp.innerText = selectedNewSeats.length > 0 ? selectedNewSeats.join(', ') : 'なし (全席開放)';
-}
-
-async function submitSeatChange() {
-    // If 0 seats, it means releasing all seats?
-    // User might want to just cancel logic, but if they explicitly deselected all, 
-    // maybe they want to make it a seat-less booking? 
-    // Let's allow 0 seats with a warning.
-
-    const count = selectedNewSeats.length;
-    if (count === 0) {
-        if (!confirm('全ての座席を選択解除しました。このまま保存しますか？\n（予約は座席なし状態になります）')) return;
-    } else {
-        if (!confirm(`座席を ${selectedNewSeats.join(', ')} に変更しますか？`)) return;
-    }
-
-    // RPC Swap Seats
-    const res = await adminSwapSeats(selectedBooking.id, selectedNewSeats);
-
-    if (res.success) {
-        alert('座席を変更しました');
-        closeSeatModal();
-        closeModal();
-        refreshData();
-    } else {
-        alert('変更失敗: ' + (res.error || '不明なエラー'));
-    }
 };
 
-function promptSeatChange() {
-    openSeatChangeModal();
-};
+// --- Modals (Settings) ---
 
-// JSONP for Email Resend (Legacy)
-function fetchJsonp(url, params, callback) {
-    const callbackName = 'jsonp_admin_' + Math.round(100000 * Math.random());
-    window[callbackName] = function (data) {
-        delete window[callbackName];
-        document.body.removeChild(script);
-        callback(data);
+// Group
+window.openGroupModal = function (id = null) {
+    const item = id ? masterData.groups.find(g => g.id === id) : {};
+    document.getElementById('group-id').value = id || '';
+    document.getElementById('group-name').value = item.name || '';
+    document.getElementById('group-order').value = item.display_order || 10;
+    const activeSel = document.getElementById('group-status');
+    if (activeSel) activeSel.value = item.is_active === false ? 'inactive' : 'active';
+
+    // Delete Button visibility
+    const delBtn = document.getElementById('btn-delete-group');
+    if (delBtn) {
+        delBtn.style.display = id ? 'inline-block' : 'none';
+        delBtn.onclick = () => deleteItem('groups', id);
+    }
+
+    document.getElementById('modal-group').classList.add('active');
+};
+window.saveGroup = async function () {
+    const id = document.getElementById('group-id').value;
+    const data = {
+        name: document.getElementById('group-name').value,
+        display_order: parseInt(document.getElementById('group-order').value),
+        is_active: document.getElementById('group-status').value === 'active'
     };
+    if (id) data.id = parseInt(id);
+    if (!data.name) return alert('名前は必須です');
 
-    const script = document.createElement('script');
-    const queryString = Object.keys(params)
-        .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(params[key]))
-        .join('&');
-    script.src = `${url}?${queryString}&callback=${callbackName}`;
-    document.body.appendChild(script);
-}
-
-// Mobile support
-window.toggleSidebar = function () {
-    document.getElementById('sidebar').classList.toggle('active');
+    // Check local duplicate for names if needed, or rely on DB
+    const res = await adminManageMaster('groups', 'save', data);
+    if (res.success) {
+        alert('保存しました');
+        closeModal('modal-group');
+        loadMasterData();
+    } else {
+        alert('エラー: ' + res.error);
+    }
 };
 
-// Global expose
-window.openDetail = openDetail;
-window.toggleEditMode = toggleEditMode;
-window.saveChanges = saveChanges;
-window.resendEmail = resendEmail;
-window.confirmCancel = confirmCancel;
-window.promptSeatChange = promptSeatChange;
-window.submitSeatChange = submitSeatChange;
-window.closeModal = closeModal;
-window.closeSeatModal = closeSeatModal;
-window.logout = function () {
+// Date
+window.openDateModal = function (id = null) {
+    const item = id ? masterData.dates.find(d => d.id === id) : {};
+    document.getElementById('date-id').value = id || '';
+    document.getElementById('date-label').value = item.date_label || '';
+    document.getElementById('date-order').value = item.display_order || 10;
+    const activeSel = document.getElementById('date-status');
+    if (activeSel) activeSel.value = item.is_active === false ? 'inactive' : 'active';
+
+    const delBtn = document.getElementById('btn-delete-date');
+    if (delBtn) {
+        delBtn.style.display = id ? 'inline-block' : 'none';
+        delBtn.onclick = () => deleteItem('event_dates', id);
+    }
+
+    document.getElementById('modal-date').classList.add('active');
+};
+window.saveDate = async function () {
+    const id = document.getElementById('date-id').value;
+    const data = {
+        date_label: document.getElementById('date-label').value,
+        display_order: parseInt(document.getElementById('date-order').value),
+        is_active: document.getElementById('date-status').value === 'active'
+    };
+    if (id) data.id = parseInt(id);
+    if (!data.date_label) return alert('ラベルは必須です');
+
+    const res = await adminManageMaster('event_dates', 'save', data);
+    if (res.success) {
+        alert('保存しました');
+        closeModal('modal-date');
+        loadMasterData();
+    } else {
+        alert('エラー: ' + res.error);
+    }
+}
+
+// Schedule
+window.openScheduleModal = function (id = null) {
+    // Populate dropdowns from masterData
+    const selGroup = document.getElementById('schedule-group-id');
+    selGroup.innerHTML = '';
+    masterData.groups.forEach(g => {
+        if (g.is_active) {
+            const opt = document.createElement('option');
+            opt.value = g.name;  // Note: Backend uses Name for uniqueness mostly, but ideally ID. Current Impl uses Name.
+            opt.innerText = g.name;
+            selGroup.appendChild(opt);
+        }
+    });
+
+    // Populate DATES (Dynamic)
+    const selDay = document.getElementById('schedule-day');
+    selDay.innerHTML = '';
+    const activeDates = masterData.dates.filter(d => d.is_active !== false).sort((a, b) => a.display_order - b.display_order);
+    activeDates.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.id; // Using ID as the "Day" value since we migrated to support flexible days
+        opt.innerText = d.date_label || `Day ${d.id}`;
+        selDay.appendChild(opt);
+    });
+
+    // Timeslot is now MANUAL INPUT, no population needed
+
+    const item = id ? masterData.schedules.find(s => s.id == id) : {};
+    document.getElementById('schedule-id').value = item?.id || '';
+    if (item.group_name) selGroup.value = item.group_name;
+    // Map day value. 
+    // If item.day is integer (e.g. 1, 2), it should match opt.value if we use ID.
+    // Ensure item.day matches the select values.
+    document.getElementById('schedule-day').value = item.day || (activeDates[0] ? activeDates[0].id : '');
+
+    // Set Input Value
+    document.getElementById('schedule-timeslot').value = item.timeslot || '';
+
+    // Max Seats (if applicable, current modal has it)
+    if (document.getElementById('schedule-max-seats')) {
+        document.getElementById('schedule-max-seats').value = item.max_seats || '';
+    }
+
+    const delBtn = document.getElementById('btn-delete-schedule');
+    if (delBtn) {
+        delBtn.style.display = id ? 'inline-block' : 'none';
+        delBtn.onclick = () => deleteScheduleEntry(id);
+    }
+
+    document.getElementById('modal-schedule').classList.add('active');
+};
+window.saveSchedule = async function () {
+    const id = document.getElementById('schedule-id').value;
+    const timeslotVal = document.getElementById('schedule-timeslot').value;
+
+    if (!timeslotVal) return alert('時間帯は必須です (例: 10:00)');
+
+    const data = {
+        group_name: document.getElementById('schedule-group-id').value,
+        day: parseInt(document.getElementById('schedule-day').value),
+        timeslot: timeslotVal
+    };
+    if (id) data.id = parseInt(id);
+
+    if (document.getElementById('schedule-max-seats')) {
+        const max = parseInt(document.getElementById('schedule-max-seats').value);
+        if (!isNaN(max)) data.max_seats = max;
+    }
+
+    const res = await adminManageSchedule(data);
+    if (res.success) {
+        alert('保存しました');
+        closeModal('modal-schedule');
+        loadMasterData();
+    } else {
+        alert('エラー: ' + res.error);
+    }
+};
+
+window.deleteScheduleEntry = async function (id) {
+    if (!confirm('本当に削除しますか？')) return;
+    const res = await adminDeleteSchedule(id);
+    if (res.success) {
+        alert('削除しました');
+        loadMasterData();
+    } else {
+        alert('エラー: ' + res.error);
+    }
+};
+
+window.deleteItem = async function (table, id) {
+    if (!confirm('本当に削除しますか？')) return;
+    const res = await adminManageMaster(table, 'delete', { id });
+    if (res.success) {
+        alert('削除しました');
+        loadMasterData();
+    } else {
+        alert('エラー: ' + res.error);
+    }
+};
+
+// --- Utils ---
+
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+    document.getElementById('tab-' + tabId).classList.add('active');
+    // Find button - simple query selector
+    const btns = document.querySelectorAll('.tab-btn');
+    if (tabId === 'dashboard') btns[0].classList.add('active');
+    if (tabId === 'settings') btns[1].classList.add('active');
+}
+
+function logout() {
     sessionStorage.removeItem('admin_session');
     window.location.href = 'admin-login.html';
-};
+}

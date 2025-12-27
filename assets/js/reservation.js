@@ -200,13 +200,20 @@ async function fetchPerformances(group) {
 }
 
 function updateDayOptions() {
-    const days = [...new Set(performanceData.map(p => p.day))].sort();
+    // Days in performanceData are IDs (e.g. 1, 2)
+    const dayIds = [...new Set(performanceData.map(p => p.day))].sort((a, b) => a - b);
 
     inputs.day.innerHTML = '<option value="" disabled selected>日程を選択してください</option>';
-    days.forEach(day => {
+
+    dayIds.forEach(dayId => {
         const option = document.createElement('option');
-        option.value = day;
-        option.textContent = `${day}日目`;
+        option.value = dayId;
+
+        // Find label from masterDates
+        const dateObj = masterDates.find(d => d.id == dayId);
+        const label = dateObj ? dateObj.date_label : `${dayId}日目`;
+
+        option.textContent = label;
         inputs.day.appendChild(option);
     });
 
@@ -215,26 +222,25 @@ function updateDayOptions() {
 
 function updateTimeslotOptions() {
     const day = parseInt(state.day);
+    // Sort timeslots directly as strings
     const timeslots = performanceData
         .filter(p => p.day == day)
         .map(p => p.timeslot)
-        .sort();
+        .sort((a, b) => a.localeCompare(b));
 
     inputs.timeslot.innerHTML = '<option value="" disabled selected>時間帯を選択してください</option>';
     timeslots.forEach(slot => {
         const option = document.createElement('option');
         option.value = slot;
-        option.textContent = `${slot}時間帯 (${getTimeString(slot)})`;
+        // Timeslot is now the Time Range string itself (e.g. "10:00 - 11:00")
+        // No need for lookup or mapping.
+        option.textContent = slot;
         inputs.timeslot.appendChild(option);
     });
 
     inputs.timeslot.disabled = false;
 }
-
-function getTimeString(timeslot) {
-    const map = { 'A': '09:00~', 'B': '11:00~', 'C': '13:00~', 'D': '15:00~', 'E': '17:00~' };
-    return map[timeslot] || '';
-}
+// Removed getTimeString as it is no longer needed
 
 // ==========================================
 // Step 2: 座席選択

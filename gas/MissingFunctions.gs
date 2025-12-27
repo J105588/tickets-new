@@ -1045,15 +1045,46 @@ function getGroupsSupabase() {
  */
 function getAllTimeslotsForGroup(group) {
   try {
-    // Supabase版では、公演データから時間帯を取得
-    const result = supabaseIntegration._request(`performances?group_name=eq.${encodeURIComponent(group)}&select=day,timeslot`);
+    // 1. 公演データ取得
+    const perfRes = supabaseIntegration._request(`performances?group_name=eq.${encodeURIComponent(group)}&select=day,timeslot&order=day.asc`);
+    if (!perfRes.success) return [];
     
-    if (!result.success) {
-      return [];
+    // 2. 時間帯マスタ取得
+    const slotRes = supabaseIntegration._request(`time_slots?select=slot_code,start_time,end_time`);
+    const slotMap = {};
+    if (slotRes.success && Array.isArray(slotRes.data)) {
+        slotRes.data.forEach(s => {
+            slotMap[s.slot_code] = `${s.start_time}-${s.end_time}`;
+        });
     }
+
+    // 3. マッピング
+    const uniqueMap = new Map(); // 重複排除用
     
-    const timeslots = result.data.map(perf => `${perf.day}日目${perf.timeslot}`);
-    return [...new Set(timeslots)]; // 重複を除去
+    perfRes.data.forEach(perf => {
+        const key = `${perf.day}-${perf.timeslot}`;
+        if (!uniqueMap.has(key)) {
+            const timeRange = slotMap[perf.timeslot] || '';
+            // 表示名: "10:00 (10:00-11:00)" または "10:00-11:00"
+            // フロントエンドの仕様に合わせて変更
+            let displayName = perf.timeslot; // Default
+            if (timeRange) {
+                 // コード自体が「10:00」等の場合、重複して表示されるのを防ぐか、親切に表示するか
+                 // ユーザー要望「何時からを設定できる」→ "10:00 (10:00-11:00)" がわかりやすい
+                 displayName = `${perf.timeslot} (${timeRange})`;
+                 // もしコードが"A"とかなら "A (10:00-11:00)"
+            }
+            
+            uniqueMap.set(key, {
+                day: perf.day,
+                timeslot: perf.timeslot,
+                displayName: displayName
+            });
+        }
+    });
+    
+    return Array.from(uniqueMap.values());
+    
   } catch (e) {
     Logger.log('getAllTimeslotsForGroup Error: ' + e.message);
     return [];

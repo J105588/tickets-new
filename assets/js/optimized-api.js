@@ -164,6 +164,16 @@ class OptimizedGasAPI {
     return this._callApiWithCache('getSeatDataMinimal', params);
   }
 
+  // マスタデータ取得（公開用）
+  static async getMasterData(useCache = true) {
+    // 頻繁に変更されないためキャッシュ推奨
+    if (useCache) {
+      return this._callApiWithCache('get_master_data', []);
+    } else {
+      return this._callApi('get_master_data', []);
+    }
+  }
+
   // 最適化された時間帯データ取得
   static async getAllTimeslotsForGroup(group) {
     const params = [group];
