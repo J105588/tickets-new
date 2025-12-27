@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>予約管理ダッシュボード | Ticket System</title>
+    <title>市川学園座席管理システム - 予約管理画面</title>
+    <link rel="icon" href="https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg">
     <!-- Reset & Base CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Supabase JS -->
@@ -288,6 +289,59 @@
             text-align: center;
             color: var(--secondary);
         }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                gap: 1rem;
+                padding: 1rem;
+            }
+
+            .header-controls {
+                width: 100%;
+                justify-content: center;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+
+            .filter-bar {
+                padding: 1rem;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 0.75rem;
+            }
+
+            .filter-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-group label {
+                font-size: 0.85rem;
+                color: var(--secondary);
+            }
+
+            .table-container {
+                padding: 0.5rem;
+            }
+
+            th,
+            td {
+                padding: 0.75rem 0.5rem;
+                font-size: 0.85rem;
+            }
+
+            .modal-content {
+                padding: 1.5rem;
+                width: 90%;
+            }
+
+            button {
+                padding: 0.6rem 1rem;
+                /* Larger touch target */
+            }
+        }
     </style>
 </head>
 
@@ -301,8 +355,12 @@
         </div>
         <div class="header-controls">
             <button class="tab-btn active" onclick="switchTab('dashboard')">予約管理</button>
-            <button class="tab-btn" onclick="switchTab('settings')">マスタ設定</button>
+            <button class="tab-btn" onclick="switchTab('settings')">マスター設定</button>
             <div style="width:20px;"></div>
+            <button onclick="window.open('admin-scan.html', '_blank')" class="btn-outline" style="margin-right:10px;">
+                <i class="fas fa-qrcode"></i> スキャン <i class="fas fa-external-link-alt"
+                    style="font-size:0.8em; margin-left:4px;"></i>
+            </button>
             <label id="refresh-label"><input type="checkbox" id="auto-refresh"> 自動更新</label>
             <button onclick="logout()">ログアウト</button>
         </div>
@@ -388,7 +446,7 @@
             <!-- GROUPS -->
             <div class="section-card">
                 <div class="section-header">
-                    <span class="section-title">団体マスタ (Groups)</span>
+                    <span class="section-title">団体マスター (Groups)</span>
                     <button class="btn-primary btn-sm" onclick="openGroupModal()">+ 追加</button>
                 </div>
                 <div class="table-responsive">
@@ -409,7 +467,7 @@
             <!-- DATES -->
             <div class="section-card">
                 <div class="section-header">
-                    <span class="section-title">日程マスタ (Event Dates)</span>
+                    <span class="section-title">日程マスター (Event Dates)</span>
                     <button class="btn-primary btn-sm" onclick="openDateModal()">+ 追加</button>
                 </div>
                 <div class="table-responsive">
@@ -566,7 +624,7 @@
                     <label for="edit-status">ステータス</label>
                     <select id="edit-status">
                         <option value="confirmed">予約済 (Confirmed)</option>
-                        <option value="checked_in">引換済 (Checked In)</option>
+                        <option value="checked_in">入場済 (Checked In)</option>
                         <option value="cancelled">キャンセル (Cancelled)</option>
                     </select>
                 </div>

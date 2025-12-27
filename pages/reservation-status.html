@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>予約状況確認 | 市川学園座席管理システム</title>
+    <title>市川学園座席管理システム - 予約状況確認</title>
+    <link rel="icon" href="https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg">
     <link rel="stylesheet" href="../assets/css/styles.css">
     <link rel="stylesheet" href="../assets/css/reservation-status.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -29,15 +30,16 @@
             <h2>予約確認</h2>
             <p>予約IDとパスコードを入力して、QRコードを表示してください。</p>
 
-            <form id="login-form">
+            <form id="login-form" autocomplete="off">
                 <div class="form-group">
                     <label for="booking-id">予約ID</label>
-                    <input type="number" id="booking-id" class="form-control" placeholder="例: 123456" required>
+                    <input type="number" id="booking-id" class="form-control" placeholder="例: 123456" required
+                        autocomplete="off">
                 </div>
                 <div class="form-group">
                     <label for="passcode">確認コード (4桁)</label>
                     <input type="password" id="passcode" class="form-control" placeholder="例: 1234" maxlength="4"
-                        required>
+                        required autocomplete="new-password">
                 </div>
                 <button type="submit" class="btn btn-primary btn-block">確認する</button>
             </form>

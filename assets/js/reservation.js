@@ -272,47 +272,60 @@ const MIN_ZOOM = 0.4;
 
 function initStep2() {
     // Open Modal
-    document.getElementById('btn-open-seat-modal').addEventListener('click', () => {
-        openSeatModal();
-    });
+    const btnOpen = document.getElementById('btn-open-seat-modal');
+    if (btnOpen) {
+        btnOpen.addEventListener('click', () => {
+            openSeatModal();
+        });
+    }
 
     // Close Modal
-    document.getElementById('btn-close-modal').addEventListener('click', () => {
-        if (confirm('選択内容は保存されません。閉じますか？')) {
-            // Revert changes? Or just keep? 
-            // User requested "Select Seat" -> Modal. 
-            // Usually "Cancel" reverts, "Confirm" saves.
-            // For simplicity, we just hide. Selection remains in state.selectedSeats unless we implement restore.
-            // Let's assume selection is live.
-            closeSeatModal();
-        }
-    });
+    const btnClose = document.getElementById('btn-close-modal');
+    if (btnClose) {
+        btnClose.addEventListener('click', () => {
+            if (confirm('選択内容は保存されません。閉じますか？')) {
+                closeSeatModal();
+            }
+        });
+    }
 
-    document.getElementById('btn-confirm-selection').addEventListener('click', () => {
-        closeSeatModal();
-        updateSelectedSeatsUI();
-    });
+    const btnConfirm = document.getElementById('btn-confirm-selection');
+    if (btnConfirm) {
+        btnConfirm.addEventListener('click', () => {
+            closeSeatModal();
+            updateSelectedSeatsUI();
+        });
+    }
 
     // Zoom Controls
-    document.getElementById('btn-zoom-in').addEventListener('click', () => {
-        if (currentZoom < MAX_ZOOM) {
-            currentZoom += ZOOM_STEP;
-            updateZoom();
-        }
-    });
+    const btnZoomIn = document.getElementById('btn-zoom-in');
+    if (btnZoomIn) {
+        btnZoomIn.addEventListener('click', () => {
+            if (currentZoom < MAX_ZOOM) {
+                currentZoom += ZOOM_STEP;
+                updateZoom();
+            }
+        });
+    }
 
-    document.getElementById('btn-zoom-out').addEventListener('click', () => {
-        if (currentZoom > MIN_ZOOM) {
-            currentZoom -= ZOOM_STEP;
-            updateZoom();
-        }
-    });
+    const btnZoomOut = document.getElementById('btn-zoom-out');
+    if (btnZoomOut) {
+        btnZoomOut.addEventListener('click', () => {
+            if (currentZoom > MIN_ZOOM) {
+                currentZoom -= ZOOM_STEP;
+                updateZoom();
+            }
+        });
+    }
 
-    document.getElementById('btn-zoom-reset').addEventListener('click', () => {
-        currentZoom = 0.8; // Default slightly zoomed out for mobile
-        if (window.innerWidth > 600) currentZoom = 1.0;
-        updateZoom();
-    });
+    const btnZoomReset = document.getElementById('btn-zoom-reset');
+    if (btnZoomReset) {
+        btnZoomReset.addEventListener('click', () => {
+            currentZoom = 0.8; // Default slightly zoomed out for mobile
+            if (window.innerWidth > 600) currentZoom = 1.0;
+            updateZoom();
+        });
+    }
 }
 
 function updateZoom() {

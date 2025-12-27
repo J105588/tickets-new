@@ -391,7 +391,7 @@ function getStatusBadge(status) {
     // Larger badges for scanner
     const map = {
         'confirmed': '<span class="status-badge status-confirmed" style="font-size:1.1rem; padding:6px 16px;">予約済</span>',
-        'checked_in': '<span class="status-badge status-checked_in" style="font-size:1.1rem; padding:6px 16px;">来場済</span>',
+        'checked_in': '<span class="status-badge status-checked_in" style="font-size:1.1rem; padding:6px 16px;">入場済</span>',
         'cancelled': '<span class="status-badge status-cancelled" style="font-size:1.1rem; padding:6px 16px;">無効</span>'
     };
     return map[status] || status;

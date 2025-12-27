@@ -187,7 +187,7 @@ function renderReservationTable(data) {
         let statusClass = '';
         let statusText = r.status;
         if (r.status === 'confirmed') { statusClass = 'status-confirmed'; statusText = '予約済'; }
-        else if (r.status === 'checked_in') { statusClass = 'status-checked-in'; statusText = '引換済'; }
+        else if (r.status === 'checked_in') { statusClass = 'status-checked-in'; statusText = '入場済'; }
         else if (r.status === 'cancelled') { statusClass = 'status-cancelled'; statusText = 'キャンセル'; }
 
         const seats = r.seats ? r.seats.map(s => s.seat_id).join(', ') : '-';

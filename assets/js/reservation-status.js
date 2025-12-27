@@ -131,6 +131,8 @@ function showDetails(data) {
             console.log('Booking update:', newBooking);
             if (newBooking.status === 'checked_in') {
                 updateUIAsCheckedIn();
+            } else if (newBooking.status === 'cancelled') {
+                updateUIAsCancelled();
             }
         });
 
@@ -151,12 +153,37 @@ function showDetails(data) {
         }, 3000);
     }
 
-    // Initial check (in case already checked in)
+    // Initial check
     if (data.status === 'checked_in') {
         updateUIAsCheckedIn();
+    } else if (data.status === 'cancelled') {
+        updateUIAsCancelled();
     }
 }
 
+
+function updateUIAsCancelled() {
+    const badge = document.getElementById('status-badge');
+    badge.className = 'badge status-cancelled';
+    badge.innerText = 'キャンセル';
+
+    // Replace QR with Cross mark
+    const qrContainer = document.getElementById('qrcode');
+    qrContainer.innerHTML = `
+        <div style="text-align: center; color: var(--danger, #ef4444); animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+            <i class="fas fa-times-circle" style="font-size: 5rem; margin-bottom: 10px;"></i>
+            <div style="font-weight:bold; font-size:1.2rem; color:var(--text-color);">無効な予約</div>
+        </div>
+    `;
+
+    // Update helper text
+    const note = document.querySelector('.qr-note');
+    if (note) note.style.display = 'none';
+
+    // Hide cancel button
+    const cancelBtn = document.getElementById('btn-cancel');
+    if (cancelBtn) cancelBtn.style.display = 'none';
+}
 
 function updateUIAsCheckedIn() {
     const badge = document.getElementById('status-badge');
