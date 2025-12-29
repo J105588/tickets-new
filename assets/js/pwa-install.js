@@ -4,14 +4,14 @@ class PWAInstallHandler {
     this.deferredPrompt = null;
     this.installButton = null;
     this.isInstalled = false;
-    
+
     this.init();
   }
 
   init() {
     // インストール済みかチェック
     this.checkIfInstalled();
-    
+
     // インストールプロンプトのイベントリスナー
     window.addEventListener('beforeinstallprompt', (e) => {
       console.log('PWA install prompt triggered');
@@ -41,8 +41,8 @@ class PWAInstallHandler {
 
   checkIfInstalled() {
     // スタンドアロンモードかチェック
-    if (window.matchMedia('(display-mode: standalone)').matches || 
-        window.navigator.standalone === true) {
+    if (window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone === true) {
       this.isInstalled = true;
     }
   }
@@ -175,16 +175,16 @@ class PWAInstallHandler {
     try {
       // インストールプロンプトを表示
       this.deferredPrompt.prompt();
-      
+
       // ユーザーの選択を待つ
       const { outcome } = await this.deferredPrompt.userChoice;
-      
+
       if (outcome === 'accepted') {
         console.log('User accepted the install prompt');
       } else {
         console.log('User dismissed the install prompt');
       }
-      
+
       // プロンプトをクリア
       this.deferredPrompt = null;
       this.hideInstallButton();
@@ -252,5 +252,4 @@ class PWAInstallHandler {
 
 // PWAインストールハンドラーを初期化
 document.addEventListener('DOMContentLoaded', () => {
-  new PWAInstallHandler();
 });

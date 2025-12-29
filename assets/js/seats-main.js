@@ -1091,7 +1091,7 @@ function createSeatElement(seatData) {
   const isAdminMode = currentMode === 'admin' || IS_ADMIN;
   const isSuperAdminMode = currentMode === 'superadmin';
 
-  if (isAdminMode && (seatData.status === 'to-be-checked-in' || seatData.status === 'reserved')) {
+  if (isAdminMode && (seatData.status === 'to-be-checked-in' || seatData.status === 'reserved' || seatData.status === 'secured')) {
     // チェックイン可能な座席を選択可能にする
     seat.classList.add('checkin-selectable');
     seat.dataset.seatName = seatData.name || '';
@@ -1351,7 +1351,7 @@ function showBulkSeatEditModal(seatIds) {
 // 管理者モードでの座席クリック処理
 function handleAdminSeatClick(seatData) {
   // チェックイン可能な座席のみ選択可能（確保ステータスも含む）
-  if (seatData.status !== 'to-be-checked-in' && seatData.status !== 'reserved' && seatData.status !== 'walkin') {
+  if (seatData.status !== 'to-be-checked-in' && seatData.status !== 'reserved' && seatData.status !== 'walkin' && seatData.status !== 'secured') {
     console.log('この座席はチェックインできません:', seatData.status);
     return;
   }
@@ -1463,20 +1463,12 @@ function updateSelectedSeatsDisplay() {
 
 
 
-// override checkInSelected for safety
-const originalCheckInSelected = window.checkInSelected;
-window.checkInSelected = function () {
-  if (rebookId) {
-    console.warn('Rebook mode active: Check-in disabled.');
-    return;
-  }
-  if (originalCheckInSelected) originalCheckInSelected();
-};
+// checkInSelected wrapper removed - guard logic moved to function definition
 
 // グローバル関数として設定
 window.showLoader = showLoader;
 window.toggleAutoRefresh = toggleAutoRefresh;
-// window.checkInSelected is already set above
+window.checkInSelected = checkInSelected;
 window.confirmReservation = confirmReservation;
 window.promptForAdminPassword = promptForAdminPassword;
 window.toggleAutoRefreshSettings = toggleAutoRefreshSettings;
@@ -1623,6 +1615,10 @@ function promptForAdminPassword() {
 
 // 複数同時チェックイン機能（最適化版）
 async function checkInSelected() {
+  if (rebookId) {
+    console.warn('Rebook mode active: Check-in disabled.');
+    return;
+  }
   const selectedSeatElements = document.querySelectorAll('.seat.selected-for-checkin');
   if (selectedSeatElements.length === 0) {
     alert('チェックインする座席を選択してください。');
@@ -1663,6 +1659,9 @@ async function checkInSelected() {
     // 選択状態をクリア
     seatEl.classList.remove('selected-for-checkin');
   });
+
+  // Clear global selection array
+  selectedSeats = [];
 
   // 選択表示を更新
   updateSelectedSeatsDisplay();
