@@ -260,6 +260,27 @@ class OptimizedGasAPI {
     return response;
   }
 
+  // 管理者用：座席交換（キャッシュクリア）
+  static async adminChangeSeats(bookingId, newSeatIds) {
+    // Note: This calls generic JSONP API action 'admin_change_seats' which is handled by AdminAPI in GAS
+    // The params expectation might need adjustment if _callApi wraps differently, 
+    // but typical _callApi just passes params array.
+    // However, AdminAPI.gs expects { action, id, seats }. 
+    // OptimizedGasAPI usually maps functionName to GAS function.
+    // IF the GAS side has a function `adminChangeSeats(bookingId, newSeatIds)`, this works.
+    // Let's assume we need to expose this in GAS or use valid mapping.
+    // Current OptimizedGasAPI maps 1:1 to GAS functions usually.
+    // Provide direct mapping to `adminChangeSeats` in GAS if it exists, OR `admin_change_seats`.
+    // Let's use `adminChangeSeats` as function name and ensure GAS has it exposed via doGet/doPost dispatcher if using JSONP wrapper there?
+    // Actually OptimizedGasAPI constructs `func=functionName`.
+    // We need to ensure GAS has `adminChangeSeats`. AdminAPI.gs has `function adminChangeSeats(bookingId, newSeatIds)`.
+    // So 1:1 mapping is correct.
+    const response = await this._callApi('adminChangeSeats', [bookingId, newSeatIds]);
+    apiCache.clearFunctionCache('getSeatData');
+    apiCache.clearFunctionCache('getSeatDataMinimal');
+    return response;
+  }
+
   // その他のメソッド（キャッシュなし）
   static async testApi() {
     const response = await this._callApi('testApi');

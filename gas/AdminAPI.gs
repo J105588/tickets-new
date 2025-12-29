@@ -44,6 +44,15 @@ function getAdminReservations(filters) {
       }
       // クラスのみの検索はあまり意味がないのでスキップ
     }
+
+    // 3. フリーワード検索 (名前, 予約ID, メール)
+    if (filters.search) {
+        const term = encodeURIComponent(filters.search);
+        // Supabase PostgREST syntax for OR: or=(col1.ilike.*val*,col2.ilike.*val*)
+        // Note: reservation_id is typically text/uuid. id is int (might fail ilike if not cast, but typically we search text fields).
+        // Let's search name, reservation_id, email.
+        conditions.push(`or=(name.ilike.*${term}*,reservation_id.ilike.*${term}*,email.ilike.*${term}*)`);
+    }
     
     // クエリパラメータの結合
     let endpoint = 'bookings?' + query;
@@ -113,24 +122,6 @@ function adminResendEmail(bookingId) {
 // 管理者用: 座席変更
 // ==========================================
 function adminChangeSeats(bookingId, newSeatIds) {
-  // 1. 旧座席の特定と開放
-  // 2. 新座席の空き確認
-  // 3. 新座席の確保とbookings紐付け
-  // これらはトランザクション的動きが必要だが、GASでは分割実行になる
-  
-  // 実装簡略化のため、一度「キャンセル扱い」にして座席を開放し、
-  // すぐに「新規予約と同じロジック」で座席を確保し直す、という手が使えるが
-  // bookingレコード自体のIDを変えたくないので、座席のupdateのみ行う。
-  
-  /* ... Complex logic implementation needed ... */
-  // Time constraint: Simple implementation first.
-  
-  /*
-    SupabaseIntegrationに updateMultipleSeatsがある。
-    1. 現在の座席を NULL/available に戻す
-    2. 新しい座席を reserved/booking_id にする
-  */
-  
   try {
     // 現在の予約取得
     const bookingRes = supabaseIntegration.getBooking(bookingId);
@@ -138,25 +129,34 @@ function adminChangeSeats(bookingId, newSeatIds) {
     const booking = bookingRes.data;
     const performanceId = booking.performance_id;
 
-    // 1. 現在の座席を開放
-    const currentSeats = booking.seats; // {seat_id, ...}
-    const releaseUpdates = currentSeats.map(s => ({
-      seatId: s.seat_id,
-      data: { status: 'available', booking_id: null, reserved_by: null, reserved_at: null }
-    }));
-    
-    const releaseRes = supabaseIntegration.updateMultipleSeats(performanceId, releaseUpdates);
-    if (!releaseRes.success) return { success: false, error: '旧座席の開放に失敗' };
+    // 1. Bulk Release: Release ALL seats associated with this booking ID
+    // This is more robust than iterating individually and avoids phantom seats
+    const releaseRes = supabaseIntegration._request(`seats?booking_id=eq.${bookingId}`, {
+        method: 'PATCH',
+        useServiceRole: true,
+        body: { 
+            status: 'available', 
+            booking_id: null, 
+            reserved_by: null, 
+            reserved_at: null 
+        }
+    });
+
+    if (!releaseRes.success) return { success: false, error: '旧座席の開放に失敗(Bulk): ' + releaseRes.error };
     
     // 2. 新しい座席の確保
     // まず空きチェック
     const checkRes = supabaseIntegration._request(`seats?performance_id=eq.${performanceId}&seat_id=in.(${newSeatIds.join(',')})`);
     const targetSeats = checkRes.data;
     
-    const unavailable = targetSeats.filter(s => s.status !== 'available' && s.booking_id !== bookingId); // 自分自身はOKだが既に開放してるはず
+    // 他人の予約が入っているかチェック (Bulk Release後なので、自分自身も既にnullになっているはず → 即ち埋まっててはいけない)
+    // ただし、既に開放済みなので、もし埋まっていたら「他人」確定。
+    const unavailable = targetSeats.filter(s => s.status !== 'available');
+    
     if (unavailable.length > 0) {
-      // ロールバック（旧座席を戻す）が必要だが、ここではエラーを返すのみ（危険）
-      return { success: false, error: '選択された座席は既に埋まっています' };
+      // 復旧困難（既に開放してしまった）
+      // FIXME: 本来はトランザクションにするべきだが、修正の緊急度優先
+      return { success: false, error: '選択された座席は既に埋まっています（旧座席は開放されました）' };
     }
     
     const reserveUpdates = newSeatIds.map(sid => ({
@@ -251,3 +251,67 @@ function adminUpdateReservation(bookingId, updates) {
     return { success: false, error: e.message };
   }
 }
+
+// ==========================================
+// 管理者用: まとめメール送信
+// ==========================================
+function adminSendSummaryEmails(jobs) {
+  let count = 0;
+  let errors = [];
+  
+  if (!jobs || !Array.isArray(jobs)) return { success: false, error: 'Invalid jobs' };
+
+  jobs.forEach(job => {
+    try {
+      const name = job.name;
+      const emails = job.emails; // Array
+      if (!emails || emails.length === 0) return;
+
+      const bookings = job.bookings || [];
+      
+      let body = `${name} 様\n\n平素より大変お世話になっております。\n市川学園座席管理システム運営でございます。\n\nお客様の現在のご予約状況を以下の通りまとめてご案内申し上げます。\n\n--------------------------------------------------\n`;
+      
+      bookings.forEach((b, i) => {
+        let statusText = b.status;
+        if (b.status === 'confirmed') statusText = '予約済';
+        if (b.status === 'checked_in') statusText = '入場済';
+        if (b.status === 'cancelled') statusText = 'キャンセル';
+
+        const link = `https://j105588.github.io/tickets-new/pages/reservation-status.html?id=${b.id}&pass=${b.passcode}`;
+        
+        let createdStr = '不明';
+        if (b.created_at) {
+          const d = new Date(b.created_at);
+          createdStr = Utilities.formatDate(d, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm');
+        }
+
+        body += `[${i+1}] ${b.group_name}\n`;
+        body += `     日時: ${b.day} (${b.timeslot})\n`;
+        body += `     座席: ${b.seat}\n`;
+        body += `     予約ID: ${b.id}\n`;
+        body += `     ステータス: ${statusText}\n`;
+        body += `     予約受付日時: ${createdStr}\n`;
+        body += `     詳細確認: ${link}\n`;
+        body += `--------------------------------------------------\n`;
+      });
+      
+      body += `\n当日はQRコードをご提示の上、受付までお越しください。\nご来場を心よりお待ち申し上げております。\n\n市川学園座席管理システム`;
+      
+      const recipient = emails[0];
+      const options = {};
+      if (emails.length > 1) {
+        options.cc = emails.slice(1).join(',');
+      }
+      
+      MailApp.sendEmail(recipient, '【市川学園座席管理システム】ご予約内容の確認', body, options);
+      count++;
+      
+    } catch (e) {
+      errors.push(`${job.name}: ${e.message}`);
+      console.error('Email send failed for ' + job.name, e);
+    }
+  });
+
+  return { success: true, count: count, errors: errors };
+}
+

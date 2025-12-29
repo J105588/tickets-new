@@ -4,6 +4,8 @@
  * GAS API版
  */
 
+import { apiUrlManager } from './config.js';
+
 import {
     fetchMasterDataFromSupabase,
     adminGetReservations,
@@ -13,7 +15,9 @@ import {
     adminFetchSchedules,     // New
     adminManageSchedule,     // New
     adminDeleteSchedule,     // New
-    adminManageMaster        // New
+    adminManageMaster,       // New
+    adminSendSummaryEmails,   // New
+    adminSwapSeats           // New
 } from './supabase-client.js';
 
 let currentReservations = [];
@@ -84,6 +88,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // 3. Initial Search
     applyFilters();
+
+    // 4. Search Input Enter Key
+    const searchInput = document.getElementById('filter-search');
+    if (searchInput) {
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                applyFilters();
+            }
+        });
+    }
 });
 
 // --- Data Loading ---
@@ -154,19 +168,7 @@ function applyFilterOptions() {
         });
     }
 
-    // 3. Timeslots Filter
-    const timeSelect = document.getElementById('filter-timeslot');
-    if (timeSelect) {
-        timeSelect.innerHTML = '<option value="">全ての時間帯</option>';
-        // Sort timeslots
-        const sorted = [...masterData.timeslots].sort((a, b) => (a.start_time || '').localeCompare(b.start_time || ''));
-        sorted.forEach(t => {
-            const opt = document.createElement('option');
-            opt.value = t.slot_code;
-            opt.innerText = `${t.slot_code} (${t.start_time}-${t.end_time})`;
-            timeSelect.appendChild(opt);
-        });
-    }
+
 }
 
 // --- Dashboard Logic ---
@@ -174,8 +176,7 @@ function applyFilterOptions() {
 window.applyFilters = async function (isBackground = false) {
     const group = document.getElementById('filter-group').value;
     const day = document.getElementById('filter-day').value;
-    const timeslot = document.getElementById('filter-timeslot').value;
-    const search = document.getElementById('filter-search').value;
+    const search = document.getElementById('filter-search').value.trim();
 
     if (!isBackground) {
         const loading = document.getElementById('loading');
@@ -183,7 +184,7 @@ window.applyFilters = async function (isBackground = false) {
         document.getElementById('reservation-table').style.opacity = '0.5';
     }
 
-    const result = await adminGetReservations({ group, day, timeslot, search });
+    const result = await adminGetReservations({ group, day, search });
 
     if (!isBackground) {
         const loading = document.getElementById('loading');
@@ -337,6 +338,11 @@ window.openEditModal = function (id) {
     document.getElementById('edit-email').value = selectedBooking.email;
     document.getElementById('edit-grade').value = selectedBooking.grade_class || '';
     document.getElementById('edit-club').value = selectedBooking.club_affiliation || '';
+
+    // Populate Seat Input
+    const seats = selectedBooking.seats ? selectedBooking.seats.map(s => s.seat_id).join(', ') : '';
+    document.getElementById('edit-seat').value = seats;
+
     document.getElementById('edit-notes').value = selectedBooking.notes || '';
     document.getElementById('edit-status').value = selectedBooking.status;
 
@@ -394,6 +400,76 @@ async function handleCancel(id) {
         alert('エラー: ' + res.error);
     }
 }
+
+window.changeSeat = async function () {
+    if (!selectedBooking) return;
+    const newSeatsStr = document.getElementById('edit-seat').value.trim();
+    if (!newSeatsStr) return alert('座席IDを入力してください');
+
+    if (!confirm(`座席を「${newSeatsStr}」に変更しますか？\n\n注意: 旧座席は開放されます。新座席が空いていない場合はエラーになります。`)) return;
+
+    const btn = document.querySelector('button[onclick="changeSeat()"]');
+    const originalText = btn.innerText;
+    btn.innerText = '変更中...';
+    btn.disabled = true;
+
+    // Split by comma or space
+    const newSeats = newSeatsStr.split(/[,、\s]+/).map(s => s.trim()).filter(s => s);
+
+    const res = await adminSwapSeats(selectedBooking.id, newSeats);
+
+    if (res.success) {
+        alert('座席を変更しました');
+        closeModal('modal-edit'); // Close to refresh data cleanly via applyFilters
+        applyFilters();
+    } else {
+        alert('変更失敗: ' + res.error);
+    }
+
+    btn.innerText = originalText;
+    btn.disabled = false;
+};
+
+window.selectFromMap = function () {
+    if (!selectedBooking) return;
+    // booking details
+    const p = selectedBooking.performances || selectedBooking.performance || {};
+    if (!p.group_name || !p.day || !p.timeslot) {
+        alert('公演情報が不足しているため座席表を開けません');
+        return;
+    }
+
+    // Construct URL
+    const params = new URLSearchParams();
+    params.set('group', p.group_name);
+    params.set('day', p.day);
+    params.set('timeslot', p.timeslot);
+    params.set('admin', 'true');
+    params.set('rebook', selectedBooking.id);
+
+    params.set('rebook', selectedBooking.id);
+    params.set('embed', 'true'); // New param for embed mode
+
+    // Set iframe src and open modal
+    const iframe = document.getElementById('seat-map-frame');
+    iframe.src = `../pages/seats.html?${params.toString()}`;
+
+    document.getElementById('modal-seat-map').classList.add('active');
+};
+
+// Listen for messages from iframe
+window.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'REBOOK_COMPLETE') {
+        if (event.data.success) {
+            alert('座席変更が完了しました');
+            closeModal('modal-seat-map');
+            closeModal('modal-edit'); // Close edit modal too
+            applyFilters(); // Refresh list
+        } else {
+            alert('座席変更エラー: ' + (event.data.error || 'Unknown'));
+        }
+    }
+});
 
 window.resendEmail = function () {
     if (!selectedBooking) return;
@@ -599,6 +675,88 @@ function switchTab(tabId) {
     if (tabId === 'dashboard') btns[0].classList.add('active');
     if (tabId === 'settings') btns[1].classList.add('active');
 }
+
+window.sendSummaryEmails = async function () {
+    if (!currentReservations || currentReservations.length === 0) {
+        alert('送信対象の予約がありません。フィルタを確認してください。');
+        return;
+    }
+
+    if (!confirm(`現在表示されている ${currentReservations.length} 件の予約情報からまとめメールを作成して送信します。\n\n・名前が一致する予約を束ねます\n・重複するメールアドレスには1通のみ送信します\n\n実行しますか？`)) return;
+
+    // 1. Group by Name
+    const groups = {}; // name -> { bookings: [], emails: Set() }
+
+    currentReservations.forEach(r => {
+        // Normalize name? Assuming exact match for now.
+        const name = r.name.trim();
+        if (!groups[name]) {
+            groups[name] = { name: name, bookings: [], emails: new Set() };
+        }
+        groups[name].bookings.push(r);
+        if (r.email) groups[name].emails.add(r.email.trim());
+    });
+
+    const jobList = Object.values(groups).map(g => ({
+        name: g.name,
+        emails: Array.from(g.emails),
+        bookings: g.bookings.map(b => ({
+            id: b.id,
+            group_name: b.performances ? b.performances.group_name : '', // Assuming joined
+            day: b.performances ? b.performances.day : '',
+            timeslot: b.performances ? b.performances.timeslot : '',
+            seat: b.seats ? b.seats.map(s => s.seat_id).join(',') : '指定なし',
+            status: b.status,     // Add status
+            passcode: b.passcode, // Add passcode
+            created_at: b.created_at // Add created_at
+        }))
+    }));
+
+    console.log(`Sending summary emails to ${jobList.length} unique names.`);
+
+    // 2. Distribute and Send
+    const urls = apiUrlManager.getAllUrls();
+    const batchSize = 3; // Small batch for GAS execution time safety
+    const jobs = [...jobList];
+    let results = { success: 0, failure: 0 };
+
+    // Progress UI (Simple)
+    const btn = document.querySelector('button[onclick="sendSummaryEmails()"]');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 送信中...';
+
+    try {
+        // Process in chunks
+        for (let i = 0; i < jobs.length; i += batchSize) {
+            const chunk = jobs.slice(i, i + batchSize);
+            // Select URL (Round Robin)
+            const urlIndex = (i / batchSize) % urls.length;
+            const targetUrl = urls[urlIndex];
+
+            console.log(`Sending batch ${i} - ${i + batchSize} to ${targetUrl}`);
+
+            // Execute
+            const res = await adminSendSummaryEmails(chunk, targetUrl);
+
+            if (res.success) {
+                results.success += (res.count || chunk.length);
+            } else {
+                console.error('Batch failed:', res.error);
+                results.failure += chunk.length; // Count as failed
+            }
+        }
+
+        alert(`送信完了\n成功: ${results.success}件\n失敗: ${results.failure}件`);
+
+    } catch (e) {
+        alert('送信中にエラーが発生しました: ' + e.message);
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+};
+
 
 function logout() {
     sessionStorage.removeItem('admin_session');

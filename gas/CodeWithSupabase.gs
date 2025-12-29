@@ -238,6 +238,11 @@ function doGet(e) {
              response = adminUpdateReservation(e.parameter.id, updates);
              break;
              
+           case 'admin_send_summary_email':
+             var jobs = JSON.parse(e.parameter.jobs || '[]');
+             response = adminSendSummaryEmails(jobs);
+             break;
+             
          case 'admin_cancel_reservation':
            // 管理者権限でのキャンセル（パスコード不要バージョン、ログ残すなど）
            // ここでは既存のcancelReservationを再利用しつつ、passcodeチェックを回避するラッパーが必要だか、
@@ -450,9 +455,10 @@ async function getSeatDataSupabase(group, day, timeslot, isAdmin = false, isSupe
         columnE: (seat.bookings && seat.bookings.notes) ? seat.bookings.notes : (seat.notes || '')
       };
       
-      // 管理者の場合のみ名前を追加
+      // 管理者の場合のみ名前と予約IDを追加
       if (isAdmin || isSuperAdmin) {
         seatData.name = seat.reserved_by || null;
+        seatData.reservation_id = seat.booking_id || null; // Rebookingのために必須
       }
       
       seatMap[seatId] = seatData;
@@ -766,6 +772,9 @@ function assignWalkInConsecutiveSeatsSupabase(group, day, timeslot, count) {
  */
 function updateSeatDataSupabase(group, day, timeslot, seatId, columnC, columnD, columnE) {
   try {
+    Logger.log(`[updateSeatDataSupabase] Start: Group=${group}, Day=${day}, Time=${timeslot}, Seat=${seatId}`);
+    Logger.log(`[updateSeatDataSupabase] Inputs: C=${columnC}, D=${columnD}, E=${columnE}`);
+
     const performanceResult = getOrCreatePerformance(group, day, timeslot);
     if (!performanceResult.success) {
       return { success: false, message: performanceResult.error };
@@ -773,20 +782,28 @@ function updateSeatDataSupabase(group, day, timeslot, seatId, columnC, columnD, 
     
     const performanceId = performanceResult.data.id;
     
-    // 座席データの更新
-    // まずはseatsテーブルの更新を試みる（notesカラムがあることを期待）
+    const newStatus = mapColumnCToSupabaseStatus(columnC);
+
+    // 座席データの更新ペイロード作成
     let updates = {
-      status: mapColumnCToSupabaseStatus(columnC),
+      status: newStatus,
       reserved_by: columnD,
       notes: columnE, 
-      checked_in_at: (mapColumnCToSupabaseStatus(columnC) === 'checked_in') ? new Date().toISOString() : null
+      checked_in_at: (newStatus === 'checked_in') ? new Date().toISOString() : null
     };
+
+    // ステータスが「空（available）」になる場合、予約との紐付けを解除する
+    if (newStatus === 'available') {
+      updates.booking_id = null;
+      updates.reserved_by = null; // 名前もクリア
+      updates.notes = null;       // メモもクリア
+    }
     
     let updateResult = supabaseIntegration.updateSeat(performanceId, seatId, updates);
     
-    // notesカラムがない場合のエラー対策: 再試行
-    if (!updateResult.success && updateResult.error && updateResult.error.includes('notes')) {
-      console.warn('seatsテーブルにnotesがない可能性があります。notesを除外して再試行します。', seatId);
+    // columnsエラー（特にnotesがない場合）の対策: 再試行
+    if (!updateResult.success) {
+      console.warn('更新失敗、notesを除外して再試行します。', seatId, updateResult.error);
       delete updates.notes;
       updateResult = supabaseIntegration.updateSeat(performanceId, seatId, updates);
     }
@@ -794,9 +811,72 @@ function updateSeatDataSupabase(group, day, timeslot, seatId, columnC, columnD, 
     if (!updateResult.success) {
       return { success: false, message: '座席データの更新に失敗しました: ' + (updateResult.error || '不明なエラー') };
     }
+
+    // 更新対象が見つからなかった場合(success=trueだがdataが空)
+    if (!updateResult.data || updateResult.data.length === 0) {
+      Logger.log(`[updateSeatDataSupabase] No rows updated! PerformanceID=${performanceId}, SeatID=${seatId}`);
+      return { success: false, message: '更新対象の座席が見つかりませんでした。データが不整合の可能性があります。' };
+    }
     
     // booking_idがある場合、bookingsテーブルも連動して更新する
-    if (updateResult.data && updateResult.data.length > 0) {
+    // updateResult.data[0]には更新「後」のデータが入るが、booking_idがnullに更新された場合、
+    // ここでbooking_idが取れない可能性があるため、更新前のデータが必要？
+    // Supabaseのupdateレスポンスは更新後の行を返す。
+    // 「空」にした場合、booking_idはnullになっているので、ここでのbooking更新がスキップされてしまう！
+    // 対策: booking_idの取得には「更新前」の状態を知る必要があるが、
+    // ここでは簡易的に「更新結果にbooking_idがあれば更新、なければキャンセル処理はできない...？」
+    // 解決策: updateSeatの前に現在の座席データを取得するか、
+    // frontendからbooking_idを送ってもらうか、
+    // または、updateSeatのレスポンスにbooking_idが含まれていなくても、
+    // 「空」にする操作の場合は、本来は「紐付いていた予約」をキャンセルすべき。
+    
+    // しかし、updateSeatでbooking_id=nullにすると、もう紐付けが切れているので、
+    // booking_idを知る由もない。
+    // そこで、updateSeatをする「前」にgetSeatsするか、
+    // あるいは、updateSeatDataSupabaseでは「座席の更新」に集中し、
+    // bookingのキャンセルは「booking_idが判明している」場合に限る？
+    
+    // 既存のコードは updateResult.data[0].booking_id を見ている。
+    // もし今回 booking_id: null にしてたら、ここは null になる。
+    // したがって、「空」にした瞬間に予約をキャンセルするロジックが動かない。
+    
+    // 修正: まず現在の座席データを取得して booking_id を確保する、のが確実だが、
+    // パフォーマンス低下を懸念。
+    // しかし正確性優先。現状の座席を取得する。
+    
+    // 待てよ、updateResult.data[0] は「更新された行」だが、
+    // select指定しないと全て返る。
+    // もし booking_id を null にしたら null が返る。
+    
+    // 対策: updateSeat処理の前に、現在のbooking_idを取得しておく。
+    // しかし、getSeatsは少し重い。
+    // ここは「予約のキャンセル」は必須要件か？
+    // 「空」にしたのに「予約」が生きてると、座席なし予約が残る。
+    // これはデータ不整合。
+    // したがって、キャンセルすべき。
+    
+    // 事前にbooking_idを取得するための軽量クエリを実行
+    let previousBookingId = null;
+    if (newStatus === 'available') {
+       const checkQuery = supabaseIntegration._request(`seats?performance_id=eq.${performanceId}&seat_id=eq.${seatId}&select=booking_id`);
+       if (checkQuery.success && checkQuery.data && checkQuery.data.length > 0) {
+         previousBookingId = checkQuery.data[0].booking_id;
+       }
+    }
+    
+    // --- 予約の連動更新 ---
+    
+    // 1. 今回の操作で紐付けが解除された予約 (Availableになった場合)
+    if (previousBookingId) {
+       Logger.log(`紐付け解除された予約をキャンセルします: ${previousBookingId}`);
+       supabaseIntegration.updateBooking(previousBookingId, {
+         status: 'cancelled',
+         notes: '管理者による座席解放のため自動キャンセル'
+       });
+    }
+    
+    // 2. 紐付けが継続している予約の更新 (Available以外)
+    if (newStatus !== 'available' && updateResult.data && updateResult.data.length > 0) {
       const seatData = updateResult.data[0];
       if (seatData.booking_id) {
          let bookingUpdates = {};
@@ -807,22 +887,30 @@ function updateSeatDataSupabase(group, day, timeslot, seatId, columnC, columnD, 
          }
          
          // 2. 名前の同期 (D列 -> name)
-         // ※ D列が空でない場合のみ更新（誤消去防止）
-         if (columnD && columnD.trim() !== '') {
+         // 空文字も許容して同期する（削除対応）
+         if (columnD !== undefined) {
            bookingUpdates.name = columnD;
          }
          
+         // E列の内容による自動チェックイン判定を廃止 (ステータス依存に変更)
+         // if (columnE && (columnE.includes('済') || columnE.toLowerCase().includes('check'))) {
+         //   updates.checked_in_at = new Date().toISOString();
+         // }
+         
          // 3. ステータスの同期
-         const newStatus = mapColumnCToSupabaseStatus(columnC);
          if (newStatus === 'checked_in') {
            bookingUpdates.status = 'checked_in';
            bookingUpdates.checked_in_at = new Date().toISOString();
          } else if (newStatus === 'reserved') {
-           // チェックイン取り消し等の場合、confirmedに戻す
-           // ただし、既にcancelledの場合は戻さない方が安全だが、
-           // 「座席編集」で「予約済」を選んだ＝有効な予約にしたい意図と捉える
+           // 既にcancelledなどでない限りconfirmedにする
            bookingUpdates.status = 'confirmed';
            bookingUpdates.checked_in_at = null;
+           
+           // ステータス更新は慎重に。
+           // チェックイン取消の場合は confirmed に戻す
+           // キャンセルを取り消して復活させる場合も confirmed
+           // bookingUpdates.status = 'confirmed';
+           // bookingUpdates.checked_in_at = null;
          }
          
          // 更新実行
@@ -830,7 +918,6 @@ function updateSeatDataSupabase(group, day, timeslot, seatId, columnC, columnD, 
            const bookingResult = supabaseIntegration.updateBooking(seatData.booking_id, bookingUpdates);
            if (!bookingResult.success) {
              console.error('予約情報の同期に失敗しました:', seatData.booking_id, bookingResult.error);
-             // 致命的ではないので続行（座席側は更新されているため）
            } else {
              Logger.log(`予約情報同期完了: Booking ID ${seatData.booking_id}, Updates: ${JSON.stringify(bookingUpdates)}`);
            }
@@ -863,15 +950,49 @@ function updateMultipleSeatsSupabase(group, day, timeslot, updates) {
     
     const performanceId = performanceResult.data.id;
     
-    // 複数座席の更新
-    const supabaseUpdates = updates.map(update => ({
-      seatId: update.seatId,
-      data: {
-        status: mapColumnCToSupabaseStatus(update.columnC),
-        reserved_by: update.columnD,
-        checked_in_at: update.columnE ? new Date().toISOString() : null
+    // 1. Availableになる座席を特定し、関連する予約をキャンセルする
+    const turningAvailable = updates.filter(u => mapColumnCToSupabaseStatus(u.columnC) === 'available').map(u => u.seatId);
+    
+    if (turningAvailable.length > 0) {
+      // 現在のbooking_idを取得 (キャンセル用)
+      // 数が多い場合は分割すべきだが、通常運用範囲内と想定
+      // in.()構文を使用
+      const q = `performance_id=eq.${performanceId}&seat_id=in.(${turningAvailable.join(',')})&select=booking_id`;
+      const current = supabaseIntegration._request(`seats?${q}`);
+      
+      if (current.success && current.data) {
+        const bIds = current.data.map(s => s.booking_id).filter(id => id);
+        if (bIds.length > 0) {
+           Logger.log(`一括解放された座席の予約をキャンセルします: ${bIds.length}件`);
+           bIds.forEach(bid => {
+             supabaseIntegration.updateBooking(bid, { 
+               status: 'cancelled',
+               notes: '管理者による一括座席解放のため自動キャンセル'
+             });
+           });
+        }
       }
-    }));
+    }
+
+    // 複数座席の更新ペイロード作成
+    const supabaseUpdates = updates.map(update => {
+      const s = mapColumnCToSupabaseStatus(update.columnC);
+      const data = {
+        status: s,
+        reserved_by: update.columnD,
+        notes: update.columnE, // E列はメモとして保存
+        checked_in_at: (s === 'checked_in') ? new Date().toISOString() : null
+      };
+      
+      // Availableなら紐付け解除
+      if (s === 'available') {
+         data.booking_id = null;
+         data.reserved_by = null;
+         data.notes = null;
+      }
+      
+      return { seatId: update.seatId, data: data };
+    });
     
     const updateResult = supabaseIntegration.updateMultipleSeats(performanceId, supabaseUpdates);
     if (!updateResult.success) {
@@ -899,8 +1020,8 @@ function updateMultipleSeatsSupabase(group, day, timeslot, updates) {
              if (originalUpdate.columnE !== undefined) {
                bookingUpdatesMap[bookingId].notes = originalUpdate.columnE;
              }
-             // 名前同期 (上書き, 空でない場合)
-             if (originalUpdate.columnD && originalUpdate.columnD.trim() !== '') {
+             // 名前同期 (上書き, 空も許容)
+             if (originalUpdate.columnD !== undefined) {
                bookingUpdatesMap[bookingId].name = originalUpdate.columnD;
              }
              // ステータス同期

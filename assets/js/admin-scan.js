@@ -363,7 +363,7 @@ async function executeCheckIn() {
     btn.innerText = 'チェックイン';
 
     if (result.success) {
-        renderSuccessState('完了', true);
+        renderSuccessState('入場OK', true);
     } else {
         alert('失敗: ' + (result.error || '不明なエラー'));
     }

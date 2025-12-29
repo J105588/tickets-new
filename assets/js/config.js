@@ -1,8 +1,7 @@
 // config.js
 // 複数のAPI URL（使用数上限回避のため分散）
 const GAS_API_URLS = [
-  "https://script.google.com/macros/s/AKfycbxbLRuJnJmmvowHJfm2fBPQ4no1By2WUuvpXbuEEOz2vpsdYODPWyUx6q3LmznA1ieylw/exec"
-  //jxjin2010@gmail.com
+  "https://script.google.com/macros/s/AKfycbxkddTvfI400MBvsVJY8s4crH58BmOrE4OFrDmrO7QS_kAIVQO0RtCS3VDOGtUbXEgT/exec"
   //"https://script.google.com/macros/s/AKfycbwfHVEZwLbCs_sJ3ckyr6vdCLfI3twmiENbBuSOidMUOLAnGwfmGoyvGLcXihJMu8T1/exec",
   //jxjin.ig.school@gmail.com
   //"https://script.google.com/macros/s/AKfycbxGBy7NvMzEdENKL_SYA9Bvk6oq_Fx7_VW2iey0bGFlDfQmGb_-zVP3Gt2pZzJ20m9B/exec",
@@ -33,7 +32,8 @@ const LOG_SHEET_NAME = 'OPERATION_LOGS'; // ログを記録するシート名
 
 // 満席通知用メールアドレス（ハードコーディング）
 const FULL_CAPACITY_NOTIFICATION_EMAILS = [
-  'jxjin2010@gmail.com'
+  'jxjin2010@gmail.com',
+  'nzn.engeki5@gmail.com'
 ];
 
 // 強化監視システム設定

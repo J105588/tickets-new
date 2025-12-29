@@ -7,10 +7,10 @@ import errorNotification from './error-notification.js';
 class GasAPI {
   // Supabase API インスタンス
   static supabaseAPI = new SupabaseAPI();
-  
+
   // データベースモードの切り替え
   static useSupabase = true; // デフォルトはGAS APIを使用
-  
+
   static setDatabaseMode(useSupabase) {
     this.useSupabase = useSupabase;
     debugLog(`データベースモード切り替え: ${useSupabase ? 'Supabase' : 'GAS API'}`);
@@ -20,13 +20,13 @@ class GasAPI {
   static async _callSupabaseAPI(method, ...args) {
     try {
       const result = await this.supabaseAPI[method](...args);
-      
+
       if (!result.success) {
         // 特定のエラーでGASフォールバックを強制的に有効化
         if (this._shouldForceGasFallback(result)) {
           console.log(`[API] Forcing GAS fallback due to error: ${result.error}`);
           this.supabaseAPI.fallbackToGas = true;
-          
+
           // GASフォールバックで再試行
           try {
             const fallbackResult = await this.supabaseAPI[method](...args);
@@ -48,25 +48,25 @@ class GasAPI {
             this.supabaseAPI.fallbackToGas = false;
           }
         }
-        
+
         // エラー通知を表示
         if (typeof window !== 'undefined' && window.ErrorNotification) {
           window.ErrorNotification.showSupabaseError(result);
         }
         console.error(`Supabase API Error (${method}):`, result);
       }
-      
+
       return result;
     } catch (error) {
       console.error(`Supabase API Exception (${method}):`, error);
-      
+
       // 重大なエラーの場合はGASフォールバックを試行
       if (this._isCriticalError(error)) {
         try {
           console.log(`[API] Attempting GAS fallback for critical error: ${error.message}`);
           this.supabaseAPI.fallbackToGas = true;
           const fallbackResult = await this.supabaseAPI[method](...args);
-          
+
           if (fallbackResult.success) {
             // 成功通知
             if (typeof window !== 'undefined' && window.ErrorNotification) {
@@ -84,7 +84,7 @@ class GasAPI {
           this.supabaseAPI.fallbackToGas = false;
         }
       }
-      
+
       // エラー通知を表示
       if (typeof window !== 'undefined' && window.ErrorNotification) {
         window.ErrorNotification.showSupabaseError({
@@ -92,7 +92,7 @@ class GasAPI {
           errorType: 'unknown'
         });
       }
-      
+
       return {
         success: false,
         error: error.message,
@@ -104,22 +104,22 @@ class GasAPI {
   // GASフォールバックを強制すべきエラーかどうかを判定
   static _shouldForceGasFallback(result) {
     if (!result || !result.error) return false;
-    
+
     const error = result.error.toLowerCase();
     const errorType = result.errorType || '';
-    
+
     // ネットワークエラー、タイムアウト、Load failedなどの場合
     return /load failed|network|timeout|fetch|connection|cors/i.test(error) ||
-           /network_error|timeout|fetch_error|cors_error/i.test(errorType);
+      /network_error|timeout|fetch_error|cors_error/i.test(errorType);
   }
 
   // 重大なエラーかどうかを判定
   static _isCriticalError(error) {
     if (!error || !error.message) return false;
-    
+
     const message = error.message.toLowerCase();
     return /load failed|network|timeout|fetch|connection|cors|abort/i.test(message) ||
-           error.name === 'TypeError' || error.name === 'NetworkError' || error.name === 'AbortError';
+      error.name === 'TypeError' || error.name === 'NetworkError' || error.name === 'AbortError';
   }
 
   // 認証API
@@ -130,7 +130,7 @@ class GasAPI {
   static async validateSession(token, maxAgeMs = 30 * 60 * 1000) {
     return this._callApi('validateSession', [token, maxAgeMs]);
   }
-  
+
   static async _retryWithBackoff(task, shouldRetry, opts = {}) {
     const {
       retries = 2,
@@ -176,6 +176,27 @@ class GasAPI {
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const data = await resp.json();
             debugLog(`API Response (POST): ${functionName}`, data);
+
+            // Result structure: { success: true, data: { ...booking, seats: [...] } }
+            // Ensure seats are normalized (in case RPC returns aggregated strings)
+            if (data && data.success && data.data && data.data.seats) {
+              const rawSeats = data.data.seats;
+              // If rawSeats is a string (rare but possible in some RPCs), parse it
+              // If rawSeats is array of objects { seat_id: "A1, A2" }, flatten it
+              if (Array.isArray(rawSeats)) {
+                const flattenedSeats = [];
+                rawSeats.forEach(s => {
+                  if (s.seat_id && s.seat_id.includes(',')) {
+                    s.seat_id.split(',').forEach(subId => {
+                      flattenedSeats.push({ ...s, seat_id: subId.trim() });
+                    });
+                  } else {
+                    flattenedSeats.push(s);
+                  }
+                });
+                data.data.seats = flattenedSeats;
+              }
+            }
             return resolve(data);
           } catch (err) {
             if (i === candidates.length - 1) {
@@ -200,8 +221,8 @@ class GasAPI {
     return new Promise((resolve, reject) => {
       try {
         // オフライン時はオフライン同期システムに処理を委譲
-        try { 
-          if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) { 
+        try {
+          if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
             // オフライン同期システムが利用可能な場合は、オフライン操作として処理
             if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
               console.log('[API] オフライン状態を検知、オフライン同期システムに委譲');
@@ -210,9 +231,9 @@ class GasAPI {
             } else {
               return resolve({ success: false, error: 'offline', offline: true });
             }
-          } 
-        } catch (_) {}
-        
+          }
+        } catch (_) { }
+
         // ネットワーク接続状態をより詳細にチェック
         if (typeof navigator !== 'undefined' && navigator && !navigator.onLine) {
           console.log('[API] ネットワーク接続なし、オフライン同期システムに委譲');
@@ -222,25 +243,25 @@ class GasAPI {
             return resolve({ success: false, error: 'offline', offline: true });
           }
         }
-        
+
         debugLog(`API Call (JSONP): ${functionName}`, params);
 
         const callbackName = 'jsonpCallback_' + functionName + '_' + Date.now();
         const encodedParams = encodeURIComponent(JSON.stringify(params));
         const encodedFuncName = encodeURIComponent(functionName);
         const uaParam = (() => { try { return encodeURIComponent(navigator.userAgent || ''); } catch (_) { return ''; } })();
-        
+
         window[callbackName] = (data) => {
           debugLog(`API Response (JSONP): ${functionName}`, data);
           try {
-            try { if (timeoutId) clearTimeout(timeoutId); } catch (e) {}
+            try { if (timeoutId) clearTimeout(timeoutId); } catch (e) { }
             delete window[callbackName]; // コールバック関数を削除
             if (script && script.parentNode) {
               script.parentNode.removeChild(script); // スクリプトタグを削除
             }
-            
-            try { audit.wrapApiCall(functionName, params, data); } catch (_) {}
-            
+
+            try { audit.wrapApiCall(functionName, params, data); } catch (_) { }
+
             // success: falseの場合も正常なレスポンスとして扱う
             if (data && typeof data === 'object') {
               resolve(data);
@@ -259,20 +280,20 @@ class GasAPI {
         const urls = Array.isArray(GAS_API_URLS) && GAS_API_URLS.length > 0 ? GAS_API_URLS : [];
         const cacheBuster = `_=${Date.now()}`;
         const formData = `func=${encodedFuncName}&params=${encodedParams}`;
-        
+
         // URL管理システムから現在のURLを取得
         const currentUrl = apiUrlManager.getCurrentUrl();
         let currentUrlIndex = urls.indexOf(currentUrl);
         if (currentUrlIndex === -1) {
           currentUrlIndex = 0; // フォールバック
         }
-        
+
         let fullUrl = `${currentUrl}?callback=${callbackName}&${formData}&userAgent=${uaParam}&${cacheBuster}`;
 
         const script = document.createElement('script');
         script.src = fullUrl;
         script.async = true;
-        
+
         // タイムアウト設定（options.timeoutMs === null の場合は無限待機）
         let timeoutId = null;
         const timeoutMs = Object.prototype.hasOwnProperty.call(options, 'timeoutMs') ? options.timeoutMs : 20000;
@@ -283,12 +304,12 @@ class GasAPI {
               // 遅延応答で callback 未定義にならないよう、しばらくはNOOPを残す
               window[callbackName] = function noop() { /* late JSONP ignored */ };
               // 60秒後に完全クリーンアップ
-              setTimeout(() => { try { delete window[callbackName]; } catch (_) {} }, 60000);
+              setTimeout(() => { try { delete window[callbackName]; } catch (_) { } }, 60000);
               if (script && script.parentNode) {
                 script.parentNode.removeChild(script);
               }
-            } catch (e) {}
-            
+            } catch (e) { }
+
             // タイムアウト時もオフライン同期システムに委譲を試行
             if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
               console.log('[API] タイムアウト、オフライン同期システムに委譲');
@@ -308,13 +329,13 @@ class GasAPI {
               // 現在のURLのインデックスを取得
               const currentUrl = apiUrlManager.getCurrentUrl();
               const currentUrlIndexInArray = urls.indexOf(currentUrl);
-              
+
               // 現在のURLとは異なるURLを選択
               let nextUrlIndex;
               do {
                 nextUrlIndex = Math.floor(Math.random() * urls.length);
               } while (nextUrlIndex === currentUrlIndexInArray && urls.length > 1);
-              
+
               const nextUrl = `${urls[nextUrlIndex]}?callback=${callbackName}&${formData}&userAgent=${uaParam}&${cacheBuster}`;
               console.warn('Failing over to different GAS url:', nextUrl);
               script.src = nextUrl;
@@ -326,7 +347,7 @@ class GasAPI {
               script.parentNode.removeChild(script);
             }
             clearTimeout(timeoutId);
-            
+
             // より詳細なエラー情報を提供
             const errorDetails = {
               functionName,
@@ -335,7 +356,7 @@ class GasAPI {
               timestamp: new Date().toISOString()
             };
             console.error('API call failed details:', errorDetails);
-            
+
             // エラー時もオフライン同期システムに委譲を試行
             if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
               console.log('[API] エラー、オフライン同期システムに委譲');
@@ -349,7 +370,7 @@ class GasAPI {
             resolve({ success: false, error: 'APIエラー処理中に例外が発生しました: ' + e.message });
           }
         };
-        
+
         const execute = () => (document.head || document.body || document.documentElement).appendChild(script);
 
         if (FEATURE_FLAGS.apiRetryEnabled) {
@@ -382,19 +403,19 @@ class GasAPI {
 
   static _reportError(errorMessage) {
     // オフライン時は報告しない（通信しない）
-    try { if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) { return; } } catch (_) {}
+    try { if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) { return; } } catch (_) { }
     // エラー詳細をコンソールに出力
     console.error('API Error Details:', {
       message: errorMessage,
       timestamp: new Date().toISOString(),
       url: window.location.href
     });
-    
+
     // UIにエラーメッセージを表示
     try {
       const errorContainer = document.getElementById('error-container');
       const errorMessageElement = document.getElementById('error-message');
-      
+
       if (errorContainer && errorMessageElement) {
         errorMessageElement.textContent = 'サーバー通信失敗: ' + errorMessage;
         errorContainer.style.display = 'flex';
@@ -402,12 +423,12 @@ class GasAPI {
     } catch (e) {
       console.error('エラー表示に失敗しました:', e);
     }
-    
+
     // エラー報告APIを呼び出す（ただし、エラーが発生している場合はスキップ）
     try {
       const callbackName = 'jsonpCallback_reportError_' + Date.now();
       const script = document.createElement('script');
-      
+
       window[callbackName] = (data) => {
         try {
           delete window[callbackName]; // コールバック関数を削除
@@ -517,6 +538,79 @@ class GasAPI {
     }
     const response = await this._callApi('getSeatDataMinimal', [group, day, timeslot, isAdmin]);
     return response;
+  }
+
+  // ActionベースのAPI呼び出し（JSONP）
+  static _callAction(action, queryParams = {}) {
+    return new Promise((resolve) => {
+      try {
+        const callbackName = 'jsonpCallback_' + action + '_' + Date.now();
+        const script = document.createElement('script');
+        let timeoutId;
+
+        window[callbackName] = (data) => {
+          try {
+            clearTimeout(timeoutId);
+            delete window[callbackName];
+            if (script && script.parentNode) script.parentNode.removeChild(script);
+
+            if (DEBUG_MODE) {
+              console.log(`API Response (${action}):`, data);
+            }
+            resolve(data);
+          } catch (e) {
+            console.error('API callback error:', e);
+            resolve({ success: false, error: 'APIコールバック処理中にエラーが発生しました' });
+          }
+        };
+
+        const errorHandler = (err) => {
+          clearTimeout(timeoutId);
+          try { delete window[callbackName]; } catch (_) { }
+          if (script && script.parentNode) script.parentNode.removeChild(script);
+          console.error(`JSONP Load Error (${action}):`, err);
+          resolve({ success: false, error: 'サーバーへの接続に失敗しました。ネットワークを確認してください。' });
+        };
+
+        script.onerror = errorHandler;
+
+        const currentUrl = apiUrlManager.getCurrentUrl();
+        let url = `${currentUrl}?callback=${callbackName}&action=${encodeURIComponent(action)}`;
+
+        Object.keys(queryParams).forEach(key => {
+          url += `&${key}=${encodeURIComponent(queryParams[key])}`;
+        });
+
+        // Add basic tracking
+        url += `&userAgent=${encodeURIComponent(navigator.userAgent || '')}`;
+
+        script.src = url;
+
+        // Timeout
+        timeoutId = setTimeout(() => {
+          errorHandler(new Error('Timeout'));
+        }, 30000);
+
+        (document.head || document.body || document.documentElement).appendChild(script);
+
+      } catch (err) {
+        console.error('API Call Exception:', err);
+        resolve({ success: false, error: err.message });
+      }
+    });
+  }
+
+  // 座席変更（Rebook用） - Server Side Implementation (GAS)
+  // Ensures RLS bypass and logic consistency
+  static async adminChangeSeats(bookingId, selectedSeats) {
+    console.log('[GasAPI] adminChangeSeats called (GAS Proxy)', { bookingId, selectedSeats });
+
+    // Always use GAS backend for this privileged operation
+    // to avoid RLS issues with "release" (Reserved -> Available) for anon users
+    return await this._callAction('admin_change_seats', {
+      id: bookingId,
+      seats: selectedSeats.join(',')
+    });
   }
 
   // 複数座席の一括更新
@@ -762,11 +856,11 @@ class GasAPI {
           response.fallbackSubject = payload.subject || `[座席監視] 異常ステータス ${abnormal.length}件`;
           response.fallbackBody = payload.body || (header + sections);
         }
-      } catch (_) {}
+      } catch (_) { }
       return response;
     } catch (e) {
       const finalMsg = `通知メール送信に失敗しました: ${e.message || e}`;
-      try { this._reportError(finalMsg); } catch (_) {}
+      try { this._reportError(finalMsg); } catch (_) { }
       return { success: false, error: finalMsg };
     }
   }
@@ -796,7 +890,7 @@ export default GasAPI;
 
 // Expose GasAPI to window for non-module consumers (e.g., OfflineSync waiters)
 if (typeof window !== 'undefined') {
-  try { window.GasAPI = GasAPI; } catch (_) {}
+  try { window.GasAPI = GasAPI; } catch (_) { }
 }
 
 // 安全なコンソールコマンド（最高管理者パスワードが必要）
@@ -815,7 +909,7 @@ if (typeof window !== 'undefined') {
   window.SeatApp.exec = async (action, payload, password) => {
     return GasAPI._callApi('execDangerCommand', [action, payload, password]);
   };
-  
+
   // URL管理システムのコンソールコマンド
   window.SeatApp.urlInfo = () => GasAPI.getUrlManagerInfo();
   window.SeatApp.selectRandomUrl = () => GasAPI.selectRandomUrl();

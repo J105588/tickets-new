@@ -323,6 +323,23 @@ export async function adminManageMaster(table, op, recordData) {
     }
 }
 
+// Bulk Summary Email
+export async function adminSendSummaryEmails(payload, endpointUrl = null) {
+    try {
+        const params = {
+            action: 'admin_send_summary_email',
+            jobs: JSON.stringify(payload)
+        };
+        // Use provided URL or default to first (though logic should provide one)
+        const url = endpointUrl || GAS_API_URLS[0];
+        const result = await jsonpRequest(url, params);
+        return result;
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
+
 
 // GAS API Wrapper for Schedule Management (Since complex join updates/saves are better handled in GAS for now)
 // Note: config.js exports GAS_API_URLS. supabase-client.js imports SUPABASE_CONFIG. Let's add GAS_API_URLS to imports.
@@ -381,12 +398,46 @@ export async function adminManageSchedule(scheduleData) {
         if (scheduleData.id) {
             params.id = scheduleData.id;
         }
-
         const result = await jsonpRequest(GAS_API_URLS[0], params);
         return result;
     } catch (e) {
         return { success: false, error: e.message };
     }
+}
+
+// Direct Supabase Access for Rebooking (Bypassing GAS)
+export async function getBookingWithSeats(bookingId) {
+    // Use RPC 'get_booking_for_scan' to bypass RLS and fetch full details
+    // This allows rebooking via ID even if public 'select' is restricted
+    try {
+        const result = await getBookingForScan(bookingId);
+        // Ensure result structure matches expectation (res.success, res.data.seats)
+        if (result && result.success) {
+            return result;
+        }
+        // Fallback or error
+        return result || { success: false, error: 'Booking lookup failed' };
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
+// Expose to Global Scope for non-module scripts (seats-main.js)
+if (typeof window !== 'undefined') {
+    window.SupabaseClient = {
+        getBookingWithSeats,
+        fetchMasterDataFromSupabase,
+        fetchSeatsFromSupabase,
+        adminGetReservations,
+        adminUpdateBooking,
+        adminCancelBooking,
+        adminResendEmail,
+        adminSwapSeats,
+        adminFetchSchedules,
+        adminManageSchedule,
+        adminManageMaster,
+        adminSendSummaryEmails
+    };
 }
 
 export async function adminDeleteSchedule(id) {

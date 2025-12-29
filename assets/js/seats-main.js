@@ -8,14 +8,41 @@ import uiOptimizer from './ui-optimizer.js';
  * 座席選択画面のメイン処理
  */
 const urlParams = new URLSearchParams(window.location.search);
+const IS_ADMIN = urlParams.get('admin') === 'true';
+const rebookId = urlParams.get('rebook');
+
+// --- [NEW] Global App Mode Definition ---
+const MODES = {
+  NORMAL: 'NORMAL',
+  ADMIN_CHECKIN: 'ADMIN_CHECKIN',
+  SUPER_ADMIN: 'SUPER_ADMIN',
+  REBOOK: 'REBOOK',
+  WALKIN: 'WALKIN'
+};
+
+function determineAppMode() {
+  if (rebookId && IS_ADMIN) return MODES.REBOOK; // Rebook takes precedence (must have admin param)
+  const current = localStorage.getItem('currentMode');
+  if (current === 'superadmin') return MODES.SUPER_ADMIN;
+  if (current === 'admin' || IS_ADMIN) return MODES.ADMIN_CHECKIN;
+  if (current === 'walkin') return MODES.WALKIN;
+  return MODES.NORMAL;
+}
+
+const APP_MODE = determineAppMode();
+console.log('[App Mode] Determined Mode:', APP_MODE);
+// ----------------------------------------
+
 const requestedGroup = urlParams.get('group') || '';
-// DEMOモードで許可外の場合ブロックしてリダイレクト
-DemoMode.guardGroupAccessOrRedirect(requestedGroup, `seats.html?group=${encodeURIComponent(DemoMode.demoGroup)}&day=${urlParams.get('day') || '1'}&timeslot=${urlParams.get('timeslot') || 'A'}`);
-// DEMOモード時は見本演劇を強制
-let GROUP = DemoMode.enforceGroup(requestedGroup || '見本演劇');
+// DEMOモードで許可外の場合ブロックしてリダイレクト (Adminは除外)
+if (!IS_ADMIN) {
+  DemoMode.guardGroupAccessOrRedirect(requestedGroup, `seats.html?group=${encodeURIComponent(DemoMode.demoGroup)}&day=${urlParams.get('day') || '1'}&timeslot=${urlParams.get('timeslot') || 'A'}`);
+}
+// DEMOモード時は見本演劇を強制 (Adminは除外)
+let GROUP = IS_ADMIN ? (requestedGroup || '見本演劇') : DemoMode.enforceGroup(requestedGroup || '見本演劇');
 const DAY = urlParams.get('day') || '1';
 const TIMESLOT = urlParams.get('timeslot') || 'A';
-const IS_ADMIN = urlParams.get('admin') === 'true';
+// const IS_ADMIN = urlParams.get('admin') === 'true'; // Removed duplicate
 
 // ゲネプロモード時の時間帯・グループ偽装
 const DISPLAY_TIMESLOT = TIMESLOT; // 表示用の時間帯
@@ -23,6 +50,7 @@ const ACTUAL_TIMESLOT = DemoMode.enforceGeneproTimeslot(TIMESLOT); // 実際にA
 const ACTUAL_GROUP = DemoMode.enforceGeneproGroupForAPI(GROUP); // 実際にAPIで使用するグループ
 
 let selectedSeats = [];
+let ownSeats = []; // Global store for own seats in rebook mode
 let isAutoRefreshEnabled = true;
 let autoRefreshInterval = null;
 let lastUpdateTime = null;
@@ -57,19 +85,7 @@ window.onload = async () => {
     performanceInfo.textContent = `${groupName} ${DAY}日目 ${displayTimeslot}`;
   }
 
-  // 現在のモードを取得
-  const currentMode = localStorage.getItem('currentMode') || 'normal';
-  const isAdminMode = currentMode === 'admin' || IS_ADMIN;
-  const isSuperAdminMode = currentMode === 'superadmin';
-  const isWalkinMode = currentMode === 'walkin';
-
-  // 通常モード用のクラスを付与（非空席をグレー表示するため）
-  try {
-    const isNormal = !isAdminMode && !isSuperAdminMode && !isWalkinMode;
-    document.body.classList.toggle('normal-mode', isNormal);
-  } catch (_) { }
-
-  // 管理者モードの表示制御
+  // Mode-based UI Control (Strict Redesign)
   const adminIndicator = document.getElementById('admin-indicator');
   const superAdminIndicator = document.getElementById('superadmin-indicator');
   const adminLoginBtn = document.getElementById('admin-login-btn');
@@ -77,39 +93,48 @@ window.onload = async () => {
   const checkInSelectedBtn = document.getElementById('check-in-selected-btn');
   const walkinButton = document.getElementById('walkin-button');
 
-  if (isSuperAdminMode) {
-    if (superAdminIndicator) superAdminIndicator.style.display = 'block';
-    if (adminIndicator) adminIndicator.style.display = 'none';
-    if (adminLoginBtn) adminLoginBtn.style.display = 'none';
-    if (submitButton) submitButton.style.display = 'none';
-    if (checkInSelectedBtn) checkInSelectedBtn.style.display = 'none';
-    if (walkinButton) {
-      walkinButton.style.display = 'block';
-    }
-  } else if (isAdminMode) {
-    if (adminIndicator) adminIndicator.style.display = 'block';
-    if (superAdminIndicator) superAdminIndicator.style.display = 'none';
-    if (adminLoginBtn) adminLoginBtn.style.display = 'none';
-    if (submitButton) submitButton.style.display = 'none';
-    if (checkInSelectedBtn) checkInSelectedBtn.style.display = 'block';
-    if (walkinButton) walkinButton.style.display = 'none';
-  } else if (isWalkinMode) {
-    if (adminIndicator) adminIndicator.style.display = 'none';
-    if (superAdminIndicator) superAdminIndicator.style.display = 'none';
-    if (adminLoginBtn) adminLoginBtn.style.display = 'none';
-    if (submitButton) submitButton.style.display = 'none';
-    if (checkInSelectedBtn) checkInSelectedBtn.style.display = 'none';
-    if (walkinButton) {
-      walkinButton.style.display = 'block';
-    }
-  } else {
-    if (adminIndicator) adminIndicator.style.display = 'none';
-    if (superAdminIndicator) superAdminIndicator.style.display = 'none';
-    if (adminLoginBtn) adminLoginBtn.style.display = 'block';
-    if (submitButton) submitButton.style.display = 'block';
-    if (checkInSelectedBtn) checkInSelectedBtn.style.display = 'none';
-    if (walkinButton) walkinButton.style.display = 'none';
+  // Reset all first
+  if (adminIndicator) adminIndicator.style.display = 'none';
+  if (superAdminIndicator) superAdminIndicator.style.display = 'none';
+  if (adminLoginBtn) adminLoginBtn.style.display = 'none';
+  if (submitButton) submitButton.style.display = 'none';
+  if (checkInSelectedBtn) checkInSelectedBtn.style.display = 'none';
+  if (walkinButton) walkinButton.style.display = 'none';
+
+  switch (APP_MODE) {
+    case MODES.SUPER_ADMIN:
+      if (superAdminIndicator) superAdminIndicator.style.display = 'block';
+      if (walkinButton) walkinButton.style.display = 'block';
+      break;
+
+    case MODES.ADMIN_CHECKIN:
+      if (adminIndicator) adminIndicator.style.display = 'block';
+      if (checkInSelectedBtn) checkInSelectedBtn.style.display = 'block';
+      break;
+
+    case MODES.REBOOK:
+      // Rebook: Needs Submit Button (for saving), Hides Check-in UI
+      if (submitButton) {
+        submitButton.style.display = 'block';
+        submitButton.textContent = '変更を保存';
+        submitButton.style.backgroundColor = '#f59e0b'; // Orange
+      }
+      // Hide admin indicators to avoid confusion, or keep simple one? 
+      // User wants clean UI. Hiding admin specific widgets.
+      break;
+
+    case MODES.WALKIN:
+      // Walkin specific UI if any
+      break;
+
+    case MODES.NORMAL:
+    default:
+      // Normal user booking
+      if (adminLoginBtn) adminLoginBtn.style.display = 'block';
+      if (submitButton) submitButton.style.display = 'block';
+      break;
   }
+
 
   showLoader(true);
 
@@ -173,6 +198,76 @@ window.onload = async () => {
     console.log("Received seatData:", seatData);
 
     if (seatData.seatMap) {
+      // Rebook Mode: Identify and pre-select own seats (Fundamental Fix v20)
+      if (APP_MODE === MODES.REBOOK) {
+        console.log('[Rebook] Starting Fundamental Seat Identification for ID:', rebookId);
+
+        // Always try to fetch fresh booking data to ensure accuracy
+        // Strategy: treating Own Seats as "Available" + "Selected" (Yellow)
+        // This allows natural Deselect/Select behavior without "Reserved" conflicts.
+
+        const processOwnSeats = (seatIds) => {
+          // Deduplicate input immediately
+          seatIds = [...new Set(seatIds)];
+          console.log('[Rebook] Processing Own Seats:', seatIds);
+          const flatIds = [];
+
+          // Normalize inputs first (handle commas)
+          seatIds.forEach(id => {
+            if (typeof id === 'string' && id.includes(',')) {
+              id.split(',').forEach(sub => flatIds.push(sub.trim()));
+            } else {
+              flatIds.push(id);
+            }
+          });
+
+          flatIds.forEach(id => {
+            // Normalize ID
+            const mapId = Object.keys(seatData.seatMap).find(k => String(k).trim() === String(id).trim());
+            if (mapId && seatData.seatMap[mapId]) {
+              const s = seatData.seatMap[mapId];
+
+              // MUTATION: Force status to available so it behaves like a normal selectable seat
+              s._originalStatus = s.status; // Backup
+              s.status = 'available';
+              s._isOwn = true;
+
+              // Add to selection if not present
+              if (!ownSeats.includes(s.id)) ownSeats.push(s.id);
+              if (!selectedSeats.includes(s.id)) selectedSeats.push(s.id);
+            }
+          });
+          updateSelectedSeatsDisplay();
+        };
+
+        // 1. Try Client Fetch first (Most reliable for "My Booking")
+        if (window.SupabaseClient && window.SupabaseClient.getBookingWithSeats) {
+          try {
+            // Await here works because this is async function
+            const res = await window.SupabaseClient.getBookingWithSeats(rebookId);
+            if (res.success && res.data && res.data.seats) {
+              const ids = res.data.seats.map(i => i.seat_id);
+              processOwnSeats(ids);
+            } else {
+              console.warn('[Rebook] Client fetch failed, falling back to GAS data matching');
+              // Fallback to GAS match
+              const gasIds = Object.values(seatData.seatMap)
+                .filter(s => String(s.reservation_id) === String(rebookId))
+                .map(s => s.id);
+              processOwnSeats(gasIds);
+            }
+          } catch (e) {
+            console.error('[Rebook] Error fetching booking:', e);
+          }
+        } else {
+          // Fallback if client missing
+          const gasIds = Object.values(seatData.seatMap)
+            .filter(s => String(s.reservation_id) === String(rebookId))
+            .map(s => s.id);
+          processOwnSeats(gasIds);
+        }
+      }
+
       console.log("座席マップ構造:", Object.keys(seatData.seatMap));
       console.log("座席データサンプル:", Object.values(seatData.seatMap).slice(0, 3));
     } else {
@@ -285,6 +380,16 @@ function drawSeatMap(seatMap) {
   container.innerHTML = '';
 
   // 受信データから座席の行と列を動的に抽出
+  // Rebook Mode Mutation: Ensure own seats are always 'available' in the model
+  if (APP_MODE === MODES.REBOOK && typeof ownSeats !== 'undefined' && ownSeats.length > 0) {
+    ownSeats.forEach(ownId => {
+      if (seatMap[ownId]) {
+        seatMap[ownId].status = 'available';
+        seatMap[ownId]._isOwn = true;
+      }
+    });
+  }
+
   const seatData = extractSeatLayoutFromData(seatMap);
 
   const seatSection = document.createElement('div');
@@ -439,11 +544,12 @@ function extractSeatLayoutFromData(seatMap) {
       rows[rowLabel].push({
         id: seatId,
         seatNumber: seatNumber,
-        status: seatData.status,
+        status: (seatData.columnC === '確保' || seatData.status === 'secured') ? 'secured' : seatData.status,
         name: seatData.name,
         columnC: seatData.columnC,
         columnD: seatData.columnD,
-        columnE: seatData.columnE
+        columnE: seatData.columnE,
+        _isOwn: seatData._isOwn // Rebook Mode: Add _isOwn flag
       });
     }
   });
@@ -949,8 +1055,29 @@ function toggleAutoRefresh() {
 // 座席要素を作成する関数
 function createSeatElement(seatData) {
   const seat = document.createElement('div');
-  seat.className = `seat ${seatData.status}`;
+  // 統一的なクラス適用関数を使用
+  applySeatStatusClasses(seat, seatData.status);
   seat.dataset.id = seatData.id;
+
+  // 選択状態の反映
+  if (selectedSeats.includes(seatData.id)) {
+    if (seatData._isOwn || ownSeats.includes(seatData.id)) {
+      seat.classList.add('my-booking'); // Yellow
+      seat.classList.add('selected'); // Logic is selected
+    } else {
+      seat.classList.add('selected'); // Orange
+    }
+  } else {
+    seat.classList.remove('selected');
+    seat.classList.remove('my-booking');
+
+    // If it's my seat but unselected, it effectively becomes 'available' (Green) visually
+    // Logic: If I drop it, it's green.
+    if (seatData._isOwn || ownSeats.includes(seatData.id)) {
+      seat.classList.add('available'); // Force available look when deselected
+      seat.classList.remove('reserved', 'seat-reserved', 'secured', 'seat-secured'); // Remove reserved look
+    }
+  }
 
   // fuck 山田一
   // 座席IDを表示
@@ -959,9 +1086,10 @@ function createSeatElement(seatData) {
   seatIdEl.textContent = seatData.id;
   seat.appendChild(seatIdEl);
 
-  // 管理者モードでチェックイン可能な座席を選択可能にする
+  // 管理者モード・最高管理者モードの判定
   const currentMode = localStorage.getItem('currentMode') || 'normal';
   const isAdminMode = currentMode === 'admin' || IS_ADMIN;
+  const isSuperAdminMode = currentMode === 'superadmin';
 
   if (isAdminMode && (seatData.status === 'to-be-checked-in' || seatData.status === 'reserved')) {
     // チェックイン可能な座席を選択可能にする
@@ -992,28 +1120,56 @@ function createSeatElement(seatData) {
     } else {
       nameEl.textContent = seatData.name;
     }
-
     seat.appendChild(nameEl);
   }
 
+  // クリックイベントの設定
+  // Rebook Mode: Allow clicking own-reserved seats
+  const isOwnSeat = seatData._isOwn || ownSeats.includes(seatData.id);
+
+  // Interaction Logic:
+  // 1. Normal User: Can only click 'available' seats
+  // 2. Admin/SuperAdmin: Can click ANY seat (to check-in, edit, or rebook)
+  // 3. Rebook Mode: Can click 'available' OR 'own' seats
+  let isInteractable = false;
+
+  if (isSuperAdminMode || isAdminMode) {
+    isInteractable = true; // Admins can touch everything
+  } else {
+    isInteractable = seatData.status === 'available';
+  }
+
+  // Rebook override
+  if (rebookId && isOwnSeat) isInteractable = true;
+
+  if (isInteractable) {
+    // Correctly handle cursor and pointer events
+    seat.style.cursor = 'pointer';
+    if (isOwnSeat) {
+      seat.style.pointerEvents = 'auto';
+    }
+  } else {
+    seat.style.pointerEvents = 'none';
+  }
+
+  // Single source of truth for click event
   seat.addEventListener('click', (e) => handleSeatClick(seatData, e));
   return seat;
 }
 
 // 座席クリック時の処理
+// 座席クリック時の処理
 function handleSeatClick(seatData, event) {
-  const currentMode = localStorage.getItem('currentMode') || 'normal';
-  const isAdminMode = currentMode === 'admin' || IS_ADMIN;
-  const isSuperAdminMode = currentMode === 'superadmin';
-
-  if (isSuperAdminMode) {
-    // 最高管理者モード：座席データ編集（マルチ選択対応）
+  // Use Global APP_MODE for routing
+  if (APP_MODE === MODES.SUPER_ADMIN) {
     handleSuperAdminSeatClick(seatData, event);
-  } else if (isAdminMode) {
-    // 管理者モード：チェックイン可能な座席を選択
+  } else if (APP_MODE === MODES.ADMIN_CHECKIN) {
     handleAdminSeatClick(seatData);
+  } else if (APP_MODE === MODES.REBOOK) {
+    // Rebook: Treat as Normal (Selection) but with override permissions
+    handleNormalSeatClick(seatData);
   } else {
-    // 通常モード：予約可能な座席を選択
+    // Normal / Walkin
     handleNormalSeatClick(seatData);
   }
 }
@@ -1126,50 +1282,50 @@ function showBulkSeatEditModal(seatIds) {
     closeBulkSeatEditModal();
     showLoader(true);
     try {
-      // リトライ付き更新ヘルパー
-      const applySeatUpdateWithRetry = async (seatId, c, d, e, retries = 2) => {
-        let lastErr = null;
-        for (let i = 0; i <= retries; i++) {
-          try {
-            await GasAPI.updateSeatData(GROUP, DAY, ACTUAL_TIMESLOT, seatId, c, d, e);
-            return true;
-          } catch (err) {
-            lastErr = err;
-          }
-        }
-        console.warn('一括編集: リトライ失敗', seatId, lastErr);
-        return false;
-      };
-
-      // 逐次で安定適用（Apps Script 呼び出し負荷軽減）
-      let successCount = 0;
-      let failCount = 0;
-      for (const id of seatIds) {
-        // 空欄は現状値を維持（意図せぬクリア防止）
+      // 一括更新用データの作成
+      const updates = seatIds.map(id => {
         const el = document.querySelector(`.seat[data-id="${id}"]`);
+        // 空欄は現状値を維持（意図せぬクリア防止）
         const cVal = columnC !== '' ? columnC : (el ? (el.dataset.columnC || '') : '');
         const dVal = columnD !== '' ? columnD : (el ? (el.dataset.columnD || '') : '');
         const eVal = columnE !== '' ? columnE : (el ? (el.dataset.columnE || '') : '');
-        const ok = await applySeatUpdateWithRetry(id, cVal, dVal, eVal);
-        if (ok) successCount++; else failCount++;
-      }
-      // 結果通知
-      if (failCount === 0) {
-        showSuccessNotification(`${successCount}席を更新しました。`);
-      } else {
-        showErrorNotification(`更新完了: 成功 ${successCount} / 失敗 ${failCount}`);
-      }
-      // 最新データで再描画
-      try {
-        const currentMode = localStorage.getItem('currentMode') || 'normal';
-        const isAdminMode = currentMode === 'admin' || IS_ADMIN;
-        const isSuperAdminMode = currentMode === 'superadmin';
-        const seatData = await GasAPI.getSeatData(GROUP, DAY, ACTUAL_TIMESLOT, isAdminMode, isSuperAdminMode);
-        if (seatData.success) {
-          drawSeatMap(seatData.seatMap);
-          updateLastUpdateTime();
+
+        return {
+          seatId: id,
+          columnC: cVal,
+          columnD: dVal,
+          columnE: eVal
+        };
+      });
+
+      console.log('一括更新実行:', updates);
+
+      const response = await GasAPI.updateMultipleSeats(GROUP, DAY, ACTUAL_TIMESLOT, updates);
+
+      if (response.success) {
+        showSuccessNotification(`${updates.length}席を更新しました。`);
+
+        // 最新データで再描画
+        try {
+          const currentMode = localStorage.getItem('currentMode') || 'normal';
+          const isAdminMode = currentMode === 'admin' || IS_ADMIN;
+          const isSuperAdminMode = currentMode === 'superadmin';
+          // キャッシュバイパス（SuperAdminならfalse）
+          const useCache = !isSuperAdminMode;
+          const seatData = await GasAPI.getSeatData(GROUP, DAY, ACTUAL_TIMESLOT, isAdminMode, isSuperAdminMode, useCache);
+
+          if (seatData.success) {
+            drawSeatMap(seatData.seatMap);
+            updateLastUpdateTime();
+          }
+        } catch (refreshErr) {
+          console.warn('再描画エラー:', refreshErr);
         }
-      } catch (_) { }
+      } else {
+        const msg = response.message || response.error || '不明なエラー';
+        showErrorNotification(`一括更新エラー: ${msg}`);
+      }
+
     } catch (error) {
       console.error('一括編集エラー:', error);
       showErrorNotification('一括編集でエラーが発生しました。');
@@ -1225,19 +1381,25 @@ function handleAdminSeatClick(seatData) {
 
 // 通常モードでの座席クリック処理
 function handleNormalSeatClick(seatData) {
-  // 利用可能な座席のみ選択可能
-  if (seatData.status !== 'available') {
-    console.log('この座席は選択できません:', seatData.status);
-    // ユーザーに分かりやすいメッセージを表示
-    const statusMessages = {
-      'reserved': 'この座席は既に予約されています',
-      'to-be-checked-in': 'この座席は既に予約されています',
-      'checked-in': 'この座席は既にチェックイン済みです',
-      'unavailable': 'この座席は利用できません'
-    };
-    const message = statusMessages[seatData.status] || 'この座席は選択できません';
-    alert(message);
-    return;
+  // 利用可能な座席のみ選択可能（通常時）
+  // Rebook Mode with Admin: Allow selecting 'reserved' seats (to keep them or claim them)
+  const isRebookAdmin = APP_MODE === MODES.REBOOK;
+
+  if (seatData.status !== 'available' && !seatData._isOwn && !ownSeats.includes(seatData.id)) {
+    // Rebook Admin Exception: Allow interaction with ANY seat to "Select" (Keep) or "Deselect" (Release)
+    if (!isRebookAdmin) {
+      console.log('この座席は選択できません:', seatData.status);
+      // ユーザーに分かりやすいメッセージを表示
+      const statusMessages = {
+        'reserved': 'この座席は既に予約されています',
+        'to-be-checked-in': 'この座席は既に予約されています',
+        'checked-in': 'この座席は既にチェックイン済みです',
+        'unavailable': 'この座席は利用できません'
+      };
+      const message = statusMessages[seatData.status] || 'この座席は選択できません';
+      alert(message);
+      return;
+    }
   }
 
   const seatElement = document.querySelector(`[data-id="${seatData.id}"]`);
@@ -1251,10 +1413,20 @@ function handleNormalSeatClick(seatData) {
     // 選択解除
     seatElement.classList.remove('selected');
     selectedSeats = selectedSeats.filter(id => id !== seatData.id);
+    // Rebook Mode: If own seat is deselected, remove 'my-booking' class
+    if (seatData._isOwn || ownSeats.includes(seatData.id)) {
+      seatElement.classList.remove('my-booking');
+      // Visually revert to available if it was an own seat and deselected
+      applySeatStatusClasses(seatElement, 'available');
+    }
   } else {
     // 選択
     seatElement.classList.add('selected');
     selectedSeats.push(seatData.id);
+    // Rebook Mode: If own seat is selected, add 'my-booking' class
+    if (seatData._isOwn || ownSeats.includes(seatData.id) || APP_MODE === MODES.REBOOK) {
+      seatElement.classList.add('my-booking');
+    }
   }
 
   // 選択された座席数を表示
@@ -1267,20 +1439,44 @@ function handleNormalSeatClick(seatData) {
 function updateSelectedSeatsDisplay() {
   const submitButton = document.getElementById('submit-button');
   if (submitButton) {
+    // Rebook Mode Text
+    const isRebook = !!rebookId && IS_ADMIN;
+    const baseText = isRebook ? '変更を保存' : 'この席で予約する';
+
+    // For Reset/Initial state in Rebook mode, we might want to say 'Change Seats' even with 0 selected?
+    // Actually, usually 0 selected means disabled.
+    // In Rebook mode, if I deselect all, I can't change. So disabled is correct.
+
     if (selectedSeats.length > 0) {
-      submitButton.textContent = `この席で予約する (${selectedSeats.length}席: ${selectedSeats.join(', ')})`;
+      const seatList = selectedSeats.join(', ');
+      submitButton.textContent = `${baseText} (${selectedSeats.length}席: ${seatList})`;
       submitButton.disabled = false;
+      // Rebook: Orange/Amber color
+      if (isRebook) submitButton.style.backgroundColor = '#f59e0b';
     } else {
-      submitButton.textContent = 'この席で予約する';
+      submitButton.textContent = baseText;
       submitButton.disabled = true;
+      if (isRebook) submitButton.style.backgroundColor = '#f59e0b';
     }
   }
 }
 
+
+
+// override checkInSelected for safety
+const originalCheckInSelected = window.checkInSelected;
+window.checkInSelected = function () {
+  if (rebookId) {
+    console.warn('Rebook mode active: Check-in disabled.');
+    return;
+  }
+  if (originalCheckInSelected) originalCheckInSelected();
+};
+
 // グローバル関数として設定
 window.showLoader = showLoader;
 window.toggleAutoRefresh = toggleAutoRefresh;
-window.checkInSelected = checkInSelected;
+// window.checkInSelected is already set above
 window.confirmReservation = confirmReservation;
 window.promptForAdminPassword = promptForAdminPassword;
 window.toggleAutoRefreshSettings = toggleAutoRefreshSettings;
@@ -1458,7 +1654,7 @@ async function checkInSelected() {
       name: seatEl.dataset.seatName || '',
       columnC: seatEl.dataset.columnC || '',
       columnD: seatEl.dataset.seatName || '',
-      columnE: '済' // チェックイン済みとして設定
+      columnE: seatEl.dataset.columnE || ''
     };
 
     // 座席要素を更新
@@ -1577,7 +1773,55 @@ async function confirmReservation() {
     return;
   }
 
-  const confirmMessage = `以下の座席で予約しますか？\n\n${selectedSeats.join(', ')}`;
+  // 予約モードの分岐
+  // Rebooking Mode
+  if (urlParams.get('rebook') && urlParams.get('admin') === 'true') {
+    const bookingId = urlParams.get('rebook');
+
+    if (!confirm(`予約変更 (Rebooking for ID: ${bookingId})\n\n選択した座席に変更します。\nよろしいですか？`)) return;
+
+    showLoader(true);
+    try {
+      const res = await GasAPI.adminChangeSeats(bookingId, selectedSeats);
+      if (res.success) {
+        if (urlParams.get('embed') === 'true') {
+          // Embed Mode: Notify parent
+          window.parent.postMessage({ type: 'REBOOK_COMPLETE', success: true }, '*');
+        } else {
+          // Standalone Mode
+          alert('座席変更が完了しました。\n管理画面に戻ります。');
+          if (window.opener) window.opener.location.reload();
+          window.close();
+        }
+      } else {
+        if (urlParams.get('embed') === 'true') {
+          window.parent.postMessage({ type: 'REBOOK_COMPLETE', success: false, error: res.error }, '*');
+        } else {
+          alert('変更失敗: ' + (res.error || 'Unknown Error'));
+        }
+      }
+    } catch (e) {
+      if (urlParams.get('embed') === 'true') {
+        window.parent.postMessage({ type: 'REBOOK_COMPLETE', success: false, error: e.message }, '*');
+      } else {
+        alert('System Error: ' + e.message);
+      }
+    } finally {
+      showLoader(false);
+    }
+    return;
+  }
+
+  // Normal Reservation
+  const confirmMessage = selectedSeats.length === 0
+    ? '座席が選択されていません。予約処理を続行しますか？' // Should probably block but keeping orig logic flavor if any
+    : `以下の座席で予約しますか？\n\n${selectedSeats.join(', ')}`;
+
+  if (selectedSeats.length === 0) {
+    alert('予約する座席を選択してください。');
+    return;
+  }
+
   if (!confirm(confirmMessage)) {
     return;
   }
@@ -1730,8 +1974,11 @@ function startUserInteraction() {
 function showSeatEditModal(seatData) {
   console.log('[最高管理者] ドロワー表示開始:', seatData);
 
-  // 既存のドロワー/オーバーレイがあれば削除
-  closeSeatEditModal();
+  // 既存のドロワー/オーバーレイがあれば即座に完全削除（ID重複回避のため、closeSeatEditModalのアニメーション待機を行わない）
+  const existingDrawer = document.getElementById('seat-edit-drawer');
+  if (existingDrawer) existingDrawer.remove();
+  const existingOverlay = document.getElementById('seat-edit-overlay');
+  if (existingOverlay) existingOverlay.remove();
 
   // ステータス定義
   const statuses = [
@@ -1768,7 +2015,7 @@ function showSeatEditModal(seatData) {
             <div class="status-chip-group">
               ${chipsHTML}
             </div>
-            <input type="hidden" id="column-c" value="${currentStatus}">
+            <input type="hidden" id="drawer-column-c" value="${currentStatus}">
           </div>
           <div class="form-group">
             <label for="column-d">予約名・備考</label>
@@ -1801,12 +2048,18 @@ function showSeatEditModal(seatData) {
 
 // ステータスチップ選択処理（グローバルへ）
 window.selectStatusChip = function (el, value) {
+  console.log('[Debug] selectStatusChip clicked:', { value, el });
   // 選択状態の更新
   document.querySelectorAll('.status-chip').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
   // 隠し入力フィールドの更新
-  const input = document.getElementById('column-c');
-  if (input) input.value = value;
+  const input = document.getElementById('drawer-column-c');
+  if (input) {
+    input.value = value;
+    console.log('[Debug] Hidden input updated:', input.value);
+  } else {
+    console.error('[Debug] Hidden input drawer-column-c NOT FOUND');
+  }
 };
 
 // 座席編集ドロワーを閉じる関数
@@ -1833,7 +2086,10 @@ function closeSeatEditModal() {
 
 // 座席データを更新する関数
 async function updateSeatData(seatId) {
-  const columnC = document.getElementById('column-c').value;
+  const inputEl = document.getElementById('drawer-column-c');
+  const columnC = inputEl ? inputEl.value : '';
+  console.log('[Debug] updateSeatData reading input:', { found: !!inputEl, value: columnC });
+
   const columnD = document.getElementById('column-d').value;
   const columnE = document.getElementById('column-e').value; // 備考として取得
 
@@ -1850,14 +2106,19 @@ async function updateSeatData(seatId) {
   let originalData = null;
 
   try {
-    // 空欄は現状値を維持
+    // 空欄は現状値を維持（意図せぬクリア防止）→ 修正: 入力値を正とする（空欄ならクリア）
     el = document.querySelector(`.seat[data-id="${seatId}"]`);
-    const cVal = columnC !== '' ? columnC : (el ? (el.dataset.columnC || '') : '');
-    const dVal = columnD !== '' ? columnD : (el ? (el.dataset.columnD || '') : '');
-    const eVal = columnE !== '' ? columnE : (el ? (el.dataset.columnE || '') : '');
+
+    // 入力値をそのまま使用する（空文字列ならクリアされる）
+    const cVal = columnC;
+    const dVal = columnD;
+    const eVal = columnE;
 
     // 楽観的更新（即座にUIを更新）
     if (el) {
+
+
+      // --- Initial Data Load ---
       originalData = {
         columnC: el.dataset.columnC,
         columnD: el.dataset.columnD,
@@ -1869,7 +2130,9 @@ async function updateSeatData(seatId) {
       el.dataset.columnC = cVal;
       el.dataset.columnD = dVal;
       el.dataset.columnE = eVal;
-      updateSeatElement(el, { columnC: cVal, columnD: dVal, columnE: eVal });
+      // statusも更新（normalizeStatusで変換されるため、入力値のままでOK）
+      el.dataset.status = cVal;
+      updateSeatElement(el, { columnC: cVal, columnD: dVal, columnE: eVal, status: cVal });
     }
 
     let response;
@@ -2088,25 +2351,43 @@ function updateSeatElement(seatEl, seatData) {
 // ステータス正規化（CSSクラス整合用）
 function normalizeStatus(status) {
   const s = String(status || '').toLowerCase();
+
+  // Japanese Mappings
+  if (s === '予約済') return 'reserved';
+  if (s === '確保') return 'secured';
+  if (s === 'チェックイン済') return 'checked-in';
+  if (s === 'チェックイン待ち') return 'to-be-checked-in';
+  if (s === '空') return 'available';
+  if (s === '使用不可') return 'unavailable';
+  if (s === '当日券') return 'walkin';
+
+  // Standard Mappings
   if (s === 'checked_in') return 'checked-in';
   if (s === 'to_be_checked_in' || s === 'to-be-checked-in') return 'to-be-checked-in';
   if (s === 'unavailable' || s === 'blocked') return 'unavailable';
   if (s === 'walkin') return 'walkin';
   if (s === 'reserved') return 'reserved';
+  if (s === 'secured') return 'secured';
   if (s === 'available') return 'available';
   return s;
 }
 
-// すべての既知ステータスクラスを除去し、必要なクラスを付与
-function applySeatStatusClasses(seatEl, status) {
-  const raw = String(status || '');
-  const normalized = normalizeStatus(raw);
-  const ALL_CLASSES = [
-    'available', 'reserved', 'to-be-checked-in', 'checked-in', 'walkin', 'unavailable', 'blocked',
-    'seat-available', 'seat-reserved', 'seat-to-be-checked-in', 'seat-checked-in', 'seat-walkin', 'seat-unavailable', 'seat-blocked'
-  ];
 
-  // 既存クラスのうちステータス関連を除去
+// 全ての座席ステータスクラス（クリーンアップ用）
+const ALL_CLASSES = [
+  'reserved', 'seat-reserved',
+  'secured', 'seat-secured',
+  'checked-in', 'seat-checked-in',
+  'to-be-checked-in', 'seat-to-be-checked-in',
+  'available', 'seat-available',
+  'unavailable', 'seat-unavailable',
+  'walkin', 'seat-walkin',
+  'blocked', 'seat-blocked'
+];
+
+function applySeatStatusClasses(seatEl, raw) {
+  const normalized = normalizeStatus(raw);
+  // すべての既知ステータスクラスを除去し、必要なクラスを付与
   seatEl.classList.remove(...ALL_CLASSES);
   // ベースクラス
   seatEl.classList.add('seat');
@@ -2210,6 +2491,7 @@ function getStatusText(status) {
   const statusMap = {
     'available': '予約可能',
     'reserved': '予約済',
+    'secured': '確保',
     'checked-in': 'チェックイン済',
     'unavailable': '設定なし'
   };
@@ -2513,7 +2795,13 @@ function checkForUrlChange() {
   }
 }
 
+// Rebook Mode UI Support (Moved from DOMContentLoaded)
+// const urlParams = new URLSearchParams(window.location.search); // Already declared at top
+// const rebookId = urlParams.get('rebook'); // Already declared at top
+
 // オフライン状態インジケーターの制御
+let updateOfflineStatus; // Define globally
+
 function initializeOfflineIndicator() {
   const indicator = document.getElementById('offline-indicator');
   const progressBar = document.getElementById('sync-progress-bar');
@@ -2521,7 +2809,7 @@ function initializeOfflineIndicator() {
   if (!indicator || !progressBar) return;
 
   // オフライン状態の監視
-  const updateOfflineStatus = () => {
+  updateOfflineStatus = () => {
     const isOnline = navigator.onLine;
     if (isOnline) {
       indicator.style.display = 'none';
@@ -2540,35 +2828,72 @@ function initializeOfflineIndicator() {
   // イベントリスナーの設定
   window.addEventListener('online', updateOfflineStatus);
   window.addEventListener('offline', updateOfflineStatus);
-
-  // オフライン同期システムの状態監視
-  if (window.OfflineSyncV2) {
-    const checkSyncStatus = () => {
-      const status = window.OfflineSyncV2.getStatus();
-
-      if (status.syncInProgress) {
-        progressBar.style.display = 'block';
-        const progress = progressBar.querySelector('.progress');
-        if (progress) {
-          progress.style.width = '100%';
-        }
-      } else {
-        progressBar.style.display = 'none';
-        const progress = progressBar.querySelector('.progress');
-        if (progress) {
-          progress.style.width = '0%';
-        }
-      }
-    };
-
-    // 定期的に状態をチェック
-    setInterval(checkSyncStatus, 1000);
-
-    // 初期状態のチェック
-    checkSyncStatus();
-
-    // URL変更の定期チェック（30秒ごと）
-    setInterval(checkForUrlChange, 30000);
-  }
 }
+
+// Rebook Mode Global Init
+document.addEventListener('DOMContentLoaded', () => {
+  // UI Support Logic using global rebookId
+  // Rebook Mode UI Support
+  // let ownSeats = []; // Store IDs of own seats - This is already a global variable. Do not redeclare.
+
+  if (rebookId && urlParams.get('admin') === 'true') {
+    const btn = document.getElementById('reservation-btn');
+    if (btn) {
+      btn.innerText = '予約変更を実行 (Change Seats)';
+      btn.style.backgroundColor = '#f59e0b'; // Amber
+    }
+
+    const headerTitle = document.querySelector('header h1');
+    if (headerTitle) {
+      headerTitle.innerHTML += ' <span style="color:#f59e0b; font-size:0.8em;">[座席変更]</span>';
+    }
+  }
+
+  // Embed Mode UI Cleanup
+  if (urlParams.get('embed') === 'true') {
+    document.body.classList.add('embed-mode');
+    // Inject styles to hide header/footer
+    const style = document.createElement('style');
+    style.textContent = `
+            header, footer { display: none !important; }
+            body { padding: 0 !important; background: transparent; }
+            .container { max-width: 100% !important; padding: 10px !important; margin: 0 !important; }
+            /* Adjust sticky button bar if needed */
+            .reservation-bar { bottom: 0; }
+        `;
+    document.head.appendChild(style);
+  }
+});
+
+// オフライン同期システムの状態監視
+if (window.OfflineSyncV2) {
+  const progressBar = document.getElementById('sync-progress-bar');
+  const checkSyncStatus = () => {
+    const status = window.OfflineSyncV2.getStatus();
+
+    if (status.syncInProgress) {
+      progressBar.style.display = 'block';
+      const progress = progressBar.querySelector('.progress');
+      if (progress) {
+        progress.style.width = '100%';
+      }
+    } else {
+      progressBar.style.display = 'none';
+      const progress = progressBar.querySelector('.progress');
+      if (progress) {
+        progress.style.width = '0%';
+      }
+    }
+  };
+
+  // 定期的に状態をチェック
+  setInterval(checkSyncStatus, 1000);
+
+  // 初期状態のチェック
+  checkSyncStatus();
+
+  // URL変更の定期チェック（30秒ごと）
+  setInterval(checkForUrlChange, 30000);
+}
+
 
