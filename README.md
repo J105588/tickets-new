@@ -1,4 +1,4 @@
-# 市川学園 座席管理システム (Ichigaku Tickets) v34.0.0 技術仕様書
+# 市川学園 座席管理システム v1.0.0 技術仕様書
 
 ## 1. システム概要
 
@@ -139,6 +139,77 @@ Google Apps Scriptは、V8ランタイム上で動作するTypeScriptライク�
 | `admin_update_reservation` | `id`, `updates` (JSON) | 予約情報（名前、メール、備考など）の更新。 |
 | `admin_resend_email` | `id` | 予約完了メールの再送処理。 |
 
+### 4.3 API 内部ロジックとフロー (Architecture Deep Dive)
+
+本システムのAPIは、単なるCRUDラッパーではなく、いくつかの複雑なオーケストレーションを担当している。
+
+#### 1. リクエストフロー (Request Lifecycle)
+
+```mermaid
+sequenceDiagram
+    participant Client as Frontend (PWA)
+    participant GAS as GAS (doGet)
+    participant Router as CodeWithSupabase.gs
+    participant Logic as *API.gs
+    participant DB as Supabase
+
+    Client->>GAS: GET /exec?action=xyz&... (JSONP)
+    GAS->>Router: doGet(e)
+    Router->>Router: User-Agent/IP Log
+    Router->>Logic: Dispatch (action)
+    
+    rect rgb(240, 248, 255)
+        note right of Logic: Business Logic
+        Logic->>DB: Fetch/Update (via REST)
+        DB-->>Logic: JSON Response
+        Logic->>Logic: Filtering / Validation
+    end
+    
+    Logic-->>Router: Result Object
+    Router-->>GAS: ContentService.createTextOutput()
+    GAS-->>Client: callback({ ... })
+```
+
+#### 2. 重要アクションのシーケンス詳細
+
+**A. 新規予約 (`create_reservation`)**
+座席の二重予約（Double Booking）を防止するため、厳密なチェックとロック機構を持つ。
+
+```mermaid
+sequenceDiagram
+    Client->>GAS: create_reservation(seats="A-1,A-2")
+    GAS->>DB: SELECT * FROM seats WHERE id IN (...)
+    
+    alt 一つでも予約済み(booking_id != null)がある
+        GAS-->>Client: Error: "一部の座席が既に予約されています"
+    else 全て空席
+        GAS->>DB: INSERT INTO bookings
+        DB-->>GAS: New Booking ID
+        GAS->>DB: UPDATE seats SET booking_id = ...
+        GAS-->>Client: Success (reservation_id)
+    end
+```
+
+**B. チェックイン (`check_in`)**
+QRスキャンまたは手動入力により実行される。
+
+1.  **Lookup**: `bookings` テーブルを `id` (Short ID) で検索。
+2.  **Verify**: 入力された `passcode` と DB上のパスコードを照合。
+3.  **Update**:
+    *   `bookings` テーブルの `status` を `'checked_in'` に更新。
+    *   紐づく `seats` レコードの `status` も `'checked_in'` に更新（冗長化による参照高速化）。
+4.  **Audit**: 監査ログに「チェックイン成功」を記録。
+
+**C. 管理者検索 (`admin_get_reservations`)**
+前述の通り、GAS側でのインメモリフィルタリングを行うが、パフォーマンス最適化のために以下の工夫がなされている。
+
+1.  **Prefetch**: 検索ワードが空の場合、直近の予約50件のみを取得。
+2.  **Smart Filter**:
+    *   数字のみの検索 (`123`): ID検索とみなし、数値型変換して比較。
+    *   UUID形式 (`...-....`): Reservation ID検索とみなす。
+    *   座席形式 (`A-1`): 座席ID検索とみなす。
+3.  **Cross-Join**: 予約者が特定できたら、その予約IDを持つ座席レコードを別クエリで一括取得 (`WHERE booking_id IN (...)`) し、結果に統合する。
+
 ---
 
 ## 5. データベース設計 (Supabase Schema)
@@ -250,6 +321,6 @@ GitHub Pages, Vercel, Firebase Hosting などの静的ホスティングサー�
 
 ---
 
-**Ichigaku Tickets v34.0.0**
+**市川学園 座席管理システム v1.0.0**
 Technical Documentation
-Commit: `v34.0.0`
+Commit: `v1.0.0`
