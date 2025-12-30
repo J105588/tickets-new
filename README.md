@@ -158,7 +158,7 @@ sequenceDiagram
     Router->>Router: User-Agent/IP Log
     Router->>Logic: Dispatch (action)
     
-    rect rgb(240, 248, 255)
+    rect rgba(42, 67, 90, 1)
         note right of Logic: Business Logic
         Logic->>DB: Fetch/Update (via REST)
         DB-->>Logic: JSON Response
