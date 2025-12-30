@@ -89,7 +89,7 @@ class PWAUpdateManager {
                     <div class="pwa-update-spinner"></div>
                 </div>
                 <div class="pwa-update-text">
-                    <div class="pwa-update-title">システム更新が利用可能です</div>
+                    <div class="pwa-update-title">新しいバージョンが利用可能です</div>
                     <div class="pwa-update-description">最新の機能と改善を利用するために更新してください</div>
                 </div>
                 <div class="pwa-update-actions">
