@@ -208,7 +208,8 @@ function doGet(e) {
              day: e.parameter.day,
              timeslot: e.parameter.timeslot,
              year: e.parameter.year,
-             class_num: e.parameter.class_num
+             class_num: e.parameter.class_num,
+             search: e.parameter.search // [Fix] Param passing missing
            };
            response = getAdminReservations(filters);
            break;

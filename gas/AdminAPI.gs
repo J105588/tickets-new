@@ -45,14 +45,10 @@ function getAdminReservations(filters) {
       // クラスのみの検索はあまり意味がないのでスキップ
     }
 
-    // 3. フリーワード検索 (名前, 予約ID, メール)
-    if (filters.search) {
-        const term = encodeURIComponent(filters.search);
-        // Supabase PostgREST syntax for OR: or=(col1.ilike.*val*,col2.ilike.*val*)
-        // Note: reservation_id is typically text/uuid. id is int (might fail ilike if not cast, but typically we search text fields).
-        // Let's search name, reservation_id, email.
-        conditions.push(`or=(name.ilike.*${term}*,reservation_id.ilike.*${term}*,email.ilike.*${term}*)`);
-    }
+    // 3. フリーワード検索 (名前, 予約ID, メール, 数値ID)
+    // 3. フリーワード検索 (Supabase側でのOR検索は型エラーや制約が多いため、GAS側でフィルタリングする)
+    // SQLでの絞り込みはScopeのみに行う
+    const activeSearch = filters.search ? filters.search.trim().toLowerCase() : null;
     
     // クエリパラメータの結合
     let endpoint = 'bookings?' + query;
@@ -63,13 +59,36 @@ function getAdminReservations(filters) {
     // ソート (作成日時順)
     endpoint += '&order=created_at.desc';
 
+    // データ取得
     const response = supabaseIntegration._request(endpoint, { useServiceRole: true });
     
     if (!response.success) {
       return { success: false, error: response.error };
     }
     
-    return { success: true, data: response.data };
+    let data = response.data;
+
+    // 4. GAS側での柔軟な検索 (ID, Name, Email, ReservationID, Seats)
+    if (activeSearch) {
+      data = data.filter(r => {
+        // ID (Numeric)
+        if (r.id && String(r.id) === activeSearch) return true;
+        // Name
+        if (r.name && r.name.toLowerCase().includes(activeSearch)) return true;
+        // Email
+        if (r.email && r.email.toLowerCase().includes(activeSearch)) return true;
+        // Reservation ID (UUID/Code)
+        if (r.reservation_id && String(r.reservation_id).toLowerCase().includes(activeSearch)) return true;
+        // Seats (Array of objects) - "F12" etc.
+        if (r.seats && Array.isArray(r.seats)) {
+           if (r.seats.some(s => s.seat_id && s.seat_id.toLowerCase().includes(activeSearch))) return true;
+        }
+        
+        return false;
+      });
+    }
+    
+    return { success: true, data: data };
 
   } catch (e) {
     return { success: false, error: e.message };
