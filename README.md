@@ -324,3 +324,5 @@ GitHub Pages, Vercel, Firebase Hosting などの静的ホスティングサー�
 **市川学園 座席管理システム v1.0.0**
 Technical Documentation
 Commit: `v1.0.0`
+
+Copyright (c) 2025 Junxiang Jin. All rights reserved.
