@@ -1,4 +1,4 @@
-# 市川学園 座席管理システム v1.0.0 技術仕様書
+# 市川学園 座席管理システム v32.0.0 技術仕様書
 
 ## 1. システム概要
 
@@ -210,6 +210,123 @@ QRスキャンまたは手動入力により実行される。
     *   座席形式 (`A-1`): 座席ID検索とみなす。
 3.  **Cross-Join**: 予約者が特定できたら、その予約IDを持つ座席レコードを別クエリで一括取得 (`WHERE booking_id IN (...)`) し、結果に統合する。
 
+#### 4.4 フロントエンド依存関係 (System Dependency)
+本システムの構成要素と依存関係の全体像。
+
+```mermaid
+%%{init: {
+  'theme': 'dark', 
+  'themeVariables': { 
+    'lineColor': '#aaa',
+    'fontSize': '15px',
+    'fontFamily': 'monospace'
+  }
+}}%%
+flowchart LR
+    %% スタイル定義 (黒背景用ハイコントラスト)
+    classDef js fill:#0d1117,stroke:#58a6ff,stroke-width:2px,color:#fff;
+    classDef html fill:#0d1117,stroke:#d29922,stroke-width:2px,color:#fff;
+    classDef css fill:#0d1117,stroke:#8b949e,stroke-width:1px,stroke-dasharray: 5 5,color:#ccc;
+    classDef gas fill:#04260f,stroke:#3fb950,stroke-width:2px,color:#fff;
+    classDef db fill:#181029,stroke:#a371f7,stroke-width:2px,color:#fff;
+    classDef infra fill:#290d0d,stroke:#ff7b72,stroke-width:2px,color:#fff;
+
+    subgraph Frontend [Frontend Application]
+        direction TB
+        
+        subgraph Core [Core & Optimization]
+            direction LR
+            OPT_LOADER([optimized-loader.js]):::js
+            OPT_API([optimized-api.js]):::js
+            OPT_CACHE([api-cache.js]):::js
+            CFG_MAIN([config.js]):::js
+        end
+
+        subgraph Offline [Offline & PWA]
+            direction LR
+            OFF_SYNC([offline-sync-v2.js]):::js
+            SERV_WORK{{sw.js}}:::infra
+            CONN_REC([connection-recovery.js]):::js
+        end
+
+        subgraph Pages [Views & Controllers]
+            direction TB
+            
+            subgraph Public
+                PG_IDX([index-main.js]):::js --- P_IDX[index.html]:::html
+                PG_SEAT([seats-main.js]):::js --- P_SEAT[seats.html]:::html
+                PG_RES([reservation.js]):::js --- P_RES[reservation.html]:::html
+            end
+            
+            subgraph Admin
+                PG_ADM([admin.js]):::js --- P_ADM[admin.html]:::html
+                PG_LOG([logs-main.js]):::js --- P_LOG[logs.html]:::html
+                PG_MON([monitor.js]):::js --- P_MON[dashboard.html]:::html
+            end
+        end
+        
+        CSS_MAIN{styles.css}:::css
+    end
+
+    subgraph Integration [Integration Layer]
+        SUPA_CLI([supabase-client.js]):::js
+        SUPA_API([supabase-api.js]):::js
+    end
+
+    subgraph Backend [Google Apps Script]
+        direction TB
+        GAS_CODE[[CodeWithSupabase.gs]]:::gas
+        GAS_ADMIN[[AdminAPI.gs]]:::gas
+        GAS_USER[[ReservationAPI.gs]]:::gas
+        GAS_MST[[MasterDataAPI.gs]]:::gas
+        GAS_SUPA[[SupabaseIntegration.gs]]:::gas
+    end
+
+    subgraph Database [Supabase DB]
+        direction TB
+        DB_SEATS[(seats)]:::db
+        DB_BOOK[(bookings)]:::db
+        DB_LOGS[(audit_logs)]:::db
+        DB_VIEW[(admin_view)]:::db
+    end
+
+    %% --- 接続定義 ---
+
+    %% 1. フロントエンド初期化フロー
+    OPT_LOADER --> OPT_API
+    OPT_API --> OPT_CACHE
+    CFG_MAIN --> OPT_API
+    
+    %% 2. API通信 (JSONP)
+    OPT_API == JSONP ==> GAS_CODE
+
+    %% 3. バックエンドロジック
+    GAS_CODE --> GAS_ADMIN
+    GAS_CODE --> GAS_USER
+    GAS_CODE --> GAS_MST
+    GAS_CODE --> GAS_SUPA
+    
+    %% 4. サーバーサイドDB接続
+    GAS_SUPA -.-> DB_SEATS
+    GAS_SUPA -.-> DB_BOOK
+
+    %% 5. クライアント直接接続 (Supabase)
+    PG_ADM -.-> SUPA_CLI
+    PG_LOG -.-> SUPA_CLI
+    PG_MON -.-> SUPA_CLI
+    
+    SUPA_CLI == REST/Realtime ==> DB_VIEW
+    SUPA_CLI --> DB_LOGS
+
+    %% 6. PWA/オフライン機能
+    OFF_SYNC -.-> SERV_WORK
+    SERV_WORK -.-> P_IDX
+    SERV_WORK -.-> P_SEAT
+
+    %% 7. スタイル適用
+    CSS_MAIN -.-> P_IDX
+```
+
 ---
 
 ## 5. データベース設計 (Supabase Schema)
@@ -321,8 +438,368 @@ GitHub Pages, Vercel, Firebase Hosting などの静的ホスティングサー�
 
 ---
 
-**市川学園 座席管理システム v1.0.0**
+---
+
+## 8. 画面別技術詳解 (Screen Technical Reference)
+
+本章では、各画面の初期化フロー、API依存関係、内部状態遷移について「専門書レベル」の詳細記述を行う。各画面は独立したSPAモジュールとして動作し、共通の `config.js` および `api.js` を介してバックエンドと通信する。
+
+### 8.1 公演選択画面 (`pages/timeslot.html`)
+
+ユーザーが最初に訪れる（`index.html` から遷移する）実質的なエントリーポイント。動的なスケジュール生成を担う。
+
+*   **Module**: `assets/js/timeslot-main.js`
+*   **Dependencies**: `optimized-api.js`, `supabase-client.js`
+
+#### A. 初期化プロセス (Initialization Flow)
+1.  **URL Parameter Parsing**: `?group=[GroupName]` を解析。デモモード時は `config.js` の設定に従い強制リライト。
+2.  **Master Data Fetch**:
+    *   **Primary**: `fetchMasterDataFromSupabase()` および `fetchPerformancesFromSupabase(group)` を並列実行。
+    *   **Fallback**: 失敗時、GAS API (`get_master_data`, `get_all_schedules`) へフォールバック。
+    *   **Data Structure**:
+        *   `DateMaster`: 日程定義（ID, ラベル）。
+        *   `TimeslotMaster`: 時間帯定義（コード, 開始・終了時刻）。
+        *   `Performances`: 特定団体の公演スケジュール（DayID, TimeslotCode）。
+
+```mermaid
+graph TD
+    A[index.html] -->|Link| B["timeslot.html?group=1組"]
+    B -->|Parse URL| C{Demo Mode?}
+    C -- Yes --> D["Rewrite Group to '見本演劇'"]
+    C -- No --> E["Use '1組'"]
+    E --> F["Fetch Data (Supabase/GAS)"]
+    F --> G[Render Buttons]
+    G -->|Click| H["seats.html?group=...&day=...&time=..."]
+```
+
+#### B. レンダリングロジック
+取得した `Performances` を `DateMaster` の順序（Day ID順）でグルーピングし、さらに `TimeslotMaster` の開始時刻順でソートしてボタンを生成する。
+*   **Dynamic Link**: 各ボタンは `seats.html?group=...&day=...&timeslot=...` へのリンクとなる。
+*   **Validation**: 過去の公演や「無効」フラグのついた公演はフィルタリングされる（管理者モードを除く）。
+
+---
+
+### 8.2 座席選択画面 (`pages/seats.html`)
+
+本システムの中核的UI。HTML5 Canvasを用いない、DOMベースの高パフォーマンス座席マップ。
+
+*   **Module**: `assets/js/seats-main.js`
+*   **Dependencies**: `optimized-api.js`, `ui-optimizer.js`, `auth.js`
+
+#### A. ライフサイクル
+1.  **Boot**: `urlParams` から `group`, `day`, `timeslot` を取得。
+2.  **Data Fetch**:
+    *   **API**: `GasAPI.getSeatData(group, day, timeslot)`
+    *   **Request**: `GET ?action=get_seats&group=...`
+    *   **Response Schema**:
+        ```json
+        {
+          "success": true,
+          "seatMap": {
+            "A1": { "id": "A1", "status": "available", "name": "", ... },
+            "A2": { "id": "A2", "status": "reserved", "name": "UserX", ... }
+          },
+          "rev": "v123" // Cache revision
+        }
+        ```
+3.  **Rendering**:
+    *   レスポンシブ対応のため、行（Div Row）と列（Div Seat）のグリッドレイアウトを動的生成。
+    *   **Zoom Logic**: CSS Variable `--seat-scale` を操作し、GPUアクセラレーションを効かせたズームを実現。
+
+```mermaid
+sequenceDiagram
+    participant P as Page
+    participant API as GasAPI
+    participant DOM as DOM Builder
+    
+    P->>API: getSeatData(group, day, time)
+    API-->>P: { success:true, seatMap: {...} }
+    P->>DOM: extractSeatLayout()
+    loop Every Row
+        DOM->>DOM: Create Row Div
+        loop Every Seat
+            DOM->>DOM: Create Seat Div
+            DOM->>DOM: Apply Status Class
+        end
+    end
+    DOM-->>P: Rendered
+```
+
+#### B. 状態遷移と操作権限
+
+| Action | User | Admin | Super Admin |
+| :--- | :--- | :--- | :--- |
+| **Available Click** | 選択トグル (Max 5) | 選択トグル (Unlimited) | 編集ドロワーOpen |
+| **Reserved Click** | `Error: Already Reserved` | **選択トグル (Check-in)** | **編集ドロワーOpen** |
+| **Check-in Logic** | N/A | `checkInSelected()` 実行<br>→ API `check_in_multiple` 呼出 | `updateSeatData()` 実行<br>→ ステータス直接書き換え |
+
+#### C. ポーリングと同期
+*   `autoRefreshInterval` (通常30秒) で差分更新を試行。
+*   **Optimistic UI**: ユーザーが操作（選択など）を行っている間はポーリングを一時停止し、操作競合を防ぐ。
+
+---
+
+### 8.3 予約入力・確定画面 (`pages/reservation.html`)
+
+予約トランザクションの境界。
+
+*   **Module**: `assets/js/reservation.js`
+*   **Transaction Scope**: `Step 1 (Validate)` → `Step 2 (Input)` → `Step 3 (Commit)`
+
+#### A. API リクエスト詳細 (`create_reservation`)
+ユーザーが「予約確定」を押すと、以下のJSONPリクエストが発行される。
+
+*   **Method**: `GET (JSONP)`
+*   **Endpoint**: `/exec?action=create_reservation`
+*   **Payload**:
+    ```javascript
+    {
+      "group": "1組",
+      "day": "1",
+      "timeslot": "A",
+      "seats": "A-1,A-2", // CSV
+      "name": "山田太郎",
+      "email": "yamada@example.com", // Optional
+      "passcode": "1234",
+      "grade_class": "1年1組"
+    }
+    ```
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Page as reservation.html
+    participant Lock as GAS LockService
+    participant DB as Supabase
+    
+    User->>Page: Submit
+    Page->>Page: Validate Input
+    Page->>Lock: Request Lock (30s)
+    
+    rect rgba(46, 52, 79, 1)
+    Lock->>DB: Check Availability
+    alt Occupied
+        DB-->>Lock: Error
+        Lock-->>Page: "Double Booking Error"
+    else Available
+        Lock->>DB: INSERT into bookings
+        Lock->>DB: UPDATE seats (link booking_id)
+        DB-->>Lock: Success
+    end
+    end
+    
+    Lock-->>Page: Reservation ID
+    Page->>User: Show Success
+```
+
+#### B. バックエンド処理 (GAS Flow)
+1.  **Mutex Lock**: GASの `LockService` を取得（最大30秒待機）。
+2.  **Double Booking Check**: 指定された座席IDが `seats` テーブルで `booking_id IS NULL` であることを確認。1つでも埋まっていれば即座にエラー返却。
+3.  **Insert**: `bookings` テーブルにレコード作成。
+4.  **Update**: `seats` テーブルの対象レコードを更新し、`booking_id` を紐付け。
+5.  **Commit**: ロック解除。
+6.  **Response**: `reservation_id` (UUID) を返却。
+
+---
+
+### 8.4 管理画面 (`pages/admin.html`)
+
+SPAとして実装された統合管理ダッシュボード。
+
+*   **Module**: `assets/js/admin.js`
+*   **Dependencies**: `supabase-client.js` (Direct DB Access)
+
+#### A. データ取得戦略
+GASを経由せず、Supabase JS Client (`@supabase/supabase-js`) を用いて直接DBを参照する（Read Replica参照的な動作）。
+*   **View**: `admin_reservations_view` (Security Definer View) を通じて、結合済みのリッチな予約データを取得。
+*   **Realtime**: Admin画面でのポーリング負荷を避けるため、一定間隔での手動/自動リロード設計（WebSocket接続はあえて未使用）。
+
+#### B. 検索アルゴリズム (Client-Side)
+取得した全件データ（または直近N件）に対し、フロントエンドで以下の検索を行う。
+*   **Fuzzy Logic**:
+    *   数字4桁 → パスコード検索? or ID検索? (ID優先)
+    *   UUID形式 → `reservation_id` 完全一致。
+    *   かな・漢字 → `name` 部分一致。
+    *   英数字 ("A-1") → `seat_id` 検索（`bookings` に紐づく `seats` 情報を検索）。
+
+```mermaid
+graph TD
+    A["Supabase 'admin_reservations_view'"] -->|Fetch| B[Client Memory]
+    C[User Input] -->|Event| D{Input Type}
+    D -- "1234" --> E[Filter by ID/Pass]
+    D -- "UUID" --> F[Filter by BookingID]
+    D -- "山田" --> G[Filter by Name]
+    B --> E
+    B --> F
+    B --> G
+    E & F & G --> H[Update DOM List]
+```
+
+---
+
+### 8.5 当日券発行画面 (`pages/walkin.html`)
+
+Admin権限専用の高速発券インターフェース。
+
+*   **Module**: `assets/js/walkin-main.js`
+*   **Algorithm**: "Best Seat Allocation"
+    1.  **Inputs**: 枚数（例: 2枚）。
+    2.  **Search**: 現在の公演の空席データから、`seat_number` が連続する空席ペアを探索。
+    3.  **Priority**: 前方・中央（行ごとの重み付け）を優先して提案。
+    4.  **Issue**: 確認なしで即座に `create_reservation` API (Walk-in Flag付) を叩き、QRコードを表示。
+    *   これにより、窓口での発券時間を数秒に短縮している。
+
+```mermaid
+graph LR
+    A[Admin Input: 2 tickets] --> B[Get Available Seats]
+    B --> C["Loop Rows (A -> Z)"]
+    C --> D{Find 2 Continuous?}
+    D -- Yes --> E[Select Seats]
+    D -- No --> F[Next Row]
+    E --> G["Create Reservation (Walkin)"]
+    G --> H["Print Ticket/QR"]
+```
+
+---
+
+### 8.6 予約完了・チケット画面 (`pages/reservation-status.html`)
+
+予約情報の永続的な表示とQRコード生成を担う。
+
+*   **Module**: `assets/js/reservation-status.js`
+*   **External Lib**: `qrcode.js` (Client-side QR Generation)
+
+#### A. データ復元ロジック
+*   **Initial Check**: URLパラメータ `?id=...&pass=...` を確認。
+*   **Auth**: サーバーに対して `action=get_booking_details` を発行し、予約が存在しパスコードが一致する場合のみ詳細情報をJSONで受け取る。
+*   **Realtime**: WebSocket (Supabase Realtime) を購読し、予約ステータス（チェックイン済/キャンセル）の変更を即座に画面反映する。
+
+#### B. QRコード生成仕様
+セキュリティと利便性を両立するため、以下のフォーマットでQRコードを生成する。
+*   **Format**: `TICKET:{booking_id}:{passcode}` (例: `TICKET:123:ABCD`)
+*   **Logic**: 
+    1.  `reservation-status` 画面では、サーバーから受け取った正規のデータに基づいてクライアントサイドでQR描画を行う。
+    2.  画像ではなく `Canvas`/`SVG` として描画されるため、ネットワーク負荷が軽い。
+
+```mermaid
+sequenceDiagram
+    participant C as Client (Browser)
+    participant S as Supabase Realtime
+    
+    C->>S: Subscribe (booking_id)
+    loop Connection
+        S-->>C: UPDATE (status='checked_in')
+        C->>C: Change UI (Green)
+        C->>C: Play Sound / Vibrate
+    end
+```
+
+---
+
+### 8.7 入場管理・スキャン画面 (`pages/admin-scan.html`)
+
+入場ゲートで使用する高速チェッカー。
+
+*   **Module**: `assets/js/admin-scan.js`
+*   **External Lib**: `html5-qrcode`
+
+#### A. スキャンプロセス
+1.  **Camera Access**: `html5-qrcode` ライブラリを使用し、デバイスの背面カメラを起動。
+2.  **Decode**: QRコードの内容を解析。`TICKET:` プレフィックスを検証。
+3.  **Fast Action**:
+    *   スキャン成功と同時に `checkInReservation()` をバックグラウンド実行。
+    *   **Optimistic UI**: サーバー応答を待たずに「チェックイン成功」音と画面表示を行う（失敗時は即座にロールバック警告）。
+    *   **Validation**: 既にチェックイン済みの場合は「警告: 既に入場済みです」と表示し、二重入場を防止。
+
+```mermaid
+graph TD
+    A[Camera] -->|Stream| B[Scan Logic]
+    B -->|Decode| C{Valid Ticket?}
+    C -- No --> B
+    C -- Yes --> D[Extract ID]
+    D --> E["Call API check_in"]
+    E -->|Async| F[Server DB Update]
+    E -->|Optimistic| G[Play Sound / Show Success]
+    F -- Error? --> H[Show Alert & Rollback]
+```
+
+---
+
+### 8.8 モニタリング・ログ画面 (`pages/monitoring-dashboard.html`, `pages/logs.html`)
+
+システムの健全性と稼働状況を監視する管理ツール。
+
+*   **Module**: `assets/js/enhanced-status-monitor.js` (Monitoring), `assets/js/audit-logger.js` (Logs)
+
+#### A. リアルタイムモニタリング
+*   **Polling**: 30秒ごとに `check_seat_status` アクションを実行し、全公演の「予約済」「確保」「空席」数を集計する。
+*   **Threshold Alerts**:
+    *   残席数が閾値（例: 20席以下）を下回ると、ダッシュボード上で警告色（赤/黄）を表示。
+    *   テスト用公演（"見本演劇"など）は自動的に集計から除外されるロジックを持つ。
+
+#### B. 監査ログ (Audit Logs)
+*   **Trigger**: 予約作成、キャンセル、チェックイン、座席変更など、システム上の重要な変更はすべて `Server-Side` でログテーブルに記録される。
+*   **Viewer**: `logs.html` は単純な時系列リストとしてこれを表示し、管理者による不正操作やトラブルシューティングの追跡を可能にする。
+
+```mermaid
+graph TD
+    A["Timer (30s)"] --> B["API: check_seat_status"]
+    B --> C[Compute Empty Count]
+    C --> D{Count < Threshold?}
+    D -- Yes --> E[Alert: Change Color]
+    D -- No --> F[Normal Display]
+    E & F --> G[Wait 30s] --> A
+        
+    H["Action (Reserve/Cancel)"] -->|Log| I[audit_logs table]
+    I -->|Read| J[logs.html]
+```
+
+---
+
+## 9. オフライン動作と同期アーキテクチャ (Offline & Sync Architecture)
+
+本システムは、ネットワーク接続が不安定な環境や完全なオフライン環境でも主要な業務を継続できるよう、堅牢なオフライン同期機構 (`offline-sync-v2.js`) を備えている。
+
+### 9.1 アーキテクチャ概要
+
+*   **PWA Cache (Service Worker)**: `sw.js` により、アプリケーションシェル（HTML, CSS, JS）および最新のマスターデータをキャッシュし、オフライン起動を保証。
+*   **Offline Queue (IndexedDB/LocalStorage)**: オフライン時に発生したデータ更新操作（予約、チェックイン、座席変更など）をキューに蓄積。
+*   **Background Sync**: オンライン復帰時、またはバックグラウンドで接続が確立された瞬間に、キュー内の操作を順次サーバーへ送信。
+
+### 9.2 同期メカニズム (`OfflineSync v2`)
+
+#### A. 操作キューリング
+オフライン時にユーザーが行った操作は、以下のメタデータと共に `OfflineQueue` にシリアライズして保存される。
+
+*   **Operation ID**: 一意な識別子
+*   **Type**: `RESERVE_SEATS`, `CHECK_IN`, `UPDATE_SEAT` など
+*   **Payload**: APIリクエストに必要な全パラメータ
+*   **Timestamp**: 操作発生時刻（競合解決に使用）
+*   **Priority**: 操作の優先度（予約作成 > チェックイン > 座席メモ編集）
+
+#### B. 競合解決 (Conflict Resolution)
+オンライン復帰時の同期において、サーバー上の状態とローカル操作が競合した場合（例：オフライン中に別の管理者が同じ席を予約していた）、以下の戦略で解決を図る。
+
+1.  **Strict Mode (予約作成)**:
+    *   サーバー上の座席が既に埋まっている場合、その操作は **失敗 (Error)** として扱い、ユーザーに通知する（二重予約の絶対防止）。
+2.  **Merge Mode (座席情報編集)**:
+    *   サーバー上の `updated_at` とローカル操作のタイムスタンプを比較し、より新しい変更を優先する（Last-Write-Wins）、あるいはフィールド単位でマージを行う。
+
+#### C. バックグラウンド同期フロー
+1.  **Detection**: `window.ononline` イベントまたは定期的な Ping (`checkConnectionStatus`) によりオンライン復帰を検知。
+2.  **Lock Acquisition**: 複数のタブが開かれている場合、`BroadcastChannel` と `LocalStorage Lock` を用いて、1つのタブのみが同期マスター（Sync Coordinator）となる。
+3.  **Batch Processing**: キューから優先度順に操作を取り出し、バッチ処理でAPIを実行。
+4.  **Feedback**: 同期完了後、成功数・失敗数をユーザーに通知（Toast Notification）し、最新のデータを再取得して画面をリフレッシュする。
+
+---
+
+---
+
+---
+
+
+**市川学園 座席管理システム v32.0.0**
 Technical Documentation
-Commit: `v1.0.0`
+Commit: `v32.0.0`
 
 Copyright (c) 2025 Junxiang Jin. All rights reserved.
