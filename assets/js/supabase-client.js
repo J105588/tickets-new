@@ -436,7 +436,8 @@ if (typeof window !== 'undefined') {
         adminFetchSchedules,
         adminManageSchedule,
         adminManageMaster,
-        adminSendSummaryEmails
+        adminSendSummaryEmails,
+        adminResetPerformance
     };
 }
 
@@ -452,3 +453,11 @@ export async function adminDeleteSchedule(id) {
         return { success: false, error: e.message };
     }
 }
+
+export async function adminResetPerformance(performanceId) {
+    return await jsonpRequest(GAS_API_URLS[0], {
+        action: 'admin_reset_performance',
+        performanceId: performanceId
+    });
+}
+

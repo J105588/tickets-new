@@ -334,3 +334,59 @@ function adminSendSummaryEmails(jobs) {
   return { success: true, count: count, errors: errors };
 }
 
+
+// ==========================================
+// 管理者用: 公演データの初期化 (Reset Performance)
+// ==========================================
+function adminResetPerformance(performanceId) {
+  try {
+    if (!performanceId) return { success: false, error: 'Performance ID is required' };
+
+    // 1. Verify existence
+    const perfRes = supabaseIntegration._request(`performances?id=eq.${performanceId}`);
+    if (!perfRes.success || perfRes.data.length === 0) {
+      return { success: false, error: '公演が見つかりません' };
+    }
+    const performance = perfRes.data[0];
+
+    // 2. Bulk Release Seats (Reset to available)
+    // PATCH /seats?performance_id=eq.ID
+    // Note: updating everything with performance_id
+    const seatUpdateRes = supabaseIntegration._request(`seats?performance_id=eq.${performanceId}`, {
+      method: 'PATCH',
+      useServiceRole: true,
+      headers: { 'Prefer': 'return=minimal' }, // Don't need all rows back
+      body: {
+        status: 'available',
+        booking_id: null,
+        reserved_by: null,
+        reserved_at: null,
+        checked_in_at: null
+      }
+    });
+
+    if (!seatUpdateRes.success) {
+      return { success: false, error: '座席の初期化に失敗しました: ' + seatUpdateRes.error };
+    }
+
+    // 3. Bulk Delete Bookings
+    // DELETE /bookings?performance_id=eq.ID
+    const bookingDeleteRes = supabaseIntegration._request(`bookings?performance_id=eq.${performanceId}`, {
+      method: 'DELETE',
+      useServiceRole: true,
+      headers: { 'Prefer': 'return=minimal' }
+    });
+
+    if (!bookingDeleteRes.success) {
+      return { success: false, error: '予約データの削除に失敗しました: ' + bookingDeleteRes.error };
+    }
+
+    return { 
+      success: true, 
+      message: `公演「${performance.group_name} ${performance.day} ${performance.timeslot}」を初期化しました\n(座席開放・予約削除完了)` 
+    };
+
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}

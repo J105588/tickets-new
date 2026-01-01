@@ -17,7 +17,8 @@ import {
     adminDeleteSchedule,     // New
     adminManageMaster,       // New
     adminSendSummaryEmails,   // New
-    adminSwapSeats           // New
+    adminSwapSeats,           // New
+    adminResetPerformance    // New
 } from './supabase-client.js';
 
 let currentReservations = [];
@@ -312,6 +313,7 @@ function renderSchedules() {
             <td><span class="badge">${timeDisplay}</span></td>
             <td>
                 <button class="btn-sm" onclick="openScheduleModal('${s.id}')">編集</button>
+                <button class="btn-sm" style="background:#f59e0b;" onclick="resetPerformance(${s.id})">初期化</button>
                 <button class="btn-danger btn-sm" onclick="deleteScheduleEntry(${s.id})">削除</button>
             </td>
         `;
@@ -652,16 +654,51 @@ window.deleteScheduleEntry = async function (id) {
     }
 };
 
-window.deleteItem = async function (table, id) {
-    if (!confirm('本当に削除しますか？')) return;
-    const res = await adminManageMaster(table, 'delete', { id });
-    if (res.success) {
-        alert('削除しました');
-        loadMasterData();
-    } else {
-        alert('エラー: ' + res.error);
+
+
+window.resetPerformance = async function (id) {
+    const item = masterData.schedules.find(s => s.id == id);
+    if (!item) return;
+
+    const confirmMsg = `【重要】本当に初期化しますか？\n\n対象: ${item.group_name} ${item.day} ${item.timeslot}\n\n・全座席が「空席」に戻ります\n・全ての予約データが「完全に削除」されます\n・この操作は取り消せません\n\n実行するには、以下に「RESET」と入力してください。`;
+
+    const input = prompt(confirmMsg);
+    if (input !== 'RESET') {
+        if (input !== null) alert('入力内容が一致しないためキャンセルしました');
+        return;
+    }
+
+    // Double check
+    if (!confirm('最終確認: 本当に初期化してよろしいですか？')) return;
+
+    // Execute
+    // Use resetPerformance wrapper
+    // UI Feedback
+    const btn = document.querySelector(`button[onclick="resetPerformance(${id})"]`);
+    const originalText = btn ? btn.innerText : '初期化';
+    if (btn) {
+        btn.innerText = '処理中...';
+        btn.disabled = true;
+    }
+
+    try {
+        const res = await adminResetPerformance(id);
+        if (res.success) {
+            alert(res.message || '初期化しました');
+            loadMasterData(); // Refresh all
+        } else {
+            alert('初期化エラー: ' + res.error);
+        }
+    } catch (e) {
+        alert('エラーが発生しました: ' + e.message);
+    } finally {
+        if (btn) {
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
     }
 };
+
 
 // --- Utils ---
 

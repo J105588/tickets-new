@@ -303,6 +303,11 @@ function doGet(e) {
              }
              break;
 
+          case 'admin_reset_performance':
+             response = adminResetPerformance(e.parameter.performanceId);
+             break;
+
+
           case 'admin_manage_master':
              // マスタデータ管理 (Save/Delete)
              var table = e.parameter.table;
