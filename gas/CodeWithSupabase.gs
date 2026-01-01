@@ -1162,7 +1162,7 @@ function mapSupabaseStatusToLegacy(supabaseStatus) {
     case 'reserved': return 'reserved';
     case 'checked_in': return 'checked-in';
     case 'walkin': return 'walkin';
-    case 'blocked': return 'unavailable';
+    case 'blocked': return 'blocked';
     default: return 'available';
   }
 }

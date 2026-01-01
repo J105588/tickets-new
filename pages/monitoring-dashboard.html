@@ -7,7 +7,7 @@
     <title>市川学園座席管理システム - 座席状況監視ダッシュボード</title>
     <link rel="icon" href="https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg">
     <meta name="theme-color" content="#007bff">
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="../manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <link rel="stylesheet" href="../assets/css/styles.css">
@@ -1140,8 +1140,8 @@
     </div>
 
     <script type="module">
-        import GasAPI from './api.js';
-        import enhancedStatusMonitor from './enhanced-status-monitor.js';
+        import GasAPI from '../assets/js/api.js';
+        import enhancedStatusMonitor from '../assets/js/enhanced-status-monitor.js';
 
         class MonitoringDashboard {
             constructor() {
@@ -2203,6 +2203,12 @@
                         } else if (statusC === 'reserved') {
                             statusC = '確保';
                             statusE = '';
+                        } else if (statusC === 'walkin') {
+                            statusC = '当日券';
+                            statusE = '済';
+                        } else if (statusC === 'blocked' || statusC === 'unavailable') {
+                            statusC = '使用不可';
+                            statusE = '';
                         } else if (statusC === 'empty' || statusC === 'available') {
                             statusC = '空';
                             statusE = '';
@@ -2467,13 +2473,13 @@
                         // 2. チェックイン済み座席: C列が「予約済」かつE列が「済」の座席数
                         // 3. 分母: 予約済み座席の計算は総座席数、チェックイン済み座席の計算は予約済み座席数
 
-                        if (statusC === '予約済' || statusC === '確保' ||
-                            statusC === 'checked-in' || statusC === 'to-be-checked-in' || statusC === 'reserved') {
+                        if (statusC === '予約済' || statusC === '確保' || statusC === '当日券' || statusC === '使用不可' ||
+                            statusC === 'checked-in' || statusC === 'to-be-checked-in' || statusC === 'reserved' || statusC === 'walkin') {
                             // 予約済み座席としてカウント（E列は関係なし）
                             reservedSeats++;
 
                             // チェックイン済みかどうかを判定
-                            if ((statusC === '予約済' && statusE === '済') || statusC === 'checked-in') {
+                            if ((statusC === '予約済' && statusE === '済') || statusC === 'checked-in' || (statusC === '当日券' && statusE === '済')) {
                                 checkedInSeats++;
                             }
                         } else if (statusC === '空' || statusC === '' || statusC === 'empty' || statusC === 'available') {
@@ -2581,7 +2587,7 @@
                     const classData = this.getClassSummary(group);
                     return `
                         <button class="class-button" data-group="${group}" onclick="window.MonitoringDashboard.showClassAnalysis('${group}')">
-                            <span class="class-name">${group}組</span>
+                            <span class="class-name">${group}</span>
                             <span class="class-stats">公演数: ${classData.totalPerformances}件</span>
                             <span class="class-description">総座席: ${classData.totalSeats}席 | 空席: ${classData.totalEmptySeats}席</span>
                         </button>

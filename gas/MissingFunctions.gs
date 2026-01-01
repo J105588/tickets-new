@@ -506,21 +506,21 @@ function sendStatusNotificationEmail(emailData) {
     const mediumPriority = notifications.filter(n => n.priority === 'medium');
     const lowPriority = notifications.filter(n => n.priority === 'low');
 
-    let subject = '座席状況通知 - 座席管理システム';
+    let subject = '座席状況通知 - 市川学園座席管理システム';
     if (highPriority.length > 0) {
       const minSeats = Math.min.apply(null, highPriority.map(n => n.timeslot && n.timeslot.emptySeats).filter(Number.isFinite));
-      subject = `🚨 残り${Number.isFinite(minSeats) ? minSeats : 'わずか'}席以下 - 座席管理システム`;
+      subject = `残り${Number.isFinite(minSeats) ? minSeats : 'わずか'}席以下 - 座席管理システム`;
     } else if (mediumPriority.length > 0) {
       const minSeats = Math.min.apply(null, mediumPriority.map(n => n.timeslot && n.timeslot.emptySeats).filter(Number.isFinite));
-      subject = `⚠️ 残り${Number.isFinite(minSeats) ? minSeats : '少数'}席 - 座席管理システム`;
+      subject = `残り${Number.isFinite(minSeats) ? minSeats : '少数'}席 - 座席管理システム`;
     } else if (lowPriority.length > 0) {
       const minSeats = Math.min.apply(null, lowPriority.map(n => n.timeslot && n.timeslot.emptySeats).filter(Number.isFinite));
-      subject = `📊 残り${Number.isFinite(minSeats) ? minSeats : ''}席 - 座席管理システム`;
+      subject = `残り${Number.isFinite(minSeats) ? minSeats : ''}席 - 座席管理システム`;
     }
 
     let body = '座席状況の変化をお知らせします。\n\n';
     if (highPriority.length > 0) {
-      body += '🚨 残り席数が少なくなっています 🚨\n';
+      body += '残り席数が少なくなっています\n';
       body += Array(51).join('=') + '\n';
       highPriority.forEach(notification => {
         const t = notification.timeslot || {};
@@ -530,7 +530,7 @@ function sendStatusNotificationEmail(emailData) {
       });
     }
     if (mediumPriority.length > 0) {
-      body += '⚠️ 残り席数にご注意ください ⚠️\n';
+      body += '残り席数にご注意ください\n';
       body += Array(51).join('=') + '\n';
       mediumPriority.forEach(notification => {
         const t = notification.timeslot || {};
@@ -539,7 +539,7 @@ function sendStatusNotificationEmail(emailData) {
       });
     }
     if (lowPriority.length > 0) {
-      body += '📊 座席状況の変化 📊\n';
+      body += '座席状況の変化\n';
       body += Array(51).join('=') + '\n';
       lowPriority.forEach(notification => {
         const t = notification.timeslot || {};
@@ -548,7 +548,7 @@ function sendStatusNotificationEmail(emailData) {
     }
 
     if (statistics) {
-      body += '\n📈 システム統計 📈\n';
+      body += '\nシステム統計\n';
       body += Array(51).join('=') + '\n';
       body += `総チェック回数: ${statistics.totalChecks || 0}回\n`;
       body += `総通知回数: ${statistics.totalNotifications || 0}回\n`;
@@ -560,7 +560,7 @@ function sendStatusNotificationEmail(emailData) {
 
     body += '\n' + Array(51).join('=') + '\n';
     body += `通知時刻: ${new Date(timestamp || new Date()).toLocaleString('ja-JP')}\n`;
-    body += 'システム: 強化座席監視システム\n';
+    body += '市川学園座席監視システム\n';
 
     const results = [];
     let successCount = 0;
