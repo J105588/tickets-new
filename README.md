@@ -793,10 +793,6 @@ graph TD
 
 ---
 
----
-
----
-
 
 **市川学園 座席管理システム v32.0.0**
 Technical Documentation
