@@ -22,12 +22,17 @@ function getMasterData() {
     if (!datesRes.success) throw new Error('日程データの取得に失敗: ' + datesRes.error);
     if (!slotsRes.success) throw new Error('時間帯データの取得に失敗: ' + slotsRes.error);
 
+    // Global Deadline (from Supabase via AdminAPI function)
+    const deadlineRes = getGlobalDeadline();
+    const deadline = deadlineRes.success ? deadlineRes.deadline : null;
+
     return {
       success: true,
       data: {
         groups: groupsRes.data,
         dates: datesRes.data,
-        timeslots: slotsRes.data
+        timeslots: slotsRes.data,
+        global_deadline: deadline // Add unified deadline
       }
     };
   } catch (e) {

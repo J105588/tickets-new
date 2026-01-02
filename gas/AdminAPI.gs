@@ -468,28 +468,53 @@ const PROP_GLOBAL_DEADLINE = 'RESERVATION_DEADLINE';
 /**
  * 予約期限を取得
  */
+/**
+ * 予約期限を取得 (Supabase settings)
+ */
 function getGlobalDeadline() {
   try {
-    const val = PropertiesService.getScriptProperties().getProperty(PROP_GLOBAL_DEADLINE);
-    return { success: true, deadline: val }; // null if not set
+    // Fetch from Supabase settings table
+    const res = supabaseIntegration._request(`settings?key=eq.${PROP_GLOBAL_DEADLINE}&select=value`);
+    
+    if (res.success && res.data && res.data.length > 0) {
+      return { success: true, deadline: res.data[0].value };
+    }
+    return { success: true, deadline: null };
   } catch (e) {
     return { success: false, error: e.message };
   }
 }
 
 /**
- * 予約期限を保存
+ * 予約期限を保存 (Supabase settings)
  * @param {string} datetimeStr ISO format or YYYY-MM-DDTHH:mm
  */
 function saveGlobalDeadline(datetimeStr) {
   try {
     if (!datetimeStr) {
-      // Clear setting
-      PropertiesService.getScriptProperties().deleteProperty(PROP_GLOBAL_DEADLINE);
+      // Clear setting (Delete)
+      const res = supabaseIntegration._request(`settings?key=eq.${PROP_GLOBAL_DEADLINE}`, {
+        method: 'DELETE',
+        useServiceRole: true
+      });
+      return res;
     } else {
-      PropertiesService.getScriptProperties().setProperty(PROP_GLOBAL_DEADLINE, datetimeStr);
+      // Upsert
+      const payload = {
+        key: PROP_GLOBAL_DEADLINE,
+        value: datetimeStr,
+        updated_at: new Date().toISOString()
+      };
+      
+      const res = supabaseIntegration._request('settings', {
+        method: 'POST',
+        headers: { 'Prefer': 'resolution=merge-duplicates' },
+        body: payload,
+        useServiceRole: true
+      });
+      
+      return res.success ? { success: true } : { success: false, error: res.error };
     }
-    return { success: true };
   } catch (e) {
     return { success: false, error: e.message };
   }

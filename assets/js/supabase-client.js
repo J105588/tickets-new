@@ -38,22 +38,28 @@ export async function fetchMasterDataFromSupabase() {
     if (!sb) return { success: false, error: 'Supabase client not initialized' };
 
     try {
-        const [groups, dates, timeslots] = await Promise.all([
+        // Parallel fetch: Supabase Tables + Settings
+        const [groups, dates, timeslots, settings] = await Promise.all([
             sb.from('groups').select('*').order('display_order'),
             sb.from('event_dates').select('*').order('display_order'),
-            sb.from('time_slots').select('*').order('display_order')
+            sb.from('time_slots').select('*').order('display_order'),
+            sb.from('settings').select('value').eq('key', 'RESERVATION_DEADLINE').maybeSingle()
         ]);
 
         if (groups.error) throw groups.error;
         if (dates.error) throw dates.error;
         if (timeslots.error) throw timeslots.error;
 
+        // Extract deadline
+        const globalDeadline = (settings.data) ? settings.data.value : null;
+
         return {
             success: true,
             data: {
                 groups: groups.data,
                 dates: dates.data,
-                timeslots: timeslots.data
+                timeslots: timeslots.data,
+                global_deadline: globalDeadline
             }
         };
     } catch (e) {
@@ -468,14 +474,82 @@ export async function adminGenerateInviteToken(minutes = 30) {
     });
 }
 
+// Unified Admin/Client Settings Access (Direct DB)
 export async function adminDeadlineSettings(op, value = null) {
-    // op: 'get' or 'save'
-    const params = { action: 'admin_deadline_settings', op: op };
-    if (value) params.value = value;
-    return await jsonpRequest(GAS_API_URLS[0], params);
+    const sb = getSupabase();
+    if (!sb) return { success: false, error: 'Supabase client not initialized' };
+
+    try {
+        if (op === 'get') {
+            const { data, error } = await sb
+                .from('settings')
+                .select('value')
+                .eq('key', 'RESERVATION_DEADLINE')
+                .maybeSingle();
+
+            if (error) throw error;
+            return { success: true, deadline: data ? data.value : null };
+        }
+        else if (op === 'save') {
+            if (!value) {
+                // Delete
+                const { error } = await sb
+                    .from('settings')
+                    .delete()
+                    .eq('key', 'RESERVATION_DEADLINE');
+                if (error) throw error;
+            } else {
+                // Upsert
+                const { error } = await sb
+                    .from('settings')
+                    .upsert({
+                        key: 'RESERVATION_DEADLINE',
+                        value: value,
+                        updated_at: new Date().toISOString()
+                    });
+                if (error) throw error;
+            }
+            return { success: true };
+        }
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
 }
 
-// Ensure global access for admin.js (which might not be using module import)
+// 時間同期 (Server Time Sync)
+export async function getServerTime() {
+    const sb = getSupabase();
+    if (!sb) return null;
+    const { data, error } = await sb.rpc('get_server_time');
+    if (error) {
+        console.error('Time sync failed:', error);
+        return new Date(); // Fallback to local
+    }
+    return new Date(data);
+}
+
+// 締め切り監視 (Realtime)
+export function subscribeToDeadline(onUpdate) {
+    const sb = getSupabase();
+    if (!sb) return null;
+
+    return sb.channel('public:settings')
+        .on('postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'settings', filter: 'key=eq.RESERVATION_DEADLINE' },
+            (payload) => {
+                onUpdate(payload.new.value);
+            }
+        )
+        .on('postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'settings', filter: 'key=eq.RESERVATION_DEADLINE' },
+            (payload) => {
+                onUpdate(payload.new.value);
+            }
+        )
+        .subscribe();
+}
+
+// Ensure global access for admin.js
 if (typeof window !== 'undefined') {
     window.adminResetPerformance = adminResetPerformance;
     window.adminGenerateInviteToken = adminGenerateInviteToken;

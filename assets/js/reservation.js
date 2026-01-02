@@ -4,7 +4,7 @@
  */
 
 import { apiUrlManager } from './config.js';
-import { fetchMasterDataFromSupabase, fetchPerformancesFromSupabase, fetchSeatsFromSupabase } from './supabase-client.js';
+import { fetchMasterDataFromSupabase, fetchPerformancesFromSupabase, fetchSeatsFromSupabase, getServerTime, subscribeToDeadline } from './supabase-client.js';
 
 // 状態管理
 const state = {
@@ -13,7 +13,10 @@ const state = {
     timeslot: '',
     selectedSeats: [], // Array of seat IDs
     maxSeats: 5, // 1回の予約で選択できる最大数
-    token: new URLSearchParams(window.location.search).get('token')
+    token: new URLSearchParams(window.location.search).get('token'),
+    serverOffset: 0,
+    globalDeadline: null,
+    isExpired: false
 };
 
 // DOM Elements
@@ -38,11 +41,133 @@ const navigation = {
 
 // 初期化
 document.addEventListener('DOMContentLoaded', async () => {
+    await initTimeSync(); // Sync first
     await initializeMasterData();
     populateFormDropdowns();
     initStep1();
     initStep2();
+    startDeadlineMonitoring(); // Start loop
 });
+
+async function initTimeSync() {
+    const serverNow = await getServerTime(); // Fetch RPC
+    if (serverNow) {
+        state.serverOffset = serverNow.getTime() - Date.now();
+        console.log('Time synced. Offset:', state.serverOffset, 'ms');
+    }
+}
+
+function getCurrentServerTime() {
+    return new Date(Date.now() + state.serverOffset);
+}
+
+// Deadline Monitor Loop
+function startDeadlineMonitoring() {
+    // 1. Check periodically
+    setInterval(checkDeadlineStatus, 1000); // Check every second
+    checkDeadlineStatus(); // Immediate check
+
+    // 2. Subscribe to changes
+    subscribeToDeadline((newValue) => {
+        state.globalDeadline = newValue;
+        checkDeadlineStatus(); // Re-check immediately
+    });
+}
+
+function checkDeadlineStatus() {
+    if (!state.globalDeadline) {
+        updateDeadlineUI(false);
+        return;
+    }
+
+    // Force JST interpretation (Append +09:00 if strictly YYYY-MM-DDTHH:mm)
+    // datetime-local format: "2025-10-30T15:00"
+    let deadlineStr = state.globalDeadline;
+    if (deadlineStr.indexOf('+') === -1 && deadlineStr.indexOf('Z') === -1) {
+        deadlineStr += '+09:00';
+    }
+    const deadlineDate = new Date(deadlineStr);
+    const now = getCurrentServerTime();
+
+    // Display Time (Always JST)
+    const formatDeadline = deadlineDate.toLocaleString('ja-JP', {
+        timeZone: 'Asia/Tokyo',
+        year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric'
+    });
+
+    if (now > deadlineDate) {
+        // Expired
+        if (!state.isExpired) {
+            state.isExpired = true;
+            handleExpiration(formatDeadline); // Pass date for display if needed
+        } else {
+            // already expired, just ensure UI is correct if needed (token case)
+            handleExpiration(formatDeadline);
+        }
+    } else {
+        // Active
+        if (state.isExpired) {
+            state.isExpired = false;
+        }
+        handleActive();
+        updateDeadlineUI(true); // This creates the span
+    }
+
+    // Set text AFTER UI update ensures span exists
+    const deadlineDisplay = document.getElementById('deadline-display-time');
+    if (deadlineDisplay) deadlineDisplay.innerText = formatDeadline;
+}
+
+function handleExpiration(deadlineText = '') {
+    if (state.token) {
+        // Token valid -> Warn but allow
+        const dInfo = document.getElementById('deadline-info');
+        if (dInfo) {
+            dInfo.style.display = 'block';
+            dInfo.innerHTML = `<i class="fas fa-exclamation-circle"></i> 期限(${deadlineText})を過ぎていますが、招待リンクにより予約可能です。`;
+            dInfo.style.backgroundColor = '#d4edda';
+            dInfo.style.color = '#155724';
+            dInfo.style.borderColor = '#c3e6cb';
+        }
+        // Show form if hidden
+        document.querySelector('.progress-bar').style.display = 'flex';
+        if (document.getElementById('step-1').style.display === 'none') {
+            // If we were on step 1, show it. If user is deeper, don't reset.
+            // Simplest: just ensure container is visible. 
+            // But wait, step-1 might not be active step.
+            // Just unhide the progress bar and let current step show.
+        }
+    } else {
+        // Block
+        document.querySelector('.progress-bar').style.display = 'none';
+        document.querySelector('.step-content.active').style.display = 'none'; // Hide current step
+        document.getElementById('reservation-closed-message').style.display = 'block';
+        document.getElementById('deadline-info').style.display = 'none'; // Hide info in favor of big error
+    }
+}
+
+function handleActive() {
+    // Re-open if extended
+    document.getElementById('reservation-closed-message').style.display = 'none';
+    document.querySelector('.progress-bar').style.display = 'flex';
+    document.querySelector('.step-content.active').style.display = 'block';
+    updateDeadlineUI(true);
+}
+
+function updateDeadlineUI(show) {
+    const el = document.getElementById('deadline-info');
+    if (!el) return;
+    if (show) {
+        el.style.display = 'block';
+        // Reset style
+        el.style.background = '#fff3cd';
+        el.style.color = '#856404';
+        el.style.border = '1px solid #ffeeba';
+        el.innerHTML = `<i class="fas fa-exclamation-circle"></i> 予約受付期限: <span id="deadline-display-time" style="font-weight: bold;"></span> まで`;
+    } else {
+        el.style.display = 'none';
+    }
+}
 
 let masterGroups = [];
 let masterDates = [];
@@ -54,6 +179,11 @@ async function initializeMasterData() {
     if (result.success) {
         masterGroups = result.data.groups;
         masterDates = result.data.dates || [];
+
+        // Initial Deadline Set (Monitoring loop handles logic)
+        state.globalDeadline = result.data.global_deadline;
+        checkDeadlineStatus(); // Force check after load
+
         populateGroupSelect();
     } else {
         console.error('Master Data Load Error:', result.error);

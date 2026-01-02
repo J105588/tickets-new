@@ -19,8 +19,13 @@
  */
 function checkReservationDeadline(performanceId) {
   try {
-    // Global Deadline Check
-    const deadlineStr = PropertiesService.getScriptProperties().getProperty('RESERVATION_DEADLINE');
+    // Global Deadline Check (Supabase Settings)
+    const res = supabaseIntegration._request(`settings?key=eq.RESERVATION_DEADLINE&select=value`);
+    let deadlineStr = null;
+    
+    if (res.success && res.data && res.data.length > 0) {
+        deadlineStr = res.data[0].value;
+    }
 
     if (!deadlineStr) {
         // Not set = Open

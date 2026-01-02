@@ -1,7 +1,7 @@
 // config.js
 // 複数のAPI URL（使用数上限回避のため分散）
 const GAS_API_URLS = [
-  "https://script.google.com/macros/s/AKfycbwOeliiHnnr7a__gu7g8JwtLavf6BEwk4rBtRHnKOdxHCOQQl9bHfWkhbz-UpFWEGxG/exec"
+  "https://script.google.com/macros/s/AKfycbzi3QoOQsi6EVSrCR36rPjTyJcPt6FBiEPcg0mA8BOEffQGiiJRfgv3rg0aAmEHCyLJRw/exec"
   //"https://script.google.com/macros/s/AKfycbwfHVEZwLbCs_sJ3ckyr6vdCLfI3twmiENbBuSOidMUOLAnGwfmGoyvGLcXihJMu8T1/exec",
   //jxjin.ig.school@gmail.com
   //"https://script.google.com/macros/s/AKfycbxGBy7NvMzEdENKL_SYA9Bvk6oq_Fx7_VW2iey0bGFlDfQmGb_-zVP3Gt2pZzJ20m9B/exec",
@@ -159,6 +159,8 @@ const FEATURE_FLAGS = {
 class DemoModeManager {
   constructor() {
     this.storageKey = 'DEMO_MODE_ACTIVE';
+    this.DEMO_MODE = true;
+    this.DEMO_USER = 'admin-demo';
     this.geneproStorageKey = 'GENEPRO_MODE_ACTIVE';
     this.demoGroup = '見本演劇';
     this.geneproGroup = '見本演劇';
