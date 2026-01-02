@@ -461,3 +461,23 @@ export async function adminResetPerformance(performanceId) {
     });
 }
 
+export async function adminGenerateInviteToken(minutes = 30) {
+    return await jsonpRequest(GAS_API_URLS[0], {
+        action: 'admin_generate_invite_token',
+        minutes: minutes
+    });
+}
+
+export async function adminDeadlineSettings(op, value = null) {
+    // op: 'get' or 'save'
+    const params = { action: 'admin_deadline_settings', op: op };
+    if (value) params.value = value;
+    return await jsonpRequest(GAS_API_URLS[0], params);
+}
+
+// Ensure global access for admin.js (which might not be using module import)
+if (typeof window !== 'undefined') {
+    window.adminResetPerformance = adminResetPerformance;
+    window.adminGenerateInviteToken = adminGenerateInviteToken;
+    window.adminDeadlineSettings = adminDeadlineSettings;
+}

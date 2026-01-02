@@ -531,23 +531,25 @@ window.saveGroup = async function () {
 window.openDateModal = function (id = null) {
     const item = id ? masterData.dates.find(d => d.id === id) : {};
     document.getElementById('date-id').value = id || '';
-    document.getElementById('date-label').value = item.date_label || '';
-    document.getElementById('date-order').value = item.display_order || 10;
-    const activeSel = document.getElementById('date-status');
-    if (activeSel) activeSel.value = item.is_active === false ? 'inactive' : 'active';
+    if (item.date_label) document.getElementById('date-label').value = item.date_label;
+    if (item.date_value) document.getElementById('date-value').value = item.date_value;
+    document.getElementById('date-order').value = item.display_order || 0;
+    if (item.is_active !== undefined) document.getElementById('date-status').value = item.is_active ? 'active' : 'inactive';
 
     const delBtn = document.getElementById('btn-delete-date');
     if (delBtn) {
         delBtn.style.display = id ? 'inline-block' : 'none';
-        delBtn.onclick = () => deleteItem('event_dates', id);
+        delBtn.onclick = () => deleteDateEntry(id);
     }
 
     document.getElementById('modal-date').classList.add('active');
 };
 window.saveDate = async function () {
     const id = document.getElementById('date-id').value;
+
     const data = {
         date_label: document.getElementById('date-label').value,
+        date_value: document.getElementById('date-value').value, // YYYY-MM-DD string
         display_order: parseInt(document.getElementById('date-order').value),
         is_active: document.getElementById('date-status').value === 'active'
     };
@@ -710,7 +712,10 @@ function switchTab(tabId) {
     // Find button - simple query selector
     const btns = document.querySelectorAll('.tab-btn');
     if (tabId === 'dashboard') btns[0].classList.add('active');
-    if (tabId === 'settings') btns[1].classList.add('active');
+    if (tabId === 'settings') {
+        btns[1].classList.add('active');
+        if (window.loadDeadlineSettings) window.loadDeadlineSettings();
+    }
 }
 
 window.sendSummaryEmails = async function () {
@@ -799,3 +804,72 @@ function logout() {
     sessionStorage.removeItem('admin_session');
     window.location.href = 'admin-login.html';
 }
+
+// --- Invitation Link ---
+window.generateInviteLink = async function () {
+    const mins = document.getElementById('invite-minutes').value;
+    const btn = document.querySelector('button[onclick="generateInviteLink()"]');
+    const originalText = btn.innerText;
+
+    btn.innerText = '発行中...';
+    btn.disabled = true;
+
+    try {
+        const res = await adminGenerateInviteToken(mins);
+        if (res.success) {
+            const baseUrl = window.location.href.replace('admin.html', 'reservation.html');
+            // Query params handling
+            const cleanBaseUrl = baseUrl.split('?')[0];
+            const fullUrl = `${cleanBaseUrl}?token=${res.token}`;
+
+            document.getElementById('invite-url').value = fullUrl;
+            document.getElementById('invite-result').style.display = 'block';
+        } else {
+            alert('発行失敗: ' + res.error);
+        }
+    } catch (e) {
+        alert('エラー: ' + e.message);
+    } finally {
+        btn.innerText = originalText;
+        btn.disabled = false;
+    }
+};
+
+window.copyInviteLink = function () {
+    const el = document.getElementById('invite-url');
+    el.select();
+    document.execCommand('copy');
+    alert('コピーしました');
+};
+
+// --- Global Deadline ---
+window.loadDeadlineSettings = async function () {
+    try {
+        const res = await adminDeadlineSettings('get');
+        if (res.success && res.deadline) {
+            document.getElementById('global-deadline').value = res.deadline;
+        } else {
+            console.log('Deadline not set or error', res.error);
+        }
+    } catch (e) {
+        console.error('Failed to load deadline', e);
+    }
+};
+
+window.saveDeadlineSettings = async function () {
+    const val = document.getElementById('global-deadline').value;
+    if (!val) {
+        if (!confirm('期限をクリア（無期限）にしますか？')) return;
+    }
+
+    try {
+        const res = await adminDeadlineSettings('save', val);
+        if (res.success) {
+            alert('保存しました');
+        } else {
+            alert('保存失敗: ' + res.error);
+        }
+    } catch (e) {
+        alert('エラー: ' + e.message);
+    }
+};

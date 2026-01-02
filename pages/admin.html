@@ -482,6 +482,53 @@
                     </table>
                 </div>
             </div>
+
+            <!-- GLOBAL DEADLINE -->
+            <div class="section-card" style="margin-top: 2rem; border-top: 4px solid #dc3545;">
+                <div class="section-header">
+                    <span class="section-title">予約受付期限一括設定 (Global Deadline)</span>
+                </div>
+                <div style="padding: 1rem;">
+                    <p style="margin-bottom: 1rem; color: #666; font-size: 0.9rem;">
+                        全公演共通の予約締切日時を設定します。<br>
+                        この時間を過ぎると、管理者用リンク以外からの新規予約ができなくなります。
+                    </p>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 1rem;">
+                        <input type="datetime-local" id="global-deadline" style="padding: 5px;">
+                        <button class="btn-primary" onclick="saveDeadlineSettings()">保存</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- INVITATION LINK -->
+            <div class="section-card" style="margin-top: 2rem; border-top: 4px solid #6f42c1;">
+                <div class="section-header">
+                    <span class="section-title">予約期限回避用リンク発行 (Invite Link)</span>
+                </div>
+                <div style="padding: 1rem;">
+                    <p style="margin-bottom: 1rem; color: #666; font-size: 0.9rem;">
+                        予約期限(開演時間など)を過ぎても予約可能な一時的なリンクを発行します。<br>
+                        発行されたリンクは指定時間内のみ有効です。
+                    </p>
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 1rem;">
+                        <label>有効時間:</label>
+                        <select id="invite-minutes" style="padding: 5px;">
+                            <option value="30">30分</option>
+                            <option value="60">60分</option>
+                            <option value="120">2時間</option>
+                            <option value="1440">24時間</option>
+                        </select>
+                        <button class="btn-primary" onclick="generateInviteLink()">リンク発行</button>
+                    </div>
+                    <div id="invite-result" style="display: none;">
+                        <textarea id="invite-url" readonly
+                            style="width: 100%; height: 60px; padding: 5px; font-size: 0.9rem;"
+                            onclick="this.select()"></textarea>
+                        <button class="btn-outline btn-sm" onclick="copyInviteLink()"
+                            style="margin-top: 5px;">コピー</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -566,6 +613,10 @@
                 <div class="form-group">
                     <label for="date-label">日程ラベル (例: Day 1, 9/20)</label>
                     <input type="text" id="date-label">
+                </div>
+                <div class="form-group">
+                    <label for="date-value">日付 (YYYY-MM-DD)</label>
+                    <input type="date" id="date-value">
                 </div>
                 <div class="form-group">
                     <label for="date-order">表示順</label>

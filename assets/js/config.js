@@ -1,7 +1,7 @@
 // config.js
 // 複数のAPI URL（使用数上限回避のため分散）
 const GAS_API_URLS = [
-  "https://script.google.com/macros/s/AKfycbxfh3ZYAKrgrkYph9QUZFNEq_EiFN-BcGNg0t-hf0-tkmV5djxku49XE_rDfeW5VHdV/exec"
+  "https://script.google.com/macros/s/AKfycbwOeliiHnnr7a__gu7g8JwtLavf6BEwk4rBtRHnKOdxHCOQQl9bHfWkhbz-UpFWEGxG/exec"
   //"https://script.google.com/macros/s/AKfycbwfHVEZwLbCs_sJ3ckyr6vdCLfI3twmiENbBuSOidMUOLAnGwfmGoyvGLcXihJMu8T1/exec",
   //jxjin.ig.school@gmail.com
   //"https://script.google.com/macros/s/AKfycbxGBy7NvMzEdENKL_SYA9Bvk6oq_Fx7_VW2iey0bGFlDfQmGb_-zVP3Gt2pZzJ20m9B/exec",

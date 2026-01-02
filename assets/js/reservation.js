@@ -12,7 +12,8 @@ const state = {
     day: '',
     timeslot: '',
     selectedSeats: [], // Array of seat IDs
-    maxSeats: 5 // 1回の予約で選択できる最大数
+    maxSeats: 5, // 1回の予約で選択できる最大数
+    token: new URLSearchParams(window.location.search).get('token')
 };
 
 // DOM Elements
@@ -648,7 +649,8 @@ document.getElementById('reservation-form').addEventListener('submit', async (e)
         name: name,
         email: email,
         grade_class: gradeClass,
-        club_affiliation: club
+        club_affiliation: club,
+        token: state.token // Admin Invite Token
     };
 
     try {

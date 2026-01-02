@@ -8,20 +8,67 @@
 // ==========================================
 
 /**
+ * 期限確認 (Check Deadline)
+ * @param {string} performanceId
+ * @return {Object} { success: true/false, isExpired: boolean, deadline: Date }
+ */
+/**
+ * 期限確認 (Check Deadline) - Global Setting
+ * @param {string} performanceId - Ignored for global checking, kept for compatibility
+ * @return {Object} { success: true/false, isExpired: boolean, deadline: Date }
+ */
+function checkReservationDeadline(performanceId) {
+  try {
+    // Global Deadline Check
+    const deadlineStr = PropertiesService.getScriptProperties().getProperty('RESERVATION_DEADLINE');
+
+    if (!deadlineStr) {
+        // Not set = Open
+        return { success: true, isExpired: false };
+    }
+
+    const deadline = new Date(deadlineStr);
+    const now = new Date();
+
+    if (now > deadline) {
+        return { success: true, isExpired: true, deadline: deadline };
+    } else {
+        return { success: true, isExpired: false, deadline: deadline };
+    }
+
+  } catch(e) {
+    console.warn('Deadline check error', e);
+    // Fail safe: if setting is broken, treat as Open or Closed?
+    // Treating as Open to avoid blocking if config error
+    return { success: true, isExpired: false };
+  }
+}
+
+/**
  * 新規予約を作成する
- * @param {Object} data - { group, day, timeslot, seats: ['A1','A2'], name, email, grade_class, club_affiliation }
+ * @param {Object} data - { ..., token: '...' } added
  */
 function createReservation(data) {
   try {
     // 1. 公演IDの特定
-    // 注意: 本来は getOrCreatePerformance ですが、予約時は既存の公演がある前提
     const perfResult = getOrCreatePerformance(data.group, data.day, data.timeslot);
     if (!perfResult.success) {
       return { success: false, error: '指定された公演が見つかりません: ' + perfResult.error };
     }
     const performanceId = perfResult.data.id;
 
-    // 2. 座席の空き状況確認（排他制御は完全ではないが、直前チェックを行う）
+    // --- Deadline Check ---
+    const deadlineCheck = checkReservationDeadline(performanceId);
+    if (deadlineCheck.success && deadlineCheck.isExpired) {
+        // 期限切れ。トークンチェックを行う。
+        const token = data.token;
+        if (!validateAdminToken(token)) {
+             return { success: false, error: '予約受付期間を終了しました。' };
+        }
+    }
+    // ----------------------
+
+    // 2. 座席の空き状況確認
     const seatIds = data.seats;
     if (!seatIds || seatIds.length === 0) {
       return { success: false, error: '座席が選択されていません' };

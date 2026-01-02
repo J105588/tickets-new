@@ -307,6 +307,20 @@ function doGet(e) {
              response = adminResetPerformance(e.parameter.performanceId);
              break;
 
+          case 'admin_generate_invite_token':
+             var mins = e.parameter.minutes ? parseInt(e.parameter.minutes) : 30;
+             response = generateAdminInviteToken(mins);
+             break;
+
+          case 'admin_deadline_settings':
+             var op = e.parameter.op; // 'get' or 'save'
+             if (op === 'save') {
+                 response = saveGlobalDeadline(e.parameter.value);
+             } else {
+                 response = getGlobalDeadline();
+             }
+             break;
+
 
           case 'admin_manage_master':
              // マスタデータ管理 (Save/Delete)

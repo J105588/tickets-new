@@ -390,3 +390,107 @@ function adminResetPerformance(performanceId) {
     return { success: false, error: e.message };
   }
 }
+
+// ==========================================
+// 期限切れ回避用トークン (Admin Invite Token)
+// ==========================================
+
+const ADMIN_TOKEN_SECRET = 'SECRET_SALT_CHANGE_THIS_IN_PROD'; // 簡易署名用
+
+/**
+ * 招待リンク用トークン生成
+ * @param {number} validMinutes 有効時間（分）
+ */
+function generateAdminInviteToken(validMinutes = 30) {
+  try {
+    const now = new Date().getTime();
+    const expiry = now + (validMinutes * 60 * 1000);
+    
+    // Payload: expiry_timestamp
+    const payload = expiry.toString();
+    
+    // Signature: MD5(payload + secret)
+    const signature = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, payload + ADMIN_TOKEN_SECRET);
+    const signatureHex = signature.map(b => ('0' + (b & 0xFF).toString(16)).slice(-2)).join('');
+    
+    // Token: Base64(payload + "_" + signatureHex)
+    const token = Utilities.base64EncodeWebSafe(`${payload}_${signatureHex}`);
+    
+    return { success: true, token: token, expiry: expiry };
+    
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * トークンの検証
+ * @param {string} token
+ * @return {boolean}
+ */
+function validateAdminToken(token) {
+  if (!token) return false;
+  
+  try {
+    const decoded = Utilities.newBlob(Utilities.base64DecodeWebSafe(token)).getDataAsString();
+    const parts = decoded.split('_');
+    if (parts.length !== 2) return false;
+    
+    const expiryStr = parts[0];
+    const signatureHex = parts[1];
+    
+    // 1. Check Signature
+    const expectedSig = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, expiryStr + ADMIN_TOKEN_SECRET);
+    const expectedHex = expectedSig.map(b => ('0' + (b & 0xFF).toString(16)).slice(-2)).join('');
+    
+    if (signatureHex !== expectedHex) return false; // Tampered
+    
+    // 2. Check Expiry
+    const expiry = parseInt(expiryStr);
+    const now = new Date().getTime();
+    
+    if (now > expiry) return false; // Expired
+    
+    return true;
+    
+  } catch (e) {
+    console.warn('Token validation error', e);
+    return false;
+  }
+}
+
+// ==========================================
+// 全体共通の予約期限設定 (Global Deadline)
+// ==========================================
+
+const PROP_GLOBAL_DEADLINE = 'RESERVATION_DEADLINE';
+
+/**
+ * 予約期限を取得
+ */
+function getGlobalDeadline() {
+  try {
+    const val = PropertiesService.getScriptProperties().getProperty(PROP_GLOBAL_DEADLINE);
+    return { success: true, deadline: val }; // null if not set
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * 予約期限を保存
+ * @param {string} datetimeStr ISO format or YYYY-MM-DDTHH:mm
+ */
+function saveGlobalDeadline(datetimeStr) {
+  try {
+    if (!datetimeStr) {
+      // Clear setting
+      PropertiesService.getScriptProperties().deleteProperty(PROP_GLOBAL_DEADLINE);
+    } else {
+      PropertiesService.getScriptProperties().setProperty(PROP_GLOBAL_DEADLINE, datetimeStr);
+    }
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
