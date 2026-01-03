@@ -510,17 +510,8 @@ function centerSeatMap() {
   const clientWidth = container.clientWidth;
 
   if (scrollWidth > clientWidth) {
-    // スクロール可能な場合、座席図の左端がスクロールバーの0位置に来るように配置
-    const maxScrollLeft = scrollWidth - clientWidth;
-
-    // 左側の余白幅を計算（座席セクションの最初の子要素の幅）
-    const seatSection = container.querySelector('.seat-section');
-    const leftPadding = seatSection ? seatSection.firstElementChild : null;
-    const leftPaddingWidth = leftPadding ? leftPadding.offsetWidth : 0;
-
-    // 座席図の左端がスクロールバーの0位置に来るようにスクロール位置を設定
-    const targetScrollLeft = Math.max(0, Math.min(maxScrollLeft, leftPaddingWidth));
-
+    // コンテナの中央に配置
+    const targetScrollLeft = (scrollWidth - clientWidth) / 2;
     container.scrollLeft = targetScrollLeft;
   }
 }
