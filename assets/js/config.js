@@ -159,8 +159,6 @@ const FEATURE_FLAGS = {
 class DemoModeManager {
   constructor() {
     this.storageKey = 'DEMO_MODE_ACTIVE';
-    this.DEMO_MODE = true;
-    this.DEMO_USER = 'admin-demo';
     this.geneproStorageKey = 'GENEPRO_MODE_ACTIVE';
     this.demoGroup = '見本演劇';
     this.geneproGroup = '見本演劇';

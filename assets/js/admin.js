@@ -18,7 +18,9 @@ import {
     adminManageMaster,       // New
     adminSendSummaryEmails,   // New
     adminSwapSeats,           // New
-    adminResetPerformance    // New
+    adminResetPerformance,    // New
+    toDisplaySeatId,
+    toDbSeatId
 } from './supabase-client.js';
 
 let currentReservations = [];
@@ -219,7 +221,8 @@ function renderReservationTable(data) {
         else if (r.status === 'checked_in') { statusClass = 'status-checked-in'; statusText = '入場済'; }
         else if (r.status === 'cancelled') { statusClass = 'status-cancelled'; statusText = 'キャンセル'; }
 
-        const seats = r.seats ? r.seats.map(s => s.seat_id).join(', ') : '-';
+        const rawSeats = r.seats ? r.seats.map(s => s.seat_id).join(', ') : '-';
+        const seats = toDisplaySeatId(rawSeats);
         const p = r.performances || r.performance; // Handle both just in case
         const groupInfo = `${p ? p.group_name : '-'} <br> <span style="font-size:0.8em; color:#666;">Day ${p ? p.day : '-'} ${p ? p.timeslot : '-'}</span>`;
 
@@ -342,8 +345,8 @@ window.openEditModal = function (id) {
     document.getElementById('edit-club').value = selectedBooking.club_affiliation || '';
 
     // Populate Seat Input
-    const seats = selectedBooking.seats ? selectedBooking.seats.map(s => s.seat_id).join(', ') : '';
-    document.getElementById('edit-seat').value = seats;
+    const rawSeats = selectedBooking.seats ? selectedBooking.seats.map(s => s.seat_id).join(', ') : '';
+    document.getElementById('edit-seat').value = toDisplaySeatId(rawSeats);
 
     document.getElementById('edit-notes').value = selectedBooking.notes || '';
     document.getElementById('edit-status').value = selectedBooking.status;
@@ -405,10 +408,13 @@ async function handleCancel(id) {
 
 window.changeSeat = async function () {
     if (!selectedBooking) return;
-    const newSeatsStr = document.getElementById('edit-seat').value.trim();
-    if (!newSeatsStr) return alert('座席IDを入力してください');
+    const displaySeatsStr = document.getElementById('edit-seat').value.trim();
+    if (!displaySeatsStr) return alert('座席IDを入力してください');
 
-    if (!confirm(`座席を「${newSeatsStr}」に変更しますか？\n\n注意: 旧座席は開放されます。新座席が空いていない場合はエラーになります。`)) return;
+    // Convert Display -> DB
+    const dbSeatsStr = toDbSeatId(displaySeatsStr);
+
+    if (!confirm(`座席を「${displaySeatsStr}」に変更しますか？\n（システムID: ${dbSeatsStr}）\n\n注意: 旧座席は開放されます。新座席が空いていない場合はエラーになります。`)) return;
 
     const btn = document.querySelector('button[onclick="changeSeat()"]');
     const originalText = btn.innerText;
@@ -416,7 +422,7 @@ window.changeSeat = async function () {
     btn.disabled = true;
 
     // Split by comma or space
-    const newSeats = newSeatsStr.split(/[,、\s]+/).map(s => s.trim()).filter(s => s);
+    const newSeats = dbSeatsStr.split(/[,、\s]+/).map(s => s.trim()).filter(s => s);
 
     const res = await adminSwapSeats(selectedBooking.id, newSeats);
 
@@ -747,7 +753,7 @@ window.sendSummaryEmails = async function () {
             group_name: b.performances ? b.performances.group_name : '', // Assuming joined
             day: b.performances ? b.performances.day : '',
             timeslot: b.performances ? b.performances.timeslot : '',
-            seat: b.seats ? b.seats.map(s => s.seat_id).join(',') : '指定なし',
+            seat: b.seats ? toDisplaySeatId(b.seats.map(s => s.seat_id).join(',')) : '指定なし',
             status: b.status,     // Add status
             passcode: b.passcode, // Add passcode
             created_at: b.created_at // Add created_at

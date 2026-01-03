@@ -555,3 +555,60 @@ if (typeof window !== 'undefined') {
     window.adminGenerateInviteToken = adminGenerateInviteToken;
     window.adminDeadlineSettings = adminDeadlineSettings;
 }
+
+// Seat Number Translation (UI Only)
+export function toDisplaySeatId(dbId) {
+    if (!dbId) return '';
+    // Single ID translation
+    const translateOne = (id) => {
+        const match = id.match(/^([A-Z]+)(\d+)$/);
+        if (!match) return id;
+        const row = match[1];
+        const num = parseInt(match[2]);
+
+        let offset = 0;
+        switch (row) {
+            case 'A': offset = 5; break; // A6 -> A1
+            case 'B': offset = 4; break; // B5 -> B1
+            case 'C': offset = 3; break; // C4 -> B1
+            case 'D': offset = 2; break; // D3 -> D1
+            case 'E': offset = 1; break; // E2 -> E1
+        }
+
+        const newNum = num - offset;
+        return (newNum > 0) ? `${row}${newNum}` : id; // Fallback if invalid
+    };
+
+    // Handle CSV or single ID
+    if (dbId.includes(',')) {
+        return dbId.split(',').map(s => translateOne(s.trim())).join(', ');
+    }
+    return translateOne(dbId);
+}
+
+export function toDbSeatId(displayId) {
+    if (!displayId) return '';
+    const translateOne = (id) => {
+        const match = id.match(/^([A-Z]+)(\d+)$/);
+        if (!match) return id;
+        const row = match[1];
+        const num = parseInt(match[2]);
+
+        let offset = 0;
+        switch (row) {
+            case 'A': offset = 5; break; // A1 -> A6
+            case 'B': offset = 4; break; // B1 -> B5
+            case 'C': offset = 3; break; // B1 -> C4
+            case 'D': offset = 2; break; // D1 -> D3
+            case 'E': offset = 1; break; // E1 -> E2
+        }
+
+        const newNum = num + offset;
+        return `${row}${newNum}`;
+    };
+
+    if (displayId.includes(',')) {
+        return displayId.split(',').map(s => translateOne(s.trim())).join(', ');
+    }
+    return translateOne(displayId);
+}

@@ -3,6 +3,7 @@ import GasAPI from './api.js';
 import { loadSidebar, toggleSidebar, showModeChangeModal, applyModeChange, closeModeModal } from './sidebar.js';
 import { apiUrlManager, DEBUG_MODE, debugLog, DemoMode } from './config.js';
 import uiOptimizer from './ui-optimizer.js';
+import { toDisplaySeatId } from './supabase-client.js';
 
 /**
  * 座席選択画面のメイン処理
@@ -36,7 +37,7 @@ console.log('[App Mode] Determined Mode:', APP_MODE);
 const requestedGroup = urlParams.get('group') || '';
 // DEMOモードで許可外の場合ブロックしてリダイレクト (Adminは除外)
 if (!IS_ADMIN) {
-  DemoMode.guardGroupAccessOrRedirect(requestedGroup, `seats.html?group=${encodeURIComponent(DemoMode.demoGroup)}&day=${urlParams.get('day') || '1'}&timeslot=${urlParams.get('timeslot') || 'A'}`);
+  DemoMode.guardGroupAccessOrRedirect(requestedGroup, `seats.html ? group = ${encodeURIComponent(DemoMode.demoGroup)}& day=${urlParams.get('day') || '1'}& timeslot=${urlParams.get('timeslot') || 'A'} `);
 }
 // DEMOモード時は見本演劇を強制 (Adminは除外)
 let GROUP = IS_ADMIN ? (requestedGroup || '見本演劇') : DemoMode.enforceGroup(requestedGroup || '見本演劇');
@@ -82,7 +83,7 @@ window.onload = async () => {
   if (performanceInfo) {
     // ゲネプロモード時は表示用の時間帯を使用
     const displayTimeslot = DemoMode.isGeneproActive() ? DISPLAY_TIMESLOT : TIMESLOT;
-    performanceInfo.textContent = `${groupName} ${DAY}日目 ${displayTimeslot}`;
+    performanceInfo.textContent = `${groupName} ${DAY}日目 ${displayTimeslot} `;
   }
 
   // Mode-based UI Control (Strict Redesign)
@@ -300,11 +301,11 @@ window.onload = async () => {
       const errorContainer = document.getElementById('error-container');
       const errorMessage = document.getElementById('error-message');
       if (errorContainer && errorMessage) {
-        errorMessage.textContent = `データ読み込み失敗: ${errorMsg}`;
+        errorMessage.textContent = `データ読み込み失敗: ${errorMsg} `;
         errorContainer.style.display = 'flex';
       } else {
         // エラーコンテナがない場合はアラートで表示
-        alert(`座席データの読み込みに失敗しました: ${errorMsg}`);
+        alert(`座席データの読み込みに失敗しました: ${errorMsg} `);
       }
 
       // エラー時でも基本的なUIは表示
@@ -336,11 +337,11 @@ window.onload = async () => {
     const errorContainer = document.getElementById('error-container');
     const errorMessage = document.getElementById('error-message');
     if (errorContainer && errorMessage) {
-      errorMessage.textContent = `サーバー通信失敗: ${error.message}`;
+      errorMessage.textContent = `サーバー通信失敗: ${error.message} `;
       errorContainer.style.display = 'flex';
     } else {
       // エラーコンテナがない場合はアラートで表示
-      alert(`サーバー通信に失敗しました: ${error.message}`);
+      alert(`サーバー通信に失敗しました: ${error.message} `);
     }
   } finally {
     showLoader(false);
@@ -352,7 +353,7 @@ function updateLastUpdateTime() {
   lastUpdateTime = new Date();
   const lastUpdateEl = document.getElementById('last-update-display');
   if (lastUpdateEl) {
-    lastUpdateEl.textContent = `最終更新: ${lastUpdateTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
+    lastUpdateEl.textContent = `最終更新: ${lastUpdateTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} `;
   } else {
     console.warn('最終更新時間を表示する要素が見つかりません');
   }
@@ -408,19 +409,19 @@ function drawSeatMap(seatMap) {
 
   const leftPadding = document.createElement('div');
   leftPadding.style.cssText = `
-    width: ${leftPaddingWidth}px;
-    min-width: 200px;
-    height: 1px;
-    flex-shrink: 0;
-  `;
+width: ${leftPaddingWidth} px;
+min - width: 200px;
+height: 1px;
+flex - shrink: 0;
+`;
 
   const rightPadding = document.createElement('div');
   rightPadding.style.cssText = `
-    width: ${rightPaddingWidth}px;
-    min-width: 200px;
-    height: 1px;
-    flex-shrink: 0;
-  `;
+width: ${rightPaddingWidth} px;
+min - width: 200px;
+height: 1px;
+flex - shrink: 0;
+`;
 
   // 余白を追加
   seatSection.appendChild(leftPadding);
@@ -1083,7 +1084,7 @@ function createSeatElement(seatData) {
   // 座席IDを表示
   const seatIdEl = document.createElement('div');
   seatIdEl.className = 'seat-id';
-  seatIdEl.textContent = seatData.id;
+  seatIdEl.textContent = toDisplaySeatId(seatData.id);
   seat.appendChild(seatIdEl);
 
   // 管理者モード・最高管理者モードの判定
@@ -1237,30 +1238,30 @@ function updateBulkEditButtonVisibility() {
 function showBulkSeatEditModal(seatIds) {
   if (!seatIds || seatIds.length < 2) return;
   const modalHTML = `
-    <div id="bulk-seat-edit-modal" class="modal">
-      <div class="modal-content" style="max-width: 520px;">
-        <h3>一括編集（${seatIds.length}席）</h3>
-        <div class="seat-edit-form">
-          <div class="form-group">
-            <label for="bulk-column-c">C列: ステータス（空、確保、予約済など）</label>
-            <input type="text" id="bulk-column-c" value="" placeholder="例: 予約済">
-          </div>
-          <div class="form-group">
-            <label for="bulk-column-d">D列: 予約名・備考（全席に同じ内容）</label>
-            <input type="text" id="bulk-column-d" value="" placeholder="例: 田中太郎">
-          </div>
-          <div class="form-group">
-            <label for="bulk-column-e">E列: チェックイン状態・その他</label>
-            <input type="text" id="bulk-column-e" value="" placeholder="例: 済">
-          </div>
+  < div id = "bulk-seat-edit-modal" class="modal" >
+    <div class="modal-content" style="max-width: 520px;">
+      <h3>一括編集（${seatIds.length}席）</h3>
+      <div class="seat-edit-form">
+        <div class="form-group">
+          <label for="bulk-column-c">C列: ステータス（空、確保、予約済など）</label>
+          <input type="text" id="bulk-column-c" value="" placeholder="例: 予約済">
         </div>
-        <div style="font-size:12px;color:#666;margin-top:-8px;">入力した内容が選択された全ての座席に適用されます。</div>
-        <div class="modal-buttons">
-          <button class="btn-primary" onclick="window.applyBulkSeatEdit()">一括適用</button>
-          <button class="btn-secondary" onclick="window.closeBulkSeatEditModal()">キャンセル</button>
+        <div class="form-group">
+          <label for="bulk-column-d">D列: 予約名・備考（全席に同じ内容）</label>
+          <input type="text" id="bulk-column-d" value="" placeholder="例: 田中太郎">
+        </div>
+        <div class="form-group">
+          <label for="bulk-column-e">E列: チェックイン状態・その他</label>
+          <input type="text" id="bulk-column-e" value="" placeholder="例: 済">
         </div>
       </div>
+      <div style="font-size:12px;color:#666;margin-top:-8px;">入力した内容が選択された全ての座席に適用されます。</div>
+      <div class="modal-buttons">
+        <button class="btn-primary" onclick="window.applyBulkSeatEdit()">一括適用</button>
+        <button class="btn-secondary" onclick="window.closeBulkSeatEditModal()">キャンセル</button>
+      </div>
     </div>
+    </div >
   `;
   document.body.insertAdjacentHTML('beforeend', modalHTML);
   // アニメーション開始
@@ -1278,7 +1279,7 @@ function showBulkSeatEditModal(seatIds) {
     const columnC = document.getElementById('bulk-column-c').value;
     const columnD = document.getElementById('bulk-column-d').value;
     const columnE = document.getElementById('bulk-column-e').value;
-    if (!confirm(`以下の内容を${seatIds.length}席に一括適用しますか？\n\nC列: ${columnC}\nD列: ${columnD}\nE列: ${columnE}`)) return;
+    if (!confirm(`以下の内容を${seatIds.length} 席に一括適用しますか？\n\nC列: ${columnC} \nD列: ${columnD} \nE列: ${columnE} `)) return;
     closeBulkSeatEditModal();
     showLoader(true);
     try {
@@ -1303,7 +1304,7 @@ function showBulkSeatEditModal(seatIds) {
       const response = await GasAPI.updateMultipleSeats(GROUP, DAY, ACTUAL_TIMESLOT, updates);
 
       if (response.success) {
-        showSuccessNotification(`${updates.length}席を更新しました。`);
+        showSuccessNotification(`${updates.length} 席を更新しました。`);
 
         // 最新データで再描画
         try {
@@ -1323,7 +1324,7 @@ function showBulkSeatEditModal(seatIds) {
         }
       } else {
         const msg = response.message || response.error || '不明なエラー';
-        showErrorNotification(`一括更新エラー: ${msg}`);
+        showErrorNotification(`一括更新エラー: ${msg} `);
       }
 
     } catch (error) {
@@ -1448,8 +1449,8 @@ function updateSelectedSeatsDisplay() {
     // In Rebook mode, if I deselect all, I can't change. So disabled is correct.
 
     if (selectedSeats.length > 0) {
-      const seatList = selectedSeats.join(', ');
-      submitButton.textContent = `${baseText} (${selectedSeats.length}席: ${seatList})`;
+      const seatList = toDisplaySeatId(selectedSeats.join(', '));
+      submitButton.textContent = `${baseText} (${selectedSeats.length} 席: ${seatList})`;
       submitButton.disabled = false;
       // Rebook: Orange/Amber color
       if (isRebook) submitButton.style.backgroundColor = '#f59e0b';
@@ -1631,8 +1632,8 @@ async function checkInSelected() {
   }));
 
   // 選択された座席の一覧を表示
-  const seatList = selectedSeatInfos.map(seat => `${seat.id}：${seat.columnD || '（名前未設定）'}`).join('\n');
-  const confirmMessage = `以下の座席をチェックインしますか？\n\n${seatList}`;
+  const seatList = selectedSeatInfos.map(seat => `${seat.id}：${seat.columnD || '（名前未設定）'} `).join('\n');
+  const confirmMessage = `以下の座席をチェックインしますか？\n\n${seatList} `;
 
   if (!confirm(confirmMessage)) {
     return;
@@ -1678,9 +1679,9 @@ async function checkInSelected() {
       showLoader(false);
 
       // 成功通知を表示（非ブロッキング）: 座席ID：名前 の形式で複数表示し、スコープを明示
-      const scopeLabel = `${GROUP} ${DAY}日目 ${DISPLAY_TIMESLOT}`;
-      const lines = selectedSeatInfos.map(s => `${s.id}：${s.columnD || '（名前未設定）'}`);
-      const message = `チェックインが完了しました（${scopeLabel}）\n\n${lines.join('\n')}`;
+      const scopeLabel = `${GROUP} ${DAY}日目 ${DISPLAY_TIMESLOT} `;
+      const lines = selectedSeatInfos.map(s => `${s.id}：${s.columnD || '（名前未設定）'} `);
+      const message = `チェックインが完了しました（${scopeLabel}）\n\n${lines.join('\n')} `;
       showSuccessNotification(message);
 
       // バックグラウンドで座席データを再取得（サイレント更新）
@@ -1755,7 +1756,7 @@ async function checkInSelected() {
     // エラー時：UIを元に戻す
     showLoader(false);
     const errorMessage = error.message || error.error || '不明なエラーが発生しました';
-    showErrorNotification(`チェックインエラー：\n${errorMessage}`);
+    showErrorNotification(`チェックインエラー：\n${errorMessage} `);
 
     // 座席データを再取得してUIを復元
     await refreshSeatData();
@@ -1777,7 +1778,7 @@ async function confirmReservation() {
   if (urlParams.get('rebook') && urlParams.get('admin') === 'true') {
     const bookingId = urlParams.get('rebook');
 
-    if (!confirm(`予約変更 (Rebooking for ID: ${bookingId})\n\n選択した座席に変更します。\nよろしいですか？`)) return;
+    if (!confirm(`予約変更(Rebooking for ID: ${bookingId}) \n\n選択した座席に変更します。\nよろしいですか？`)) return;
 
     showLoader(true);
     try {
@@ -1814,7 +1815,7 @@ async function confirmReservation() {
   // Normal Reservation
   const confirmMessage = selectedSeats.length === 0
     ? '座席が選択されていません。予約処理を続行しますか？' // Should probably block but keeping orig logic flavor if any
-    : `以下の座席で予約しますか？\n\n${selectedSeats.join(', ')}`;
+    : `以下の座席で予約しますか？\n\n${selectedSeats.join(', ')} `;
 
   if (selectedSeats.length === 0) {
     alert('予約する座席を選択してください。');
@@ -1832,7 +1833,7 @@ async function confirmReservation() {
 
   // 選択された座席を即座に予約済みとして表示
   selectedSeats.forEach(seatId => {
-    const seatEl = document.querySelector(`[data-id="${seatId}"]`);
+    const seatEl = document.querySelector(`[data - id= "${seatId}"]`);
     if (seatEl) {
       const seatData = {
         id: seatId,
@@ -1937,7 +1938,7 @@ async function confirmReservation() {
     // エラー時：UIを元に戻す
     showLoader(false);
     const errorMessage = error.message || error.error || '不明なエラーが発生しました';
-    showErrorNotification(`予約エラー：\n${errorMessage}`);
+    showErrorNotification(`予約エラー：\n${errorMessage} `);
 
     // 座席データを再取得してUIを復元
     await refreshSeatData();
@@ -1993,15 +1994,15 @@ function showSeatEditModal(seatData) {
 
   // チップのHTML生成
   const chipsHTML = statuses.map(s => `
-    <div class="status-chip ${s.value === currentStatus ? 'selected' : ''}" 
-         data-value="${s.value}" 
-         onclick="selectStatusChip(this, '${s.value}')">
-      ${s.label}
-    </div>
+  < div class="status-chip ${s.value === currentStatus ? 'selected' : ''}"
+data - value="${s.value}"
+onclick = "selectStatusChip(this, '${s.value}')" >
+  ${s.label}
+    </div >
   `).join('');
 
   const drawerHTML = `
-    <div id="seat-edit-overlay" class="seat-edit-overlay" onclick="closeSeatEditModal()"></div>
+  < div id = "seat-edit-overlay" class="seat-edit-overlay" onclick = "closeSeatEditModal()" ></div >
     <div id="seat-edit-drawer" class="seat-edit-drawer">
       <div class="drawer-header">
         <h3>座席編集 - ${seatData.id}</h3>
@@ -2032,7 +2033,7 @@ function showSeatEditModal(seatData) {
         <button class="btn-primary" onclick="updateSeatData('${seatData.id}')">保存</button>
       </div>
     </div>
-  `;
+`;
 
   document.body.insertAdjacentHTML('beforeend', drawerHTML);
 
@@ -2093,7 +2094,7 @@ async function updateSeatData(seatId) {
   const columnE = document.getElementById('column-e').value; // 備考として取得
 
   // 確認ダイアログを表示
-  const confirmMessage = `座席 ${seatId} のデータを以下の内容で更新しますか？\n\nC列: ${columnC}\nD列: ${columnD}\nE列: ${columnE}`;
+  const confirmMessage = `座席 ${seatId} のデータを以下の内容で更新しますか？\n\nC列: ${columnC} \nD列: ${columnD} \nE列: ${columnE} `;
 
   if (!confirm(confirmMessage)) {
     return;
@@ -2106,7 +2107,7 @@ async function updateSeatData(seatId) {
 
   try {
     // 空欄は現状値を維持（意図せぬクリア防止）→ 修正: 入力値を正とする（空欄ならクリア）
-    el = document.querySelector(`.seat[data-id="${seatId}"]`);
+    el = document.querySelector(`.seat[data - id= "${seatId}"]`);
 
     // 入力値をそのまま使用する（空文字列ならクリアされる）
     const cVal = columnC;
@@ -2226,7 +2227,7 @@ async function updateSeatData(seatId) {
           duration: 8000
         });
       } else {
-        alert(`更新エラー：\n${errorMessage}`);
+        alert(`更新エラー：\n${errorMessage} `);
       }
     }
   } catch (error) {
@@ -2259,7 +2260,7 @@ async function updateSeatData(seatId) {
         duration: 10000
       });
     } else {
-      alert(`更新中にエラーが発生しました：\n${errorMessage}`);
+      alert(`更新中にエラーが発生しました：\n${errorMessage} `);
     }
   } finally {
     showLoader(false);
@@ -2290,7 +2291,7 @@ function navigateToWalkin() {
   }
 
   // 現在のURLパラメータを使用して当日券ページに遷移
-  window.location.href = `walkin.html?group=${GROUP}&day=${DAY}&timeslot=${TIMESLOT}`;
+  window.location.href = `walkin.html ? group = ${GROUP}& day=${DAY}& timeslot=${TIMESLOT} `;
 }
 
 
@@ -2307,7 +2308,7 @@ window.editSelectedSeats = function () {
   }
   if (selected.length === 1) {
     // 1席のみなら従来の単体編集モーダルへ
-    const el = document.querySelector(`.seat.selected-for-edit`);
+    const el = document.querySelector(`.seat.selected -for-edit`);
     if (!el) return;
     const seatId = el.dataset.id;
     // 簡易データを組み立てて既存モーダルを開く
@@ -2514,11 +2515,11 @@ function showSuccessNotification(message) {
   notification.style.maxWidth = '400px';
 
   notification.innerHTML = `
-    <div class="notification-content" style="display: flex; align-items: center; gap: 10px;">
+  < div class="notification-content" style = "display: flex; align-items: center; gap: 10px;" >
       <span class="notification-icon" style="font-size: 1.2em; color: #28a745;">✓</span>
       <span class="notification-message" style="flex: 1; font-size: 0.9em;">${message}</span>
       <button class="notification-close" onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; color: #155724; font-size: 1.2em; cursor: pointer; padding: 0; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: background-color 0.2s;">×</button>
-    </div>
+    </div >
   `;
 
   // 通知を表示
@@ -2549,11 +2550,11 @@ function showErrorNotification(message) {
   notification.style.maxWidth = '400px';
 
   notification.innerHTML = `
-    <div class="notification-content" style="display: flex; align-items: center; gap: 10px;">
+  < div class="notification-content" style = "display: flex; align-items: center; gap: 10px;" >
       <span class="notification-icon" style="font-size: 1.2em; color: #dc3545;">✗</span>
       <span class="notification-message" style="flex: 1; font-size: 0.9em;">${message}</span>
       <button class="notification-close" onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; color: #721c24; font-size: 1.2em; cursor: pointer; padding: 0; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: background-color 0.2s;">×</button>
-    </div>
+    </div >
   `;
 
   // 通知を表示
@@ -2572,44 +2573,44 @@ function showOfflineRestoreNotification(seatCount) {
   const notification = document.createElement('div');
   notification.className = 'offline-restore-notification';
   notification.innerHTML = `
-    <div style="display: flex; align-items: center; gap: 8px;">
+  < div style = "display: flex; align-items: center; gap: 8px;" >
       <span style="font-size: 16px; color: #fff;">●</span>
       <div>
         <div style="font-weight: 600; margin-bottom: 2px;">オフライン復元完了</div>
         <div style="font-size: 12px; opacity: 0.9;">${seatCount}席のデータをキャッシュから復元しました</div>
       </div>
-    </div>
+    </div >
   `;
   notification.style.cssText = `
-    position: fixed;
-    top: 20px;
-    left: 20px;
-    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-    color: white;
-    padding: 12px 16px;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    z-index: 10000;
-    font-size: 14px;
-    max-width: 320px;
-    word-wrap: break-word;
-    animation: slideInLeft 0.3s ease-out;
-  `;
+position: fixed;
+top: 20px;
+left: 20px;
+background: linear - gradient(135deg, #28a745 0 %, #20c997 100 %);
+color: white;
+padding: 12px 16px;
+border - radius: 8px;
+box - shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+z - index: 10000;
+font - size: 14px;
+max - width: 320px;
+word - wrap: break-word;
+animation: slideInLeft 0.3s ease - out;
+`;
 
   // アニメーション用のCSS
   const style = document.createElement('style');
   style.textContent = `
-    @keyframes slideInLeft {
+@keyframes slideInLeft {
       from {
-        transform: translateX(-100%);
-        opacity: 0;
-      }
+    transform: translateX(-100 %);
+    opacity: 0;
+  }
       to {
-        transform: translateX(0);
-        opacity: 1;
-      }
-    }
-  `;
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+`;
   document.head.appendChild(style);
 
   document.body.appendChild(notification);
@@ -2671,27 +2672,27 @@ function showUrlChangeAnimation(oldUrl, newUrl, changeType = 'rotation') {
   const notification = document.createElement('div');
   notification.className = 'url-change-notification';
   notification.style.cssText = `
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 12px 20px;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    z-index: 10000;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 14px;
-    font-weight: 500;
-    opacity: 0;
-    transform: translateX(-50%) translateY(-20px);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    max-width: 90vw;
-    text-align: center;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    cursor: pointer;
-  `;
+position: fixed;
+top: 20px;
+left: 50 %;
+transform: translateX(-50 %);
+background: linear - gradient(135deg, #667eea 0 %, #764ba2 100 %);
+color: white;
+padding: 12px 20px;
+border - radius: 8px;
+box - shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+z - index: 10000;
+font - family: -apple - system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans - serif;
+font - size: 14px;
+font - weight: 500;
+opacity: 0;
+transform: translateX(-50 %) translateY(-20px);
+transition: all 0.3s cubic - bezier(0.4, 0, 0.2, 1);
+max - width: 90vw;
+text - align: center;
+border: 1px solid rgba(255, 255, 255, 0.2);
+cursor: pointer;
+`;
 
   // アイコンとメッセージを設定
   const icon = changeType === 'rotation' ? '↻' : '⚡';
@@ -2702,11 +2703,11 @@ function showUrlChangeAnimation(oldUrl, newUrl, changeType = 'rotation') {
   const displayId = scriptId.substring(0, 8) + '...';
 
   notification.innerHTML = `
-    <div style="display: flex; align-items: center; gap: 8px;">
+  < div style = "display: flex; align-items: center; gap: 8px;" >
       <span style="font-size: 16px; font-weight: bold;">${icon}</span>
       <span>${message}</span>
       <span style="opacity: 0.8; font-size: 12px;">(${displayId})</span>
-    </div>
+    </div >
   `;
 
   // 通知表示用のCSS
@@ -2714,33 +2715,33 @@ function showUrlChangeAnimation(oldUrl, newUrl, changeType = 'rotation') {
     const style = document.createElement('style');
     style.id = 'url-change-animation-styles';
     style.textContent = `
-      @keyframes slideInDown {
+@keyframes slideInDown {
         from {
-          opacity: 0;
-          transform: translateX(-50%) translateY(-20px);
-        }
+    opacity: 0;
+    transform: translateX(-50 %) translateY(-20px);
+  }
         to {
-          opacity: 1;
-          transform: translateX(-50%) translateY(0);
-        }
-      }
-      @keyframes slideOutUp {
+    opacity: 1;
+    transform: translateX(-50 %) translateY(0);
+  }
+}
+@keyframes slideOutUp {
         from {
-          opacity: 1;
-          transform: translateX(-50%) translateY(0);
-        }
+    opacity: 1;
+    transform: translateX(-50 %) translateY(0);
+  }
         to {
-          opacity: 0;
-          transform: translateX(-50%) translateY(-20px);
-        }
-      }
-      .url-change-notification {
-        animation: slideInDown 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-      }
-      .url-change-notification.hiding {
-        animation: slideOutUp 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-      }
-    `;
+    opacity: 0;
+    transform: translateX(-50 %) translateY(-20px);
+  }
+}
+      .url - change - notification {
+  animation: slideInDown 0.3s cubic - bezier(0.4, 0, 0.2, 1) forwards;
+}
+      .url - change - notification.hiding {
+  animation: slideOutUp 0.3s cubic - bezier(0.4, 0, 0.2, 1) forwards;
+}
+`;
     document.head.appendChild(style);
   }
 
@@ -2854,12 +2855,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Inject styles to hide header/footer
     const style = document.createElement('style');
     style.textContent = `
-            header, footer { display: none !important; }
-            body { padding: 0 !important; background: transparent; }
-            .container { max-width: 100% !important; padding: 10px !important; margin: 0 !important; }
+header, footer { display: none!important; }
+            body { padding: 0!important; background: transparent; }
+            .container { max - width: 100 % !important; padding: 10px!important; margin: 0!important; }
             /* Adjust sticky button bar if needed */
-            .reservation-bar { bottom: 0; }
-        `;
+            .reservation - bar { bottom: 0; }
+`;
     document.head.appendChild(style);
   }
 });

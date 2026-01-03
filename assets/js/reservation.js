@@ -4,7 +4,7 @@
  */
 
 import { apiUrlManager } from './config.js';
-import { fetchMasterDataFromSupabase, fetchPerformancesFromSupabase, fetchSeatsFromSupabase, getServerTime, subscribeToDeadline } from './supabase-client.js';
+import { fetchMasterDataFromSupabase, fetchPerformancesFromSupabase, fetchSeatsFromSupabase, getServerTime, subscribeToDeadline, toDisplaySeatId } from './supabase-client.js';
 
 // 状態管理
 const state = {
@@ -663,7 +663,7 @@ function createSeatElement(seat) {
     }
 
     seatEl.dataset.id = seat.seat_id;
-    seatEl.innerText = seat.seat_id; // ID全体を表示 (A1, A2...)
+    seatEl.innerText = toDisplaySeatId(seat.seat_id); // UI Translation
 
     // スタイルはCSSクラスで制御
     seatEl.addEventListener('click', () => handleSeatClick(seat));
@@ -727,7 +727,7 @@ function updateSelectedSeatsUI() {
         display.innerText = 'なし';
         navigation.toStep3.disabled = true;
     } else {
-        display.innerText = state.selectedSeats.join(', ');
+        display.innerText = toDisplaySeatId(state.selectedSeats.join(', '));
         navigation.toStep3.disabled = false;
     }
     updateModalCount();
@@ -742,7 +742,7 @@ navigation.toStep3.addEventListener('click', () => {
     // 確認画面へのセットアップ
     document.getElementById('conf-group').innerText = state.group;
     document.getElementById('conf-time').innerText = `${state.day}日目 ${state.timeslot}`;
-    document.getElementById('conf-seats').innerText = state.selectedSeats.join(', ');
+    document.getElementById('conf-seats').innerText = toDisplaySeatId(state.selectedSeats.join(', '));
     showStep(3);
 });
 
