@@ -2098,7 +2098,7 @@ async function updateSeatData(seatId) {
 
   try {
     // 空欄は現状値を維持（意図せぬクリア防止）→ 修正: 入力値を正とする（空欄ならクリア）
-    el = document.querySelector(`.seat[data - id= "${seatId}"]`);
+    el = document.querySelector(`.seat[data-id="${seatId}"]`);
 
     // 入力値をそのまま使用する（空文字列ならクリアされる）
     const cVal = columnC;
