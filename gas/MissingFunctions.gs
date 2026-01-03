@@ -754,6 +754,37 @@ function getCapacityStatisticsSupabase() {
 // ===============================================================
 
 /**
+ * 座席IDを表示用IDに変換する (DB: A6 -> Display: A1)
+ */
+function toDisplaySeatId(dbId) {
+  if (!dbId) return '';
+  
+  var translateOne = function(id) {
+    var match = id.match(/^([A-Z]+)(\d+)$/);
+    if (!match) return id;
+    var row = match[1];
+    var num = parseInt(match[2], 10);
+    
+    var offset = 0;
+    switch(row) {
+      case 'A': offset = 5; break; // A6 -> A1
+      case 'B': offset = 4; break; // B5 -> B1
+      case 'C': offset = 3; break; // C4 -> B1
+      case 'D': offset = 2; break; // D3 -> D1
+      case 'E': offset = 1; break; // E2 -> E1
+    }
+    
+    var newNum = num - offset;
+    return (newNum > 0) ? row + newNum : id; // Fallback if invalid
+  };
+
+  if (dbId.indexOf(',') !== -1) {
+    return dbId.split(',').map(function(s) { return translateOne(s.trim()); }).join(', ');
+  }
+  return translateOne(dbId);
+}
+
+/**
  * 座席IDが有効かどうかを検証する
  */
 function isValidSeatId(seatId) {

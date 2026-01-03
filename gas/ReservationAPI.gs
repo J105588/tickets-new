@@ -331,7 +331,7 @@ ${info.name} 様
 予約ID: ${info.bookingId}
 公演: ${info.group}
 日時: ${info.day}日目 ${info.timeslot}
-座席: ${info.seats}
+座席: ${toDisplaySeatId(info.seats)}
 ----------------------------
 
 ■ 当日の入場について

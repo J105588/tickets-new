@@ -306,7 +306,7 @@ function adminSendSummaryEmails(jobs) {
 
         body += `[${i+1}] ${b.group_name}\n`;
         body += `     日時: ${b.day} (${b.timeslot})\n`;
-        body += `     座席: ${b.seat}\n`;
+        body += `     座席: ${toDisplaySeatId(b.seat)}\n`;
         body += `     予約ID: ${b.id}\n`;
         body += `     ステータス: ${statusText}\n`;
         body += `     予約受付日時: ${createdStr}\n`;
