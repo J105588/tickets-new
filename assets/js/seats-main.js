@@ -1985,15 +1985,15 @@ function showSeatEditModal(seatData) {
 
   // チップのHTML生成
   const chipsHTML = statuses.map(s => `
-  < div class="status-chip ${s.value === currentStatus ? 'selected' : ''}"
-data - value="${s.value}"
-onclick = "selectStatusChip(this, '${s.value}')" >
-  ${s.label}
-    </div >
+  <div class="status-chip ${s.value === currentStatus ? 'selected' : ''}"
+    data-value="${s.value}"
+    onclick="selectStatusChip(this, '${s.value}')">
+      ${s.label}
+  </div>
   `).join('');
 
   const drawerHTML = `
-  < div id = "seat-edit-overlay" class="seat-edit-overlay" onclick = "closeSeatEditModal()" ></div >
+    <div id="seat-edit-overlay" class="seat-edit-overlay" onclick="closeSeatEditModal()"></div>
     <div id="seat-edit-drawer" class="seat-edit-drawer">
       <div class="drawer-header">
         <h3>座席編集 - ${seatData.id}</h3>
