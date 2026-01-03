@@ -2,6 +2,7 @@
 -- nazuna-kunieda.sql
 -- Complete Database Schema for Tickets System
 -- Generated on 2025-12-28 (Updated 2026-01-04)
+-- Refined to match AdminAPI.gs usage (settings table)
 -- ===============================================================
 
 -- 1. Master Data Tables (Refactored)
@@ -42,8 +43,7 @@ INSERT INTO groups (name, display_order) VALUES
 ('吹奏楽部', 20),
 ('オーケストラ部', 30),
 ('音楽部', 40),
-('マーチング', 50),
-('見本演劇', 99)
+('マーチング', 50)
 ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO event_dates (date_label, display_order) VALUES
@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS seats (
   UNIQUE(performance_id, seat_id)
 );
 
--- Settings Table
+-- Settings Table (Correct name for AdminAPI.gs)
 CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT,
@@ -130,7 +130,7 @@ CREATE INDEX IF NOT EXISTS idx_seats_booking_id ON seats(booking_id);
 
 CREATE INDEX IF NOT EXISTS idx_bookings_email ON bookings(email);
 CREATE INDEX IF NOT EXISTS idx_bookings_passcode ON bookings(passcode);
-CREATE INDEX IF NOT EXISTS idx_reservations_performance_id ON bookings(performance_id); -- alias for compatibility thinking
+CREATE INDEX IF NOT EXISTS idx_reservations_performance_id ON bookings(performance_id); 
 
 
 -- 4. Row Level Security (RLS)
@@ -165,7 +165,7 @@ CREATE POLICY "Enable insert for anon (public)" ON bookings FOR INSERT WITH CHEC
 DROP POLICY IF EXISTS "Enable read for anon (public)" ON seats;
 CREATE POLICY "Enable read for anon (public)" ON seats FOR SELECT USING (true);
 
--- Settings Policies (Permissive - As per '03_fix_settings_policy.sql')
+-- Settings Policies (Permissive)
 DROP POLICY IF EXISTS "Allow all access to settings" ON settings;
 CREATE POLICY "Allow all access to settings" ON settings FOR ALL USING (true) WITH CHECK (true);
 
@@ -516,6 +516,6 @@ END;
 $$;
 
 
--- 6. Initialization (Optional - Run if needed)
+-- 6. Initialization (Uncomment to execute if fresh db)
 -- ===============================================================
 -- SELECT initialize_performances();
