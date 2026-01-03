@@ -101,6 +101,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         });
     }
+
+    // 5. Force Auto Refresh (Every 30 seconds)
+    setInterval(() => {
+        const dashboardTab = document.getElementById('tab-dashboard');
+        // Only refresh if dashboard is active to save resources
+        if (dashboardTab && dashboardTab.classList.contains('active')) {
+            // Check if user is typing in search
+            const searchInput = document.getElementById('filter-search');
+            if (searchInput && document.activeElement === searchInput && searchInput.value.length > 0) {
+                console.log('Skipping auto-refresh while typing');
+                return;
+            }
+            console.log('Auto-refreshing dashboard...');
+            applyFilters(true); // Background refresh
+        }
+    }, 30000);
 });
 
 // --- Data Loading ---

@@ -319,6 +319,9 @@ function sendCancellationEmail(to, info) {
     // JST Time
     const timestamp = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
     
+    // User Agent Parsing
+    const friendlyDevice = parseUserAgent(info.userAgent);
+
     const body = `
 ${info.name} 様
 
@@ -333,7 +336,7 @@ ${info.name} 様
 ■ 操作端末情報
 ----------------------------
 IPアドレス: ${info.ip}
-端末情報: ${info.userAgent}
+端末: ${friendlyDevice}
 ----------------------------
 
 お心当たりがない場合は、速やかに運営までご連絡ください。
@@ -344,6 +347,26 @@ IPアドレス: ${info.ip}
         subject: '【市川学園座席管理システム】予約キャンセルのお知らせ',
         body: body
     });
+}
+
+function parseUserAgent(ua) {
+    if (!ua || ua === 'unknown') return '不明';
+
+    let os = '不明なOS';
+    if (ua.includes('iPhone')) os = 'iPhone';
+    else if (ua.includes('iPad')) os = 'iPad';
+    else if (ua.includes('Android')) os = 'Android';
+    else if (ua.includes('Windows')) os = 'Windows PC';
+    else if (ua.includes('Macintosh')) os = 'Mac';
+    else if (ua.includes('Linux')) os = 'Linux PC';
+
+    let browser = '不明なブラウザ';
+    if (ua.includes('CriOS') || ua.includes('Chrome')) browser = 'Chrome';
+    else if (ua.includes('FxiOS') || ua.includes('Firefox')) browser = 'Firefox';
+    else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Safari';
+    else if (ua.includes('Edge') || ua.includes('Edg')) browser = 'Edge';
+
+    return `${os} (${browser})`;
 }
 
 // ==========================================
