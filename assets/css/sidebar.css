@@ -44,7 +44,7 @@
 .sidebar-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.4);
+  background: rgba(0, 0, 0, 0.4);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s ease;
@@ -128,25 +128,25 @@
 
 .debug-section {
   margin-top: 20px;
-  padding-top: 20px;
+  padding: 20px;
   border-top: 1px solid #444;
 }
 
 .debug-btn {
-    width: 100%;
-    padding: 4px 8px;
-    background: none;
-    color: #888;
-    border: none;
-    cursor: pointer;
-    font-size: 11px;
-    text-decoration: underline;
-    text-align: left;
+  width: 100%;
+  padding: 4px 8px;
+  background: none;
+  color: #888;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  text-decoration: underline;
+  text-align: left;
 }
 
 .debug-btn:hover {
-    color: #666;
-    text-decoration: none;
+  color: #666;
+  text-decoration: none;
 }
 
 .mode-options {

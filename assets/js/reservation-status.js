@@ -105,7 +105,7 @@ function showDetails(data) {
     // Datetime
     if (data.performances) {
         document.getElementById('disp-datetime').innerText =
-            `${data.performances.day}日目 ${data.performances.timeslot} (09:00〜)`;
+            `${data.performances.day}日目 ${data.performances.timeslot}`;
     }
 
     // QR Code Generation

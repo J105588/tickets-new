@@ -15,7 +15,6 @@ const sidebarHTML = `
       <a href="javascript:void(0)" onclick="navigateToWalkin()" class="nav-link" id="walkin-nav-link">当日券発行</a>
     </div>
     <div class="debug-section">
-      <button class="debug-btn" onclick="testGASConnection()">GAS疎通テスト</button>
       <a href="javascript:void(0)" class="nav-link" id="admin-login-nav-link" onclick="navigateToAdminLogin()">管理者ログイン</a>
     </div>
   </div>
