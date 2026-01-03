@@ -739,6 +739,10 @@ function updateModalCount() {
 }
 
 navigation.toStep3.addEventListener('click', () => {
+    // Determine which modal is active and close it
+    // But explicitly closing seat modal is safest
+    closeSeatModal(); // Close modal first!
+
     // 確認画面へのセットアップ
     document.getElementById('conf-group').innerText = state.group;
     document.getElementById('conf-time').innerText = `${state.day}日目 ${state.timeslot}`;
