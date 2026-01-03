@@ -92,7 +92,7 @@ function mountLoginUI() {
   wrapper.style.cssText = 'position:fixed;inset:0;background:#fff;display:flex;align-items:center;justify-content:center;z-index:20000;';
   wrapper.innerHTML = `
     <div style="background:#fff;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.25);max-width:360px;width:92%;padding:24px 20px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;">
-      <div style="font-size:18px;font-weight:600;margin-bottom:14px;text-align:center;">座席管理システム - 國枝版  へようこそ</div>
+      <div style="font-size:18px;font-weight:600;margin-bottom:14px;text-align:center;">市川学園座席管理システムへ ようこそ</div>
       <div style="display:flex;flex-direction:column;gap:10px;">
         <label style="font-size:13px;color:#555;">ユーザーID</label>
         <input id="auth-user-id" type="text" autocomplete="username" inputmode="text" style="padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none;" />
@@ -256,7 +256,7 @@ async function showOpeningCeremony() {
       ].join(';') + ';';
 
       const title = document.createElement('div');
-      title.textContent = '座席管理-國枝版';
+      title.textContent = '市川学園座席管理システム';
       title.style.cssText = [
         'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif',
         'letter-spacing:0.35em',

@@ -16,7 +16,7 @@ const sidebarHTML = `
     </div>
     <div class="debug-section">
       <button class="debug-btn" onclick="testGASConnection()">GAS疎通テスト</button>
-      <a href="javascript:void(0)" class="nav-link" id="logs-nav-link" onclick="navigateToLogs()">操作ログ</a>
+      <a href="javascript:void(0)" class="nav-link" id="admin-login-nav-link" onclick="navigateToAdminLogin()">管理者ログイン</a>
     </div>
   </div>
   <div id="sidebar-overlay" class="sidebar-overlay" onclick="closeSidebar()"></div>
@@ -222,7 +222,7 @@ function closeSidebar() {
 function updateNavigationAccess() {
     const currentMode = localStorage.getItem('currentMode') || 'normal';
     const walkinNavLink = document.getElementById('walkin-nav-link');
-    const logsNavLink = document.getElementById('logs-nav-link');
+    const adminLoginNavLink = document.getElementById('admin-login-nav-link');
 
     if (walkinNavLink) {
         if (currentMode === 'walkin' || currentMode === 'superadmin') {
@@ -234,14 +234,13 @@ function updateNavigationAccess() {
         }
     }
 
-    if (logsNavLink) {
-        if (currentMode === 'superadmin') {
-            logsNavLink.style.display = 'block';
-            logsNavLink.style.opacity = '1';
-            logsNavLink.style.pointerEvents = 'auto';
-        } else {
-            logsNavLink.style.display = 'none';
-        }
+    if (adminLoginNavLink) {
+        // 管理者ログインは通常モード（未ログイン）または管理者以外のモードで表示？
+        // 便宜上、常に表示しておく（ログイン画面へ遷移するだけなので）
+        // ただし、要望に従い「管理者ログインの者に変える」ため、通常モード等でもアクセス可能にする
+        adminLoginNavLink.style.display = 'block';
+        adminLoginNavLink.style.opacity = '1';
+        adminLoginNavLink.style.pointerEvents = 'auto';
     }
 }
 
@@ -264,25 +263,16 @@ function navigateToWalkin() {
         // 現在のページにパラメータがある場合は、それを使用
         window.location.href = `walkin.html?group=${group}&day=${day}&timeslot=${timeslot}`;
     } else {
-        // パラメータがない場合は、組選択ページに戻る
-        alert('公演情報が見つかりません。組選択ページから再度お試しください。');
+        // パラメータがない場合（管理画面などから）は、組選択ページに戻る
+        // alert('公演情報が見つかりません。組選択ページから再度お試しください。');
         window.location.href = '../index.html';
     }
 }
 
-// 操作ログページへのナビゲーション（パラメータ付与）
-function navigateToLogs() {
-    const currentMode = localStorage.getItem('currentMode') || 'normal';
-    if (currentMode !== 'superadmin') {
-        alert('操作ログは最高管理者モードのみ閲覧できます。');
-        return;
-    }
-    const token = localStorage.getItem('superadminToken') || '1';
-    const url = new URL(location.origin + location.pathname.replace(/[^/]+$/, '') + 'logs.html');
-    url.searchParams.set('auth', token);
-    window.location.href = url.toString();
+// 管理者ログインページへのナビゲーション
+function navigateToAdminLogin() {
+    window.location.href = '../pages/admin-login.html';
 }
-
 
 // グローバル変数として設定
 window.loadSidebar = loadSidebar;
@@ -292,7 +282,7 @@ window.showModeChangeModal = showModeChangeModal; // モーダルを表示する
 window.closeModeModal = closeModeModal; // モーダルを閉じる関数もグローバル登録
 window.applyModeChange = applyModeChange; // モード変更を適用する関数もグローバル登録
 window.navigateToWalkin = navigateToWalkin; // 当日券ページへのナビゲーション関数もグローバル登録
-window.navigateToLogs = navigateToLogs;
+window.navigateToAdminLogin = navigateToAdminLogin;
 
 // URLパラメータでモード指定（mode, password）
 async function applyModeFromUrl() {

@@ -1,8 +1,8 @@
 {
-  "name": "座席管理システム-國枝版",
-  "short_name": "座席管理-國枝版",
+  "name": "市川学園座席管理システム",
+  "short_name": "國枝座席管理",
   "description": "國枝ホール向けの座席予約・チェックイン・当日券発行システム",
-  "version": "17.0.0",
+  "version": "32.0.0",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -11,7 +11,10 @@
   "scope": "./",
   "lang": "ja",
   "dir": "ltr",
-  "categories": ["productivity", "utilities"],
+  "categories": [
+    "productivity",
+    "utilities"
+  ],
   "icons": [
     {
       "src": "https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg",

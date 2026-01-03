@@ -124,7 +124,7 @@ class GasAPI {
 
   // 認証API
   static async login(userId, password) {
-    return this._callApi('login', [userId, password]);
+    return this._callApi('login', [userId, password], { suppressLog: true });
   }
 
   static async validateSession(token, maxAgeMs = 30 * 60 * 1000) {
@@ -244,7 +244,8 @@ class GasAPI {
           }
         }
 
-        debugLog(`API Call (JSONP): ${functionName}`, params);
+        const logParams = options.suppressLog ? ['***SECRET***'] : params;
+        debugLog(`API Call (JSONP): ${functionName}`, logParams);
 
         const callbackName = 'jsonpCallback_' + functionName + '_' + Date.now();
         const encodedParams = encodeURIComponent(JSON.stringify(params));
@@ -398,7 +399,7 @@ class GasAPI {
   }
 
   static setSystemLock(shouldLock, password) {
-    return this._callApi('setSystemLock', [shouldLock === true, password || '']);
+    return this._callApi('setSystemLock', [shouldLock === true, password || ''], { suppressLog: true });
   }
 
   static _reportError(errorMessage) {
@@ -461,7 +462,7 @@ class GasAPI {
   }
 
   static async verifyModePassword(mode, password) {
-    const response = await this._callApi('verifyModePassword', [mode, password]);
+    const response = await this._callApi('verifyModePassword', [mode, password], { suppressLog: true });
     return response;
   }
 
