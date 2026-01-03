@@ -88,6 +88,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 2. Setup Helpers
     window.switchTab = switchTab;
     window.logout = logout;
+    window.loadMasterData = loadMasterData;
+    window.applyFilters = applyFilters;
+
+    window.applyFilters = applyFilters;
+    window.deleteItem = deleteItem;
+    window.deleteDateEntry = (id) => deleteItem('event_dates', id);
 
     // 3. Initial Search
     applyFilters();
@@ -675,6 +681,26 @@ window.deleteScheduleEntry = async function (id) {
         loadMasterData();
     } else {
         alert('エラー: ' + res.error);
+    }
+};
+
+window.deleteItem = async function (type, id) {
+    if (!confirm('本当に削除しますか？\n(関連する予約データ等がある場合、整合性エラーになる可能性があります)')) return;
+
+    try {
+        const res = await adminManageMaster(type, 'delete', { id: id });
+        if (res.success) {
+            alert('削除しました');
+            // Close generic modals if open
+            if (type === 'groups') closeModal('modal-group');
+            if (type === 'event_dates') closeModal('modal-date');
+
+            loadMasterData();
+        } else {
+            alert('削除エラー: ' + res.error);
+        }
+    } catch (e) {
+        alert('システムエラー: ' + e.message);
     }
 };
 

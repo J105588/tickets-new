@@ -511,13 +511,22 @@
                         発行されたリンクは指定時間内のみ有効です。
                     </p>
                     <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 1rem;">
-                        <label>有効時間:</label>
-                        <select id="invite-minutes" style="padding: 5px;">
-                            <option value="30">30分</option>
-                            <option value="60">60分</option>
-                            <option value="120">2時間</option>
-                            <option value="1440">24時間</option>
-                        </select>
+                        <label>有効時間(分):</label>
+                        <input type="number" id="invite-minutes" value="60" min="1" style="width: 80px; padding: 5px;">
+                        <span style="font-size: 0.8rem; color: #666; margin-left: -5px; margin-right: 10px;">分</span>
+
+                        <div style="display:flex; gap:5px; margin-right:10px;">
+                            <button class="btn-sm btn-outline"
+                                onclick="document.getElementById('invite-minutes').value=30">30分</button>
+                            <button class="btn-sm btn-outline"
+                                onclick="document.getElementById('invite-minutes').value=60">1h</button>
+                            <button class="btn-sm btn-outline"
+                                onclick="document.getElementById('invite-minutes').value=120">2h</button>
+                            <button class="btn-sm btn-outline"
+                                onclick="document.getElementById('invite-minutes').value=1440">24h</button>
+                            <button class="btn-sm btn-outline"
+                                onclick="document.getElementById('invite-minutes').value=4320">3日</button>
+                        </div>
                         <button class="btn-primary" onclick="generateInviteLink()">リンク発行</button>
                     </div>
                     <div id="invite-result" style="display: none;">
