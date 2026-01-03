@@ -4,7 +4,7 @@
  */
 
 import { apiUrlManager } from './config.js';
-import { fetchMasterDataFromSupabase, checkInReservation, getBookingForScan } from './supabase-client.js';
+import { fetchMasterDataFromSupabase, checkInReservation, getBookingForScan, toDisplaySeatId } from './supabase-client.js';
 
 const state = {
     group: '',
@@ -284,7 +284,8 @@ async function fetchBookingAndConfirm(id, passcode) {
 function renderConfirmation(booking) {
     const perf = booking.performances || {};
     // seats is now an array of objects from RPC
-    const seats = booking.seats && booking.seats.length > 0 ? booking.seats.map(s => s.seat_id).join(', ') : '-';
+    const rawSeats = booking.seats && booking.seats.length > 0 ? booking.seats.map(s => s.seat_id).join(', ') : '-';
+    const seats = toDisplaySeatId(rawSeats);
 
     // Status Logic
     const isTargetMatch = (perf.group_name === state.group && perf.timeslot === state.timeslot && perf.day == state.day);

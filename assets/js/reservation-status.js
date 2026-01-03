@@ -4,7 +4,7 @@
  */
 
 import { apiUrlManager } from './config.js';
-import { subscribeToSeatUpdates, subscribeToReservationUpdates, getBookingForScan } from './supabase-client.js';
+import { subscribeToSeatUpdates, subscribeToReservationUpdates, getBookingForScan, toDisplaySeatId } from './supabase-client.js';
 
 
 function initReservationStatus() {
@@ -98,8 +98,8 @@ function showDetails(data) {
 
     // Seats
     if (data.seats && data.seats.length > 0) {
-        const seatStr = data.seats.map(s => `${s.seat_id}`).join(', ');
-        document.getElementById('disp-seats').innerText = seatStr;
+        const rawSeats = data.seats.map(s => s.seat_id).join(', ');
+        document.getElementById('disp-seats').innerText = toDisplaySeatId(rawSeats);
     }
 
     // Datetime

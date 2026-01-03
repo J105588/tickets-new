@@ -30,14 +30,40 @@ function updateReservationUI(seats) {
   const titleEl = document.querySelector('.reservation-title');
   if (!reservationResult || !reservedSeatEl || !titleEl) return;
 
-  // タイトルに座席IDを表示（例: A6/A7/A8）
-  titleEl.textContent = Array.isArray(seats) ? seats.join('/') : String(seats || '');
+  // タイトルに座席IDを表示（例: A6/A7/A8） -> A1/A2/A3
+  const rawSeats = Array.isArray(seats) ? seats : (seats ? [seats] : []);
+  const displaySeats = rawSeats.map(s => toDisplaySeatId(String(s))).join('/');
+
+  titleEl.textContent = displaySeats;
   // 下部のチップ表示は非表示に（重複表示を避ける）
   try {
     reservedSeatEl.innerHTML = '';
     reservedSeatEl.style.display = 'none';
   } catch (_) { }
   reservationResult.classList.add('show');
+}
+
+// Seat Translation Helper (Copied from supabase-client.js to avoid dependency)
+function toDisplaySeatId(dbId) {
+  if (!dbId) return '';
+  const translateOne = (id) => {
+    const match = id.match(/^([A-Z]+)(\d+)$/);
+    if (!match) return id;
+    const row = match[1];
+    const num = parseInt(match[2]);
+    let offset = 0;
+    switch (row) {
+      case 'A': offset = 5; break;
+      case 'B': offset = 4; break;
+      case 'C': offset = 3; break;
+      case 'D': offset = 2; break;
+      case 'E': offset = 1; break;
+    }
+    const newNum = num - offset;
+    return (newNum > 0) ? `${row}${newNum}` : id;
+  };
+  if (dbId.includes(',')) return dbId.split(',').map(s => translateOne(s.trim())).join(', ');
+  return translateOne(dbId);
 }
 
 // APIレスポンスから座席ID配列を抽出するユーティリティ
