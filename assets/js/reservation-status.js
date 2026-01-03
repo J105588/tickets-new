@@ -225,6 +225,7 @@ function updateUIAsCheckedIn() {
 }
 
 
+
 async function cancelBooking(id, passcode) {
     if (!confirm('本当に予約をキャンセルしますか？\nこの操作は取り消せません。')) return;
 
@@ -233,10 +234,26 @@ async function cancelBooking(id, passcode) {
     btn.disabled = true;
     btn.innerText = '処理中...';
 
+    // 1. Collect Metadata
+    let ip = 'unknown';
+    const userAgent = navigator.userAgent;
+
+    try {
+        const ipRes = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(3000) });
+        if (ipRes.ok) {
+            const ipData = await ipRes.json();
+            ip = ipData.ip;
+        }
+    } catch (e) {
+        console.warn('Failed to fetch IP:', e);
+    }
+
     const params = {
         action: 'cancel_reservation',
         id: id,
-        passcode: passcode
+        passcode: passcode,
+        ip: ip,
+        user_agent: userAgent
     };
 
     try {
@@ -251,10 +268,9 @@ async function cancelBooking(id, passcode) {
                 btn.innerText = originalText;
             }
         });
-
     } catch (e) {
-        console.error(e);
-        alert('通信エラーが発生しました');
+        console.error('API Error:', e);
+        alert('通信エラーが発生しました。もう一度お試しください。');
         btn.disabled = false;
         btn.innerText = originalText;
     }

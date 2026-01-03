@@ -247,7 +247,8 @@ function checkInReservation(bookingId, passcode) {
  * 予約をキャンセルする
  * 安全のため、bookingIdとpasscodeの両方が必要
  */
-function cancelReservation(bookingId, passcode) {
+
+function cancelReservation(bookingId, passcode, ip, userAgent) {
   try {
     // 1. 予約の検証
     const getRes = supabaseIntegration.getBookingByCredentials(bookingId, passcode);
@@ -297,12 +298,52 @@ function cancelReservation(bookingId, passcode) {
         }
     }
 
+    // 4. キャンセル通知メール送信
+    sendCancellationEmail(booking.email, {
+        name: booking.name,
+        bookingId: bookingId,
+        ip: ip || 'unknown',
+        userAgent: userAgent || 'unknown'
+    });
+
     return { success: true, message: '予約をキャンセルしました' };
 
   } catch (e) {
     console.error('cancelReservation Error:', e);
     return { success: false, error: e.message };
   }
+}
+
+// キャンセル通知メール
+function sendCancellationEmail(to, info) {
+    // JST Time
+    const timestamp = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
+    
+    const body = `
+${info.name} 様
+
+以下の予約がキャンセルされました。
+
+■ キャンセル内容
+----------------------------
+予約ID: ${info.bookingId}
+キャンセル日時: ${timestamp}
+----------------------------
+
+■ 操作端末情報
+----------------------------
+IPアドレス: ${info.ip}
+端末情報: ${info.userAgent}
+----------------------------
+
+お心当たりがない場合は、速やかに運営までご連絡ください。
+`;
+
+    MailApp.sendEmail({
+        to: to,
+        subject: '【市川学園座席管理システム】予約キャンセルのお知らせ',
+        body: body
+    });
 }
 
 // ==========================================
