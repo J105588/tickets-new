@@ -198,7 +198,7 @@ function doGet(e) {
            response = createReservation(resData);
            break;
          case 'cancel_reservation':
-           response = cancelReservation(e.parameter.id, e.parameter.passcode);
+           response = cancelReservation(e.parameter.id, e.parameter.passcode, e.parameter.ip, e.parameter.user_agent);
            break;
          
          // --- 管理者追加機能 ---
