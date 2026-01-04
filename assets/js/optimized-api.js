@@ -155,7 +155,10 @@ class OptimizedGasAPI {
 
   // 最適化された座席データ取得
   static async getSeatData(group, day, timeslot, isAdmin, isSuperAdmin = false, useCache = true) {
-    const params = [group, day, timeslot, isAdmin, isSuperAdmin];
+    const token = (typeof window.AppAuth !== 'undefined' && window.AppAuth.getToken)
+      ? window.AppAuth.getToken()
+      : null;
+    const params = [group, day, timeslot, isAdmin, isSuperAdmin, token];
     if (useCache) {
       return this._callApiWithCache('getSeatData', params);
     } else {
@@ -165,7 +168,10 @@ class OptimizedGasAPI {
 
   // 最適化された座席データ取得（最小限）
   static async getSeatDataMinimal(group, day, timeslot, isAdmin = false) {
-    const params = [group, day, timeslot, isAdmin];
+    const token = (typeof window.AppAuth !== 'undefined' && window.AppAuth.getToken)
+      ? window.AppAuth.getToken()
+      : null;
+    const params = [group, day, timeslot, isAdmin, token];
     return this._callApiWithCache('getSeatDataMinimal', params);
   }
 

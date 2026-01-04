@@ -477,10 +477,17 @@ class GasAPI {
   }
 
   static async getSeatData(group, day, timeslot, isAdmin, isSuperAdmin = false) {
+    // クライアント側でトークンを取得
+    const token = (typeof window.AppAuth !== 'undefined' && window.AppAuth.getToken)
+      ? window.AppAuth.getToken()
+      : null;
+
     if (this.useSupabase) {
+      // Supabase利用時もトークン検証が必要な場合があるが、ここではGAS側修正に合わせて呼び出し元APIを統一
       return await this.supabaseAPI.getSeatData(group, day, timeslot, isAdmin);
     }
-    const response = await this._callApi('getSeatData', [group, day, timeslot, isAdmin, isSuperAdmin]);
+    // GAS呼び出し時は token を付与 (isAdmin, isSuperAdmin, token)
+    const response = await this._callApi('getSeatData', [group, day, timeslot, isAdmin, isSuperAdmin, token]);
     return response;
   }
 
@@ -537,10 +544,16 @@ class GasAPI {
 
   // 最適化された座席データ取得（最小限のデータ）
   static async getSeatDataMinimal(group, day, timeslot, isAdmin = false) {
+    // クライアント側でトークンを取得
+    const token = (typeof window.AppAuth !== 'undefined' && window.AppAuth.getToken)
+      ? window.AppAuth.getToken()
+      : null;
+
     if (this.useSupabase) {
       return await this.supabaseAPI.getSeatDataMinimal(group, day, timeslot, isAdmin);
     }
-    const response = await this._callApi('getSeatDataMinimal', [group, day, timeslot, isAdmin]);
+    // GAS呼び出し時は token を付与
+    const response = await this._callApi('getSeatDataMinimal', [group, day, timeslot, isAdmin, token]);
     return response;
   }
 

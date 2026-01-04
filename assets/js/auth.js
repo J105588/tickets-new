@@ -57,9 +57,8 @@ async function isSessionActive() {
 
 async function enforceAuthOrRedirect() {
   // Admin Backdoor: Skip all checks if admin=true in URL
-  if (new URLSearchParams(location.search).get('admin') === 'true') {
-    return true;
-  }
+  // Admin Backdoor Removed for Security
+
 
   if (!(await isSessionActive())) {
     clearAuthSession();
@@ -208,7 +207,8 @@ window.AppAuth = {
   clearAuthSession,
   enforceAuthOrRedirect,
   startInactivityWatcher,
-  ensureAuthenticatedOnIndex
+  ensureAuthenticatedOnIndex,
+  getToken: () => { const s = getAuthSession(); return s ? s.token : null; }
 };
 
 

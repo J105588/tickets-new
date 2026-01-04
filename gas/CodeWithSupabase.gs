@@ -446,8 +446,30 @@ function doGet(e) {
 /**
  * Supabaseから座席データを取得する
  */
-async function getSeatDataSupabase(group, day, timeslot, isAdmin = false, isSuperAdmin = false) {
+// NOTE: SECURITY UPDATE - token引数を追加し、サーバー側で権限を検証する
+async function getSeatDataSupabase(group, day, timeslot, isAdmin = false, isSuperAdmin = false, token = null) {
   try {
+    // セキュリティチェック: 管理者権限を要求する場合、トークンの検証を強制
+    if (isAdmin || isSuperAdmin) {
+      let isVerified = false;
+      if (token) {
+        const session = validateSession(token);
+        if (session.success) {
+          isVerified = true;
+          // 将来的には session.userId に基づいて管理者権限をさらに厳密にチェック可能
+          // 現状は有効なセッション (ログイン済み) であれば管理者とみなす
+        }
+      }
+      
+      if (!isVerified) {
+        // 検証失敗: 管理者権限を剥奪して実行（一般公開データのみ返す）
+        // ただし、完全に拒否するのではなく、一般ユーザーとして振る舞うことでUXを維持
+        isAdmin = false;
+        isSuperAdmin = false;
+        Logger.log(`Security Warning: Unauthorized admin access attempt for ${group}-${day}-${timeslot}. Downgrading to public view.`);
+      }
+    }
+
     // 公演IDを取得または作成
     const performanceResult = await getOrCreatePerformance(group, day, timeslot);
     if (!performanceResult.success) {
@@ -479,6 +501,12 @@ async function getSeatDataSupabase(group, day, timeslot, isAdmin = false, isSupe
       if (isAdmin || isSuperAdmin) {
         seatData.name = seat.reserved_by || null;
         seatData.reservation_id = seat.booking_id || null; // Rebookingのために必須
+      } else {
+        // 一般ユーザーには個人情報を隠蔽 (念のため明示的にnullセット)
+        seatData.name = null;
+        seatData.reservation_id = null;
+        seatData.columnD = ''; // 予約者名も隠す
+        seatData.columnE = ''; // メモも隠す
       }
       
       seatMap[seatId] = seatData;
@@ -492,7 +520,7 @@ async function getSeatDataSupabase(group, day, timeslot, isAdmin = false, isSupe
       Object.assign(seatMap, defaultSeats);
     }
     
-    Logger.log(`Supabase座席データを正常に取得: [${group}-${day}-${timeslot}], 座席数: ${Object.keys(seatMap).length}`);
+    Logger.log(`Supabase座席データを正常に取得: [${group}-${day}-${timeslot}], 座席数: ${Object.keys(seatMap).length}, Admin: ${isAdmin}`);
     return { success: true, seatMap: seatMap };
     
   } catch (e) {
@@ -504,8 +532,21 @@ async function getSeatDataSupabase(group, day, timeslot, isAdmin = false, isSupe
 /**
  * 最小限の座席データを取得する（Supabase版）
  */
-function getSeatDataMinimalSupabase(group, day, timeslot, isAdmin = false) {
+// NOTE: SECURITY UPDATE - token引数を追加
+function getSeatDataMinimalSupabase(group, day, timeslot, isAdmin = false, token = null) {
   try {
+     // セキュリティチェック
+    if (isAdmin) {
+      let isVerified = false;
+      if (token) {
+        const session = validateSession(token);
+        if (session.success) isVerified = true;
+      }
+      if (!isVerified) {
+        isAdmin = false; // Downgrade to public
+      }
+    }
+
     const performanceResult = getOrCreatePerformance(group, day, timeslot);
     if (!performanceResult.success) {
       return { success: false, error: performanceResult.error };
