@@ -261,7 +261,7 @@ async function fetchBookingAndConfirm(id, passcode) {
     state.currentBooking = null;
 
     // Direct Supabase RPC Call (Fast)
-    const result = await getBookingForScan(id);
+    const result = await getBookingForScan(id, passcode);
 
     if (result.success) {
         state.currentBooking = result.data;

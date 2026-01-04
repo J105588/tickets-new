@@ -402,6 +402,16 @@ class GasAPI {
     return this._callApi('setSystemLock', [shouldLock === true, password || ''], { suppressLog: true });
   }
 
+  static async adminDeadlineSettings(value) {
+    if (this.useSupabase) {
+      // Logic to route through GAS or Secure RPC is required here. 
+      // Since the Settings RLS will cover "admin write", we must route to GAS to use Service Role.
+      // Even if useSupabase is true, for THIS specific administrative action, we fallback to GAS.
+    }
+    // Call GAS Action
+    return await this._callAction('admin_deadline_settings', { op: 'save', value: value });
+  }
+
   static _reportError(errorMessage) {
     // オフライン時は報告しない（通信しない）
     try { if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) { return; } } catch (_) { }
@@ -491,43 +501,36 @@ class GasAPI {
   }
 
   static async checkInSeat(group, day, timeslot, seatId) {
-    if (this.useSupabase) {
-      // Supabaseモードでは直接Supabaseに反映（大規模座席IDにも対応）
-      return await this.supabaseAPI.checkInSeat(group, day, timeslot, seatId);
-    }
+    // Force GAS usage for Check-in (RLS requires Service Role)
+    // if (this.useSupabase) { ... }
     const response = await this._callApi('checkInSeat', [group, day, timeslot, seatId]);
     return response;
   }
 
   static async checkInMultipleSeats(group, day, timeslot, seatIds) {
-    if (this.useSupabase) {
-      // Supabaseモードでは直接Supabaseに反映（大規模座席IDにも対応）
-      return await this.supabaseAPI.checkInMultipleSeats(group, day, timeslot, seatIds);
-    }
+    // Force GAS usage for Check-in
+    // if (this.useSupabase) { ... }
     const response = await this._callApi('checkInMultipleSeats', [group, day, timeslot, seatIds]);
     return response;
   }
 
   static async assignWalkInSeats(group, day, timeslot, count) {
-    if (this.useSupabase) {
-      return await this.supabaseAPI.assignWalkInSeats(group, day, timeslot, count);
-    }
+    // Force GAS usage for Walk-in (RLS requires Service Role)
+    // if (this.useSupabase) { ... }
     const response = await this._callApi('assignWalkInSeats', [group, day, timeslot, count]);
     return response;
   }
 
   static async assignWalkInConsecutiveSeats(group, day, timeslot, count) {
-    if (this.useSupabase) {
-      return await this.supabaseAPI.assignWalkInConsecutiveSeats(group, day, timeslot, count);
-    }
+    // Force GAS usage for Walk-in
+    // if (this.useSupabase) { ... }
     const response = await this._callApi('assignWalkInConsecutiveSeats', [group, day, timeslot, count]);
     return response;
   }
 
   static async updateSeatData(group, day, timeslot, seatId, columnC, columnD, columnE) {
-    if (this.useSupabase) {
-      return await this.supabaseAPI.updateSeatData(group, day, timeslot, seatId, columnC, columnD, columnE);
-    }
+    // Force GAS usage for Seat Update (RLS requires Service Role)
+    // if (this.useSupabase) { ... }
     const response = await this._callApi('updateSeatData', [group, day, timeslot, seatId, columnC, columnD, columnE]);
     return response;
   }

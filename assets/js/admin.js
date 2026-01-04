@@ -911,7 +911,7 @@ window.saveDeadlineSettings = async function () {
     }
 
     try {
-        const res = await adminDeadlineSettings('save', val);
+        const res = await GasAPI.adminDeadlineSettings(val);
         if (res.success) {
             alert('保存しました');
         } else {
