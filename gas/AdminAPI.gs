@@ -251,13 +251,21 @@ function adminUpdateReservation(bookingId, updates) {
     if (!bookingId) return { success: false, error: 'Booking ID is required' };
     
     // updateBookingStatus is for status only. Use generic PATCH for other fields.
-    const endpoint = `bookings?id=eq.${bookingId}`;
-    const result = supabaseIntegration._request(endpoint, {
-      method: 'PATCH',
-      headers: { 
-        'Prefer': 'return=minimal'
-      },
-      body: updates
+    // RPCを使用することで、座席ステータスの連動更新（キャンセル時の開放など）を確実に行う
+    const rpcParams = {
+      p_id: parseInt(bookingId),
+      p_name: updates.name,
+      p_email: updates.email,
+      p_grade_class: updates.grade_class,
+      p_club_affiliation: updates.club_affiliation,
+      p_notes: updates.notes,
+      p_status: updates.status || null // 明示的にnullを渡す
+    };
+
+    const result = supabaseIntegration._request('rpc/admin_update_booking', {
+      method: 'POST',
+      body: rpcParams,
+      useServiceRole: true // 管理者操作なのでService Roleを使用
     });
     
     if (!result.success) {
