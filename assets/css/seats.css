@@ -1350,15 +1350,20 @@ body.embed-mode .seat.selected.seat-available {
     pointer-events: auto !important;
     opacity: 1 !important;
 }
+
 /* Rebook Mode: Own Seats are Yellow */
 body.embed-mode .seat.my-booking {
-    background-color: #ffd43b !important; /* Yellow */
+    background-color: #ffd43b !important;
+    /* Yellow */
     border-color: #eebb00 !important;
     color: #444 !important;
 }
+
 body.embed-mode .seat.my-booking.selected {
-    background-color: #ffd43b !important; /* Keep Yellow when selected */
+    background-color: #ffd43b !important;
+    /* Keep Yellow when selected */
 }
+
 /* When deselected, it becomes available (Green) via JS logic, so this css targets the 'selected' state mostly */
 
 
@@ -1372,14 +1377,18 @@ body.embed-mode .mode-section {
 
 /* Enhance Rebook Visuals */
 body.embed-mode .seat.my-booking {
-    background-color: #ffd43b !important; /* Yellow */
-    border: 2px solid #e67700 !important; /* Darker Orange Border */
+    background-color: #ffd43b !important;
+    /* Yellow */
+    border: 2px solid #e67700 !important;
+    /* Darker Orange Border */
     color: #000 !important;
     font-weight: bold;
-    transform: scale(1.05); /* Slight pop */
-    box-shadow: 0 4px 6px rgba(0,0,0,0.2) !important;
+    transform: scale(1.05);
+    /* Slight pop */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2) !important;
     z-index: 10;
 }
+
 /* Ensure MyBooking wins over standard Selected */
 body.embed-mode .seat.my-booking.selected {
     background-color: #ffd43b !important;
@@ -1387,10 +1396,11 @@ body.embed-mode .seat.my-booking.selected {
 
 /* New Selection (Standard Select) logic remains Orange */
 body.embed-mode .seat.selected:not(.my-booking) {
-    background-color: #ff922b !important; /* Orange */
+    background-color: #ff922b !important;
+    /* Orange */
     border: 2px solid #e8590c !important;
     transform: scale(1.05);
-    box-shadow: 0 4px 6px rgba(0,0,0,0.2) !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2) !important;
 }
 
 /* Visual cue for text/content to show checked status? */
@@ -1408,9 +1418,15 @@ body.embed-mode .seat.selected::after {
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-}
-body.embed-mode .seat.my-booking::after {
-    color: #e67700; /* Match yellow theme */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
+body.embed-mode .seat.my-booking::after {
+    color: #e67700;
+    /* Match yellow theme */
+}
+
+/* Ensure loading modal is always on top of side drawers (z-index 2000+) */
+#loading-modal {
+    z-index: 11000 !important;
+}
