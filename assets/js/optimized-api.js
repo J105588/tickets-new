@@ -1,9 +1,14 @@
-// optimized-api.js - 最適化されたAPIクラス
 import { GAS_API_URLS, DEBUG_MODE, debugLog, apiUrlManager } from './config.js';
 import audit from './audit-logger.js';
 import apiCache from './api-cache.js';
+import { SupabaseAPI } from './supabase-api.js';
 
 class OptimizedGasAPI {
+  // Supabase API インスタンス
+  static supabaseAPI = new SupabaseAPI();
+  static useSupabase = true;
+
+
   static _callApi(functionName, params = []) {
     return new Promise((resolve, reject) => {
       try {
