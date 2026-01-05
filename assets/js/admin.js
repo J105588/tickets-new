@@ -284,20 +284,70 @@ function renderReservationTable(data) {
 
         const rawSeats = r.seats ? r.seats.map(s => s.seat_id).join(', ') : '-';
         const seats = toDisplaySeatId(rawSeats);
-        const p = r.performances || r.performance; // Handle both just in case
-        const groupInfo = `${p ? p.group_name : '-'} <br> <span style="font-size:0.8em; color:#666;">Day ${p ? p.day : '-'} ${p ? p.timeslot : '-'}</span>`;
+        const p = r.performances || r.performance; // Handle both
+        const groupInfo = p ? `${p.group_name}` : '-';
+        const dateInfo = p ? `Day ${p.day} ${p.timeslot}` : '-';
 
-        tr.innerHTML = `
-            <td>${r.id} <br> <span style="font-size:0.8em; color:#888;">${r.reservation_id || ''}</span></td>
-            <td>${r.name}</td>
-            <td>${r.email}</td>
-            <td>${groupInfo}</td>
-            <td>${seats}</td>
-            <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-            <td>
-                <button class="btn-outline btn-sm" onclick="openEditModal(${r.id})">詳細/編集</button>
-            </td>
-        `;
+        // Safe DOM Construction
+        // Col 1: ID
+        const tdId = document.createElement('td');
+        tdId.textContent = r.id; // Safe
+        if (r.reservation_id) {
+            const br = document.createElement('br');
+            const spanUuid = document.createElement('span');
+            spanUuid.style.fontSize = '0.8em';
+            spanUuid.style.color = '#888';
+            spanUuid.textContent = r.reservation_id; // Safe
+            tdId.appendChild(br);
+            tdId.appendChild(spanUuid);
+        }
+        tr.appendChild(tdId);
+
+        // Col 2: Name (VULNERABLE POINT FIXED)
+        const tdName = document.createElement('td');
+        tdName.textContent = r.name; // Safe
+        tr.appendChild(tdName);
+
+        // Col 3: Email (VULNERABLE POINT FIXED)
+        const tdEmail = document.createElement('td');
+        tdEmail.textContent = r.email; // Safe
+        tr.appendChild(tdEmail);
+
+        // Col 4: Group
+        const tdGroup = document.createElement('td');
+        tdGroup.textContent = groupInfo;
+        if (p) {
+            const br = document.createElement('br');
+            const spanDate = document.createElement('span');
+            spanDate.style.fontSize = '0.8em';
+            spanDate.style.color = '#666';
+            spanDate.textContent = dateInfo;
+            tdGroup.appendChild(br);
+            tdGroup.appendChild(spanDate);
+        }
+        tr.appendChild(tdGroup);
+
+        // Col 5: Seats
+        const tdSeats = document.createElement('td');
+        tdSeats.textContent = seats;
+        tr.appendChild(tdSeats);
+
+        // Col 6: Status
+        const tdStatus = document.createElement('td');
+        const spanStatus = document.createElement('span');
+        spanStatus.className = `status-badge ${statusClass}`;
+        spanStatus.textContent = statusText;
+        tdStatus.appendChild(spanStatus);
+        tr.appendChild(tdStatus);
+
+        // Col 7: Action
+        const tdAction = document.createElement('td');
+        const btn = document.createElement('button');
+        btn.className = 'btn-outline btn-sm';
+        btn.textContent = '詳細/編集';
+        btn.onclick = () => openEditModal(r.id);
+        tdAction.appendChild(btn);
+        tr.appendChild(tdAction);
         tbody.appendChild(tr);
     });
 }
