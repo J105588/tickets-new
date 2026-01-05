@@ -85,10 +85,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateActivity();
 
 
-    // 1. Load All Data (Filters + Settings)
-    await loadMasterData();
+    // 1. Load All Data (Parallel)
+    // We launch master data load and initial reservation fetch simultaneously.
+    // 'loadMasterData' handles UI rendering for filters.
+    // 'adminGetReservations' fetches data.
+    const [_, result] = await Promise.all([
+        loadMasterData(),
+        adminGetReservations({})
+    ]);
 
-    // 2. Setup Helpers
+    // 2. Render Initial Reservations
+    if (result && result.success) {
+        currentReservations = result.data;
+        renderReservationTable(currentReservations);
+    } else {
+        console.error('Initial reservation fetch failed', result ? result.error : 'Unknown');
+        // If failed, applyFilters will be callable manually or via retry
+    }
+
+    // 3. Setup Helpers
     window.switchTab = switchTab;
     window.logout = logout;
     window.loadMasterData = loadMasterData;
@@ -98,8 +113,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.deleteItem = deleteItem;
     window.deleteDateEntry = (id) => deleteItem('event_dates', id);
 
-    // 3. Initial Search
-    applyFilters();
+    // Filter UI is already populated by loadMasterData inside the promise above.
+    // We do NOT call applyFilters() again here to avoid double-fetch, unless we want to ensure DOM sync.
+    // But since inputs are empty initially, adminGetReservations({}) is equivalent.
 
     // 4. Search Input Enter Key
     const searchInput = document.getElementById('filter-search');

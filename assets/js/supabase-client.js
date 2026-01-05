@@ -33,7 +33,28 @@ function getSupabase() {
 }
 
 // データ取得ヘルパー
-export async function fetchMasterDataFromSupabase() {
+// Master Data Cache
+const CACHE_KEY_MASTER = 'tickets_master_data_v2';
+const CACHE_TTL = 60 * 60 * 1000; // 1 Hour
+
+export async function fetchMasterDataFromSupabase(forceRefresh = false) {
+    // 1. Try Cache
+    if (!forceRefresh) {
+        try {
+            const cached = localStorage.getItem(CACHE_KEY_MASTER);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                const now = new Date().getTime();
+                if (now - parsed.timestamp < CACHE_TTL) {
+                    console.log('Using Cached Master Data');
+                    return { success: true, data: parsed.data };
+                }
+            }
+        } catch (e) {
+            console.warn('Cache read failed', e);
+        }
+    }
+
     const sb = getSupabase();
     if (!sb) return { success: false, error: 'Supabase client not initialized' };
 
@@ -53,15 +74,24 @@ export async function fetchMasterDataFromSupabase() {
         // Extract deadline
         const globalDeadline = (settings.data) ? settings.data.value : null;
 
-        return {
-            success: true,
-            data: {
-                groups: groups.data,
-                dates: dates.data,
-                timeslots: timeslots.data,
-                global_deadline: globalDeadline
-            }
+        const resultData = {
+            groups: groups.data,
+            dates: dates.data,
+            timeslots: timeslots.data,
+            global_deadline: globalDeadline
         };
+
+        // Save to Cache
+        try {
+            localStorage.setItem(CACHE_KEY_MASTER, JSON.stringify({
+                timestamp: new Date().getTime(),
+                data: resultData
+            }));
+        } catch (e) {
+            console.warn('Cache write failed', e);
+        }
+
+        return { success: true, data: resultData };
     } catch (e) {
         return { success: false, error: e.message || 'Unknown error' };
     }
