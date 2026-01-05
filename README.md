@@ -442,7 +442,7 @@ GitHub Pages, Vercel, Firebase Hosting などの静的ホスティングサー�
 
 ## 8. 画面別技術詳解 (Screen Technical Reference)
 
-本章では、各画面の初期化フロー、API依存関係、内部状態遷移について「専門書レベル」の詳細記述を行う。各画面は独立したSPAモジュールとして動作し、共通の `config.js` および `api.js` を介してバックエンドと通信する。
+本章では、各画面の初期化フロー、API依存関係、内部状態遷移について詳細記述を行う。各画面は独立したSPAモジュールとして動作し、共通の `config.js` および `api.js` を介してバックエンドと通信する。
 
 ### 8.1 公演選択画面 (`pages/timeslot.html`)
 
