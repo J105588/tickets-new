@@ -98,6 +98,10 @@ function doPost(e) {
         'sendStatusNotificationEmail': sendStatusNotificationEmail,
         'getDetailedCapacityAnalysis': getDetailedCapacityAnalysisSupabase,
         'getCapacityStatistics': getCapacityStatisticsSupabase,
+        // Backup & Restore
+        'backupDatabase': backupDatabase,
+        'getBackupsList': getBackupsList,
+        'restoreDatabase': restoreDatabase,
         'getGroupsSupabase': getGroupsSupabase,
         'isValidSeatId': isValidSeatId,
         'safeLogOperation': safeLogOperation,
@@ -403,6 +407,10 @@ function doGet(e) {
           'sendStatusNotificationEmail': sendStatusNotificationEmail,
           'getDetailedCapacityAnalysis': getDetailedCapacityAnalysisSupabase,
           'getCapacityStatistics': getCapacityStatisticsSupabase,
+          // Backup & Restore
+          'backupDatabase': backupDatabase,
+          'getBackupsList': getBackupsList,
+          'restoreDatabase': restoreDatabase,
           'getGroupsSupabase': getGroupsSupabase,
           'isValidSeatId': isValidSeatId,
           'safeLogOperation': safeLogOperation,

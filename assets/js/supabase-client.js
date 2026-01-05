@@ -313,6 +313,45 @@ export async function adminSwapSeats(id, newSeats) {
     }
 }
 
+export async function adminBackupDatabase() {
+    try {
+        const params = {
+            func: 'backupDatabase',
+            params: JSON.stringify([])
+        };
+        const result = await jsonpRequest(GAS_API_URLS[0], params);
+        return result;
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
+export async function adminGetBackups() {
+    try {
+        const params = {
+            func: 'getBackupsList',
+            params: JSON.stringify([])
+        };
+        const result = await jsonpRequest(GAS_API_URLS[0], params);
+        return result;
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
+export async function adminRestoreDatabase(backupId, restoreKey) {
+    try {
+        const params = {
+            func: 'restoreDatabase',
+            params: JSON.stringify([backupId, restoreKey])
+        };
+        const result = await jsonpRequest(GAS_API_URLS[0], params);
+        return result;
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
 export async function adminManageMaster(table, op, recordData) {
     try {
         const params = {

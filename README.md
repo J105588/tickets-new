@@ -791,8 +791,32 @@ graph TD
 3.  **Batch Processing**: キューから優先度順に操作を取り出し、バッチ処理でAPIを実行。
 4.  **Feedback**: 同期完了後、成功数・失敗数をユーザーに通知（Toast Notification）し、最新のデータを再取得して画面をリフレッシュする。
 
----
 
+---
+## 10. システム管理機能 (System Management)
+
+### 10.1 システムバックアップと復元 (Backup & Restore)
+
+データ保全のため、Supabase上の全データをGoogle Sheetsにバックアップし、必要時にそこから復元する機能を実装している。
+
+#### A. バックアップ機能
+*   **Trigger**: 管理画面からの手動実行、または GAS の Time-Driven Trigger による自動実行。
+*   **Storage**: Google Drive のルートディレクトリに `Tickets_Backup` フォルダを自動生成し、その中に日時ごとのスプレッドシート (`Backup_YYYYMMDD_HHMMSS`) を保存する。
+*   **Scope**: `bookings`, `seats`, `performances`, `groups`, `event_dates`, `time_slots`, `system_settings` の全テーブル。
+
+#### B. 復元 (Restore) 機能
+*   **Security**: 破壊的な操作であるため、二重のセキュリティチェックを行う。
+    1.  **UI確認**: ユーザーによる確認ダイアログと、キーワード `RESTORE` の手動入力。
+    2.  **Restore Key**: スクリプトプロパティ `RESTORE_KEY` に設定されたパスワードの入力（サーバーサイド検証）。
+*   **Process**:
+    1.  すべてのテーブルデータを削除 (`TRUNCATE` / `DELETE`).
+    2.  スプレッドシートからデータを読み込み。
+    3.  依存関係を考慮した順序でデータを再挿入（Bulk Insert）。
+
+#### C. 自動ローテーション
+*   定期実行スクリプト (`runPeriodicBackup`) により、古いバックアップ（デフォルトで最新30件保持）を自動的にゴミ箱へ移動し、Drive容量を節約する。
+
+---
 
 **市川学園 座席管理システム v32.0.0**
 Technical Documentation

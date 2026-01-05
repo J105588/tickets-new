@@ -19,6 +19,9 @@ import {
     adminSendSummaryEmails,   // New
     adminSwapSeats,           // New
     adminResetPerformance,    // New
+    adminBackupDatabase,      // Backup
+    adminGetBackups,          // Backup
+    adminRestoreDatabase,     // Backup
     toDisplaySeatId,
     toDbSeatId
 } from './supabase-client.js';
@@ -763,6 +766,7 @@ function switchTab(tabId) {
     if (tabId === 'settings') {
         btns[1].classList.add('active');
         if (window.loadDeadlineSettings) window.loadDeadlineSettings();
+        if (window.loadBackupsForUI) window.loadBackupsForUI();
     }
 }
 
@@ -921,3 +925,98 @@ window.saveDeadlineSettings = async function () {
         alert('エラー: ' + e.message);
     }
 };
+
+// --- BACKUP & RESTORE UI ---
+
+async function loadBackupsForUI() {
+    const tbody = document.querySelector('#table-backups tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;"><i class="fas fa-spinner fa-spin"></i> 読み込み中...</td></tr>';
+
+    const res = await adminGetBackups();
+    tbody.innerHTML = '';
+
+    if (!res.success) {
+        tbody.innerHTML = `<tr><td colspan="3" style="color:red;">エラー: ${res.error}</td></tr>`;
+        return;
+    }
+
+    if (!res.backups || res.backups.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">バックアップはありません</td></tr>';
+        return;
+    }
+
+    res.backups.forEach(backup => {
+        const tr = document.createElement('tr');
+        const dateStr = new Date(backup.created).toLocaleString();
+        tr.innerHTML = `
+            <td>${dateStr}</td>
+            <td><a href="${backup.url}" target="_blank">${backup.name}</a></td>
+            <td>
+                <button class="btn-danger btn-sm" onclick="restoreBackupForUI('${backup.id}')">復元</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+async function createBackupForUI() {
+    if (!confirm('現在のデータベースのバックアップを作成しますか？\n（数秒〜数十秒かかる場合があります）')) return;
+
+    const btn = document.querySelector('button[onclick="createBackupForUI()"]');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 作成中...';
+
+    const res = await adminBackupDatabase();
+
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+
+    if (res.success) {
+        alert(`バックアップが完了しました。\n保存先: ${res.name}`);
+        loadBackupsForUI();
+    } else {
+        alert(`バックアップに失敗しました: ${res.error}`);
+    }
+}
+
+async function restoreBackupForUI(backupId) {
+    if (!confirm('【警告】\n選択したバックアップからデータベースを復元します。\n\n・現在のデータは全て上書き（削除）されます。\n・この操作は取り消せません。\n\n本当に実行しますか？')) return;
+
+    const userInput = prompt('確認のため "RESTORE" と入力してください:');
+    if (userInput !== 'RESTORE') {
+        alert('入力が一致しないためキャンセルしました。');
+        return;
+    }
+
+    const restoreKey = prompt('セキュリティのため、復元用キー(RESTORE_KEY)を入力してください:');
+    if (!restoreKey) {
+        alert('キーが入力されなかったためキャンセルしました。');
+        return;
+    }
+
+    const btn = document.querySelector(`button[onclick="restoreBackupForUI('${backupId}')"]`);
+    if (btn) btn.disabled = true;
+
+    const loading = document.createElement('div');
+    loading.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);color:white;display:flex;justify-content:center;align-items:center;z-index:9999;flex-direction:column;";
+    loading.innerHTML = '<div><i class="fas fa-spinner fa-spin fa-3x"></i></div><div style="margin-top:20px;">復元中... ページを閉じないでください</div>';
+    document.body.appendChild(loading);
+
+    const res = await adminRestoreDatabase(backupId, restoreKey);
+
+    document.body.removeChild(loading);
+    if (btn) btn.disabled = false;
+
+    if (res.success) {
+        alert('復元が完了しました。ページをリロードします。');
+        location.reload();
+    } else {
+        alert(`復元に失敗しました: ${res.error}`);
+    }
+}
+
+window.createBackupForUI = createBackupForUI;
+window.loadBackupsForUI = loadBackupsForUI;
+window.restoreBackupForUI = restoreBackupForUI;

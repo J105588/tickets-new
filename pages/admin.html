@@ -538,6 +538,45 @@
                     </div>
                 </div>
             </div>
+
+            <!-- SYSTEM BACKUP -->
+            <div class="section-card" style="margin-top: 2rem; border-top: 4px solid #0d6efd;">
+                <div class="section-header">
+                    <span class="section-title">システムバックアップ (System Backup)</span>
+                    <button class="btn-primary btn-sm" onclick="createBackupForUI()">
+                        <i class="fas fa-save"></i> 今すぐバックアップ
+                    </button>
+                </div>
+                <div style="padding: 1rem;">
+                    <p style="margin-bottom: 1rem; color: #666; font-size: 0.9rem;">
+                        データベースの定期バックアップ（スプレッドシート形式）を管理します。<br>
+                        <span style="color:#ef4444; font-weight:bold;">復元機能は現在のデータベースを完全に上書きします。慎重に操作してください。</span>
+                    </p>
+
+                    <div style="margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
+                        <h4>バックアップ履歴</h4>
+                        <button class="btn-outline btn-sm" onclick="loadBackupsForUI()"><i class="fas fa-sync"></i>
+                            更新</button>
+                    </div>
+
+                    <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                        <table id="table-backups">
+                            <thead>
+                                <tr>
+                                    <th>作成日時</th>
+                                    <th>ファイル名</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="3" style="text-align:center;">読み込み中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
