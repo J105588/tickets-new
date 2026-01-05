@@ -333,16 +333,27 @@ function renderConfirmation(booking) {
         </div>`;
         btn.style.display = 'none'; // DISABLE CHECKIN for mismatch
         showResultModal('入場不可', html, 'error');
+        // Auto-close error after 3s
+        setTimeout(() => {
+            const overlay = document.getElementById('result-overlay');
+            // Only close if it's still the mismatch error (simple check)
+            if (overlay.style.display === 'flex' && document.getElementById('res-title').innerText === '入場不可') {
+                hideResultModal();
+            }
+        }, 3000);
         return;
     }
 
     if (booking.status === 'checked_in') {
-        renderSuccessState('既にチェックイン済みです', false);
-        return; // Stop here, rendering handled by renderSuccessState
+        // Auto-close enabled for already checked-in (1.5s)
+        renderSuccessState('既にチェックイン済みです', true);
+        return;
     } else if (booking.status === 'cancelled') {
         html += `<div style="color:var(--danger); font-weight:bold; margin-top:10px; font-size:1.2rem; text-align:center;">キャンセルされた予約です</div>`;
         btn.style.display = 'none';
-        showResultModal('エラー', html, 'error'); // Show failure
+        showResultModal('エラー', html, 'error');
+        // Auto-close error after 3s
+        setTimeout(() => { if (state.currentBooking && state.currentBooking.id === booking.id) hideResultModal(); }, 3000);
     } else {
         btn.style.display = 'inline-block';
         showResultModal('予約確認', html, 'normal');

@@ -216,13 +216,14 @@ export async function checkInReservation(id, passcode) {
     }
 }
 
-export async function getBookingForScan(id) {
+export async function getBookingForScan(id, passcode) {
     const sb = getSupabase();
     if (!sb) return { success: false, error: 'System Error' };
 
     try {
         const { data, error } = await sb.rpc('get_booking_for_scan', {
-            p_id: parseInt(id)
+            p_id: parseInt(id),
+            p_passcode: passcode || null
         });
 
         if (error) throw error;
