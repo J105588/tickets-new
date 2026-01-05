@@ -213,6 +213,14 @@ function applyFilterOptions() {
     }
 
 
+
+    window.clearFilters = function () {
+        document.getElementById('filter-group').value = '';
+        document.getElementById('filter-day').value = '';
+        document.getElementById('filter-search').value = '';
+        applyFilters();
+    };
+
 }
 
 // --- Dashboard Logic ---
@@ -228,7 +236,19 @@ window.applyFilters = async function (isBackground = false) {
         document.getElementById('reservation-table').style.opacity = '0.5';
     }
 
-    const result = await adminGetReservations({ group, day, search });
+    // Toggle Clear Button Visibility
+    const btnClear = document.getElementById('btn-clear-filters');
+    if (btnClear) {
+        if (group || day || search) {
+            btnClear.style.display = 'inline-block';
+        } else {
+            btnClear.style.display = 'none';
+        }
+    }
+
+    // Default pagination: Get latest 100
+    // Future: Implement 'Load More' button by tracking page offset
+    const result = await adminGetReservations({ group, day, search, limit: 100, page: 0 });
 
     if (!isBackground) {
         const loading = document.getElementById('loading');

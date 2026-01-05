@@ -390,7 +390,11 @@
             </div>
 
             <div class="filter-group">
-                <input type="text" id="filter-search" placeholder="名前・予約ID・メールで検索..." aria-label="名前・予約IDで検索">
+                <input type="text" id="filter-search" placeholder="名前/ID/メール で検索" style="flex:1;">
+                <button id="btn-clear-filters" class="btn-outline" onclick="clearFilters()" title="絞り込み解除"
+                    style="display:none;">
+                    <i class="fas fa-times"></i> 解除
+                </button>
             </div>
             <button onclick="applyFilters()">検索</button>
         </div>
@@ -513,12 +517,12 @@
                         予約期限(開演時間など)を過ぎても予約可能な一時的なリンクを発行します。<br>
                         発行されたリンクは指定時間内のみ有効です。
                     </p>
-                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 1rem;">
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 1rem; flex-wrap: wrap;">
                         <label>有効時間(分):</label>
                         <input type="number" id="invite-minutes" value="60" min="1" style="width: 80px; padding: 5px;">
                         <span style="font-size: 0.8rem; color: #666; margin-left: -5px; margin-right: 10px;">分</span>
 
-                        <div style="display:flex; gap:5px; margin-right:10px;">
+                        <div style="display:flex; gap:5px; margin-right:10px; flex-wrap: wrap;">
                             <button class="btn-sm btn-outline"
                                 onclick="document.getElementById('invite-minutes').value=30">30分</button>
                             <button class="btn-sm btn-outline"

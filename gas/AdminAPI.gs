@@ -45,50 +45,40 @@ function getAdminReservations(filters) {
       // クラスのみの検索はあまり意味がないのでスキップ
     }
 
-    // 3. フリーワード検索 (名前, 予約ID, メール, 数値ID)
-    // 3. フリーワード検索 (Supabase側でのOR検索は型エラーや制約が多いため、GAS側でフィルタリングする)
-    // SQLでの絞り込みはScopeのみに行う
-    const activeSearch = filters.search ? filters.search.trim().toLowerCase() : null;
-    
-    // クエリパラメータの結合
+    // 3. Search (Server-side OR filter)
+    // Re-construct endpoint from query and conditions
     let endpoint = 'bookings?' + query;
     if (conditions.length > 0) {
       endpoint += '&' + conditions.join('&');
     }
-    
-    // ソート (作成日時順)
-    endpoint += '&order=created_at.desc';
 
-    // データ取得
+    if (filters.search && filters.search.trim()) {
+      const term = filters.search.trim();
+      // Use ilike for case-insensitive partial match on name and email.
+      // Note: Cast id to text if needed, but Supabase might struggle with mixed types in OR. 
+      // For now, search name and email.
+      // Syntax: or=(name.ilike.*term*,email.ilike.*term*)
+      const searchCond = `or=(name.ilike.*${encodeURIComponent(term)}*,email.ilike.*${encodeURIComponent(term)}*)`;
+      endpoint += '&' + searchCond;
+    }
+
+    // 4. Sort & Pagination
+    // Default limit 100 to prevent timeout
+    const limit = filters.limit ? parseInt(filters.limit) : 100;
+    const page = filters.page ? parseInt(filters.page) : 0;
+    const offset = page * limit;
+
+    endpoint += `&order=created_at.desc&limit=${limit}&offset=${offset}`;
+
+    // Data Fetch
     const response = supabaseIntegration._request(endpoint, { useServiceRole: true });
     
     if (!response.success) {
       return { success: false, error: response.error };
     }
     
-    let data = response.data;
-
-    // 4. GAS側での柔軟な検索 (ID, Name, Email, ReservationID, Seats)
-    if (activeSearch) {
-      data = data.filter(r => {
-        // ID (Numeric)
-        if (r.id && String(r.id) === activeSearch) return true;
-        // Name
-        if (r.name && r.name.toLowerCase().includes(activeSearch)) return true;
-        // Email
-        if (r.email && r.email.toLowerCase().includes(activeSearch)) return true;
-        // Reservation ID (UUID/Code)
-        if (r.reservation_id && String(r.reservation_id).toLowerCase().includes(activeSearch)) return true;
-        // Seats (Array of objects) - "F12" etc.
-        if (r.seats && Array.isArray(r.seats)) {
-           if (r.seats.some(s => s.seat_id && s.seat_id.toLowerCase().includes(activeSearch))) return true;
-        }
-        
-        return false;
-      });
-    }
-    
-    return { success: true, data: data };
+    // Direct return (Client-side filtering removed)
+    return { success: true, data: response.data };
 
   } catch (e) {
     return { success: false, error: e.message };

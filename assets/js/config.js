@@ -1,8 +1,7 @@
 // config.js
 // 複数のAPI URL（使用数上限回避のため分散）
 const GAS_API_URLS = [
-  "https://script.google.com/macros/s/AKfycbx4zOvL3E7YF4vUseb9k1gIVykeEU8oVdOzWsBLfPi_cYsXS0qU_Zm_bc4m1MogYS0bGA/exec"
-  //"https://script.google.com/macros/s/AKfycbwfHVEZwLbCs_sJ3ckyr6vdCLfI3twmiENbBuSOidMUOLAnGwfmGoyvGLcXihJMu8T1/exec",
+  "https://script.google.com/macros/s/AKfycbyQ6_WXaZD_-u9kUaRhiYa-CIIMg7Y1eEmIssjqK-myiM1-1GyTr1vMB7cBi0cn37469Q/exec"
   //jxjin.ig.school@gmail.com
   //"https://script.google.com/macros/s/AKfycbxGBy7NvMzEdENKL_SYA9Bvk6oq_Fx7_VW2iey0bGFlDfQmGb_-zVP3Gt2pZzJ20m9B/exec",
   //nzn.engeki5@gmail.com
@@ -15,7 +14,8 @@ const GAS_API_URLS = [
   //engeki.enjitsu@gmail.com
   //"https://script.google.com/macros/s/AKfycbz0gcsEHWPSsoM_tQaGJCHO6ga9Qzu2by81EYA4QRPww8m4QsrSQZ8dZ3WMZoga_yqx/exec"
   // 赤松
-  //"https://script.google.com/macros/s/AKfycbxhXhbb42I2QBgtsa239zj6P5xnrq59i-2Q4rX20dl3fmcUMCmG27nfSV8L6PLdLwuKLg/exec"
+  //"https://script.google.com/macros/s/AKfycbxhXhbb42I2QBgtsa239zj6P5xnrq59i-2Q4rX20dl3fmcUMCmG27nfSV8L6PLdLwuKLg/exec"//"https://script.google.com/macros/s/AKfycbwfHVEZwLbCs_sJ3ckyr6vdCLfI3twmiENbBuSOidMUOLAnGwfmGoyvGLcXihJMu8T1/exec",
+
 ];
 
 // Supabase設定（直接接続用）
