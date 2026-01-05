@@ -899,7 +899,12 @@ window.loadDeadlineSettings = async function () {
     try {
         const res = await adminDeadlineSettings('get');
         if (res.success && res.deadline) {
-            document.getElementById('global-deadline').value = res.deadline;
+            // datetime-local expects YYYY-MM-DDTHH:mm
+            // Supabase/GAS might return ISO string with seconds/ms/Z
+            // We slice to first 16 chars: "2026-01-05T15:00"
+            let val = res.deadline;
+            if (val.length > 16) val = val.substring(0, 16);
+            document.getElementById('global-deadline').value = val;
         } else {
             console.log('Deadline not set or error', res.error);
         }

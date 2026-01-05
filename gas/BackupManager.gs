@@ -18,7 +18,7 @@ function backupDatabase() {
     
     // 1. データ取得 (Supabaseから全データを取得)
     // 依存関係の逆順（子から親）ではなく、バックアップは順不同でOK。リストア時に順序制御。
-    const tables = ['bookings', 'seats', 'performances', 'groups', 'event_dates', 'time_slots', 'system_settings'];
+    const tables = ['bookings', 'seats', 'performances', 'groups', 'event_dates', 'time_slots', 'settings'];
     const backupData = {};
     
     tables.forEach(table => {
@@ -233,7 +233,7 @@ function restoreDatabase(backupSpreadsheetId, restoreKey) {
     
     // 依存関係順序 (削除はこの逆、挿入はこの順序)
     // 親から順に挿入する
-    const insertOrder = ['groups', 'event_dates', 'time_slots', 'performances', 'bookings', 'seats', 'system_settings'];
+    const insertOrder = ['groups', 'event_dates', 'time_slots', 'performances', 'bookings', 'seats', 'settings'];
     const deleteOrder = [...insertOrder].reverse();
     
     // 1. 全データ削除 (Truncate)
@@ -275,17 +275,32 @@ function restoreDatabase(backupSpreadsheetId, restoreKey) {
           let val = row[index];
           // スプレッドシートの日付オブジェクトをISO文字列に変換
           if (val instanceof Date) {
-             val = val.toISOString();
+             // time_slotsのstart_time/end_timeの場合はHH:mm形式にする
+             if ((table === 'time_slots' && (header === 'start_time' || header === 'end_time')) ||
+                 (table === 'performances' && header === 'timeslot')) {
+               const hours = ('0' + val.getHours()).slice(-2);
+               const minutes = ('0' + val.getMinutes()).slice(-2);
+               val = `${hours}:${minutes}`;
+             } else {
+               val = val.toISOString();
+             }
           }
-          // JSON文字列をオブジェクトに戻す (JSONBカラム用)
-          // シンプル判定: 文字列で { または [ で始まる場合
-          if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
-            try {
-              val = JSON.parse(val);
-            } catch (_) {
-              // パース失敗ならそのまま文字列として扱う
-            }
+          
+          if (typeof val === 'string') {
+             // JSON文字列をオブジェクトに戻す
+             if (val.startsWith('{') || val.startsWith('[')) {
+                try { val = JSON.parse(val); } catch (_) {}
+             }
+             // time_slotsのVARCHAR(5)制限対応 (文字列の場合もカット)
+             // performancesのVARCHAR(10)制限対応
+             if (table === 'time_slots' && (header === 'start_time' || header === 'end_time')) {
+                if (val.length > 5) val = val.substring(0, 5);
+             }
+             if (table === 'performances' && header === 'timeslot') {
+                if (val.length > 10) val = val.substring(0, 10);
+             }
           }
+
           // 空文字はnullにする？ Supabaseの挙動によるが、FKなどはnullが必要
           if (val === '') val = null;
           

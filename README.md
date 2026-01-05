@@ -802,7 +802,7 @@ graph TD
 #### A. バックアップ機能
 *   **Trigger**: 管理画面からの手動実行、または GAS の Time-Driven Trigger による自動実行。
 *   **Storage**: Google Drive のルートディレクトリに `Tickets_Backup` フォルダを自動生成し、その中に日時ごとのスプレッドシート (`Backup_YYYYMMDD_HHMMSS`) を保存する。
-*   **Scope**: `bookings`, `seats`, `performances`, `groups`, `event_dates`, `time_slots`, `system_settings` の全テーブル。
+*   **Scope**: `bookings`, `seats`, `performances`, `groups`, `event_dates`, `time_slots`, `settings` の全テーブル。
 
 #### B. 復元 (Restore) 機能
 *   **Security**: 破壊的な操作であるため、二重のセキュリティチェックを行う。
