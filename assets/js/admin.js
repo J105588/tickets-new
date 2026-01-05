@@ -900,11 +900,29 @@ window.loadDeadlineSettings = async function () {
         const res = await adminDeadlineSettings('get');
         if (res.success && res.deadline) {
             // datetime-local expects YYYY-MM-DDTHH:mm
-            // Supabase/GAS might return ISO string with seconds/ms/Z
-            // We slice to first 16 chars: "2026-01-05T15:00"
-            let val = res.deadline;
-            if (val.length > 16) val = val.substring(0, 16);
-            document.getElementById('global-deadline').value = val;
+            // Supabase/GAS might return ISO string (UTC) or ISO-like string.
+            // iOS requires strict format and local time representation.
+            try {
+                const d = new Date(res.deadline);
+                if (!isNaN(d.getTime())) {
+                    const pad = n => n.toString().padStart(2, '0');
+                    const year = d.getFullYear();
+                    const month = pad(d.getMonth() + 1);
+                    const day = pad(d.getDate());
+                    const hour = pad(d.getHours());
+                    const minute = pad(d.getMinutes());
+                    // Local ISO-like string: YYYY-MM-DDTHH:mm
+                    const localIso = `${year}-${month}-${day}T${hour}:${minute}`;
+                    document.getElementById('global-deadline').value = localIso;
+                } else {
+                    // Fallback to simple slicing if date parsing fails
+                    let val = res.deadline;
+                    if (val.length > 16) val = val.substring(0, 16);
+                    document.getElementById('global-deadline').value = val;
+                }
+            } catch (e) {
+                console.error('Date parsing failed', e);
+            }
         } else {
             console.log('Deadline not set or error', res.error);
         }
