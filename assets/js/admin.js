@@ -938,10 +938,46 @@ window.sendSummaryEmails = async function () {
 };
 
 
+// --- Logout & Session Security ---
+
 function logout() {
     sessionStorage.removeItem('admin_session');
-    window.location.href = 'admin-login.html';
+    sessionStorage.removeItem('admin_verified_at');
+    sessionStorage.removeItem('admin_last_active');
+
+    // Replace history to trap back button
+    window.location.replace('admin-login.html');
 }
+
+// Function to enforce session validity
+function checkSessionSecurity() {
+    const session = sessionStorage.getItem('admin_session');
+    // If we are on admin.html and no session exists, redirect immediately
+    // Note: checking path to ensure we don't loop if logic moves to common file
+    if (!session && window.location.pathname.includes('admin.html')) {
+        console.warn('Session missing, redirecting to login');
+        window.location.replace('admin-login.html');
+    }
+}
+
+// 1. Back/Forward Cache (BFCache) Restore
+window.addEventListener('pageshow', (event) => {
+    if (event.persisted || (window.performance && window.performance.navigation.type === 2)) {
+        checkSessionSecurity();
+    }
+});
+
+// 2. iOS PWA / Mobile Tab Visibility (App Resume)
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        checkSessionSecurity();
+    }
+});
+
+// 3. Window Focus (Alt-Tab / Desktop)
+window.addEventListener('focus', () => {
+    checkSessionSecurity();
+});
 
 // --- Invitation Link ---
 window.generateInviteLink = async function () {
