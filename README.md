@@ -1,4 +1,4 @@
-# 市川学園 座席管理システム v32.0.2 技術仕様書
+# 市川学園 座席管理システム v32.0.3 技術仕様書
 
 ## 1. システム概要
 
@@ -818,8 +818,8 @@ graph TD
 
 ---
 
-**市川学園 座席管理システム v32.0.2**
+**市川学園 座席管理システム v32.0.3**
 Technical Documentation
-Commit: `v32.0.2`
+Commit: `v32.0.3`
 
 Copyright (c) 2025 Junxiang Jin. All rights reserved.

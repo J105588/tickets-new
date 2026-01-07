@@ -129,7 +129,35 @@ function doPost(e) {
         'isValidSeatId': isValidSeatId,
         'safeLogOperation': safeLogOperation,
         'login': login,
-        'validateSession': validateSession
+        'validateSession': validateSession,
+
+        // Admin API
+        'adminChangeSeats': adminChangeSeats,
+        'adminResendEmail': adminResendEmail,
+        'adminCancelReservation': adminCancelReservation,
+        'adminUpdateReservation': adminUpdateReservation,
+        'getAdminReservations': getAdminReservations,
+        'adminSendSummaryEmails': adminSendSummaryEmails,
+        'adminResetPerformance': adminResetPerformance,
+        'generateAdminInviteToken': generateAdminInviteToken,
+        'validateAdminToken': validateAdminToken,
+        'getGlobalDeadline': getGlobalDeadline,
+        'saveGlobalDeadline': saveGlobalDeadline,
+
+        // Master Data API
+        'get_master_data': getMasterData,
+        'getMasterData': getMasterData,
+        'saveGroup': saveGroup,
+        'saveEventDate': saveEventDate,
+        'saveTimeSlot': saveTimeSlot,
+        'deleteMaster': deleteMaster,
+        'getAllSchedules': getAllSchedules,
+        'saveSchedule': saveSchedule,
+        'deleteSchedule': deleteSchedule,
+
+        // Admin Notices
+        'broadcastAdminNotice': broadcastAdminNotice,
+        'fetchAdminNotices': fetchAdminNotices
       };
 
       if (functionMap[funcName]) {
