@@ -22,6 +22,8 @@ import {
     adminBackupDatabase,      // Backup
     adminGetBackups,          // Backup
     adminRestoreDatabase,     // Backup
+    adminGetMaintenanceSchedule, // Maintenance
+    adminSetMaintenanceSchedule, // Maintenance
     toDisplaySeatId,
     toDbSeatId
 } from './supabase-client.js';
@@ -91,7 +93,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 'adminGetReservations' fetches data.
     const [_, result] = await Promise.all([
         loadMasterData(),
-        adminGetReservations({})
+        adminGetReservations({}),
+        loadMaintenanceStatus() // Load maintenance schedule
     ]);
 
     // 2. Render Initial Reservations
@@ -1165,3 +1168,128 @@ async function restoreBackupForUI(backupId) {
 window.createBackupForUI = createBackupForUI;
 window.loadBackupsForUI = loadBackupsForUI;
 window.restoreBackupForUI = restoreBackupForUI;
+
+
+// --- Scheduled Maintenance ---
+
+async function loadMaintenanceStatus() {
+    const statusText = document.getElementById('maint-status-text');
+    const startInput = document.getElementById('maint-start');
+    const endInput = document.getElementById('maint-end');
+
+    if (!statusText) return; // UI might not exist yet if partial load
+
+    try {
+        const res = await adminGetMaintenanceSchedule();
+        if (res.success) {
+            if (res.enabled) {
+                const now = new Date();
+                const start = res.start ? new Date(res.start) : new Date(0);
+                const end = res.end ? new Date(res.end) : null;
+
+                let statusStr = '';
+                if (now < start) {
+                    statusStr = `予約中 (開始: ${new Date(res.start).toLocaleString()})`;
+                    statusText.className = 'badge bg-warning text-dark';
+                } else if (!end || now <= end) {
+                    statusStr = 'メンテナンス中 (LOCKED)';
+                    statusText.className = 'badge bg-danger';
+                } else {
+                    statusStr = '終了 (無効化待ち)';
+                    statusText.className = 'badge bg-secondary';
+                }
+
+                if (end) statusStr += ` ～ ${new Date(res.end).toLocaleString()}`;
+
+                statusText.textContent = statusStr;
+
+                // Helper to format Date to "YYYY-MM-DDTHH:mm" in LOCAL time
+                const toLocalISOString = (date) => {
+                    const pad = (n) => n < 10 ? '0' + n : n;
+                    return date.getFullYear() +
+                        '-' + pad(date.getMonth() + 1) +
+                        '-' + pad(date.getDate()) +
+                        'T' + pad(date.getHours()) +
+                        ':' + pad(date.getMinutes());
+                };
+
+                // Set inputs to current values (Local Time)
+                if (res.start && startInput) startInput.value = toLocalISOString(new Date(res.start));
+                if (res.end && endInput) endInput.value = toLocalISOString(new Date(res.end));
+
+            } else {
+                statusText.textContent = '未設定 (稼働中)';
+                statusText.className = 'badge bg-success';
+                if (startInput) startInput.value = '';
+                if (endInput) endInput.value = '';
+            }
+        } else {
+            statusText.textContent = '取得エラー';
+        }
+    } catch (e) {
+        console.error(e);
+        statusText.textContent = 'エラー';
+    }
+}
+
+async function saveMaintenanceSchedule() {
+    const startVal = document.getElementById('maint-start').value;
+    const endVal = document.getElementById('maint-end').value;
+
+    if (!startVal) {
+        alert('開始日時を設定してください。\n（即時開始したい場合は現在時刻を指定）');
+        return;
+    }
+
+    const start = new Date(startVal);
+    const end = endVal ? new Date(endVal) : null;
+
+    if (end && start >= end) {
+        alert('終了日時は開始日時より後に設定してください。');
+        return;
+    }
+
+    if (!confirm('メンテナンススケジュールを設定しますか？\n設定された時間帯は全ての利用者がアクセスできなくなります。')) return;
+
+    const password = prompt('設定のため、最高管理者パスワードを入力してください:');
+    if (!password) return;
+
+    // Convert to ISO string for storage
+    const startIso = start.toISOString();
+    const endIso = end ? end.toISOString() : null;
+
+    try {
+        const res = await adminSetMaintenanceSchedule(true, startIso, endIso, password);
+        if (res.success) {
+            alert('設定しました。');
+            loadMaintenanceStatus();
+        } else {
+            alert(`失敗しました: ${res.error || res.message}`);
+        }
+    } catch (e) {
+        alert(`エラー: ${e.message}`);
+    }
+}
+
+async function clearMaintenanceSchedule() {
+    if (!confirm('メンテナンス設定を解除しますか？\nシステムは即座に通常稼働に戻ります。')) return;
+
+    const password = prompt('解除のため、最高管理者パスワードを入力してください:');
+    if (!password) return;
+
+    try {
+        const res = await adminSetMaintenanceSchedule(false, null, null, password);
+        if (res.success) {
+            alert('解除しました。');
+            loadMaintenanceStatus();
+        } else {
+            alert(`失敗しました: ${res.error || res.message}`);
+        }
+    } catch (e) {
+        alert(`エラー: ${e.message}`);
+    }
+}
+
+window.loadMaintenanceStatus = loadMaintenanceStatus;
+window.saveMaintenanceSchedule = saveMaintenanceSchedule;
+window.clearMaintenanceSchedule = clearMaintenanceSchedule;

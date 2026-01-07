@@ -10,11 +10,11 @@ class PerformanceMonitor {
       userInteractions: 0,
       errors: 0
     };
-    
+
     this.startTime = performance.now();
     this.isVisible = false;
     this.dashboard = null;
-    
+
     this.initializeMonitoring();
   }
 
@@ -27,19 +27,19 @@ class PerformanceMonitor {
 
     // API呼び出しの監視
     this.monitorAPICalls();
-    
+
     // メモリ使用量の監視
     this.monitorMemoryUsage();
-    
+
     // レンダリング時間の監視
     this.monitorRenderTime();
-    
+
     // ユーザーインタラクションの監視
     this.monitorUserInteractions();
-    
+
     // エラーの監視
     this.monitorErrors();
-    
+
     // ダッシュボードの初期化
     this.createDashboard();
   }
@@ -47,27 +47,27 @@ class PerformanceMonitor {
   monitorAPICalls() {
     const originalFetch = window.fetch;
     const self = this;
-    
-    window.fetch = function(...args) {
+
+    window.fetch = function (...args) {
       const startTime = performance.now();
       self.metrics.apiCalls++;
-      
+
       return originalFetch.apply(this, args).then(response => {
         const endTime = performance.now();
         const responseTime = endTime - startTime;
-        
+
         self.metrics.apiResponseTime.push(responseTime);
         self.logMetric('apiResponse', responseTime);
-        
+
         return response;
       }).catch(error => {
         const endTime = performance.now();
         const responseTime = endTime - startTime;
-        
+
         self.metrics.apiResponseTime.push(responseTime);
         self.metrics.errors++;
         self.logMetric('apiError', responseTime);
-        
+
         throw error;
       });
     };
@@ -78,14 +78,14 @@ class PerformanceMonitor {
       setInterval(() => {
         const memory = performance.memory;
         const usedMB = memory.usedJSHeapSize / 1048576;
-        
+
         this.metrics.memoryUsage.push({
           timestamp: Date.now(),
           used: usedMB,
           total: memory.totalJSHeapSize / 1048576,
           limit: memory.jsHeapSizeLimit / 1048576
         });
-        
+
         // 最新の10件のみ保持
         if (this.metrics.memoryUsage.length > 10) {
           this.metrics.memoryUsage.shift();
@@ -107,13 +107,13 @@ class PerformanceMonitor {
         }
       });
     });
-    
+
     observer.observe({ entryTypes: ['measure'] });
   }
 
   monitorUserInteractions() {
     const events = ['click', 'keydown', 'scroll', 'resize'];
-    
+
     events.forEach(eventType => {
       document.addEventListener(eventType, () => {
         this.metrics.userInteractions++;
@@ -132,7 +132,7 @@ class PerformanceMonitor {
         colno: event.colno
       });
     });
-    
+
     window.addEventListener('unhandledrejection', (event) => {
       this.metrics.errors++;
       this.logMetric('unhandledRejection', event.reason);
@@ -162,9 +162,9 @@ class PerformanceMonitor {
       max-height: 80vh;
       overflow-y: auto;
     `;
-    
+
     document.body.appendChild(this.dashboard);
-    
+
     // ダッシュボード表示/非表示のキーボードショートカット
     document.addEventListener('keydown', (event) => {
       if (event.ctrlKey && event.shiftKey && event.key === 'P') {
@@ -177,25 +177,25 @@ class PerformanceMonitor {
   toggleDashboard() {
     this.isVisible = !this.isVisible;
     this.dashboard.style.display = this.isVisible ? 'block' : 'none';
-    
+
     if (this.isVisible) {
       this.updateDashboard();
     }
   }
 
   updateDashboard() {
-    const avgApiResponseTime = this.metrics.apiResponseTime.length > 0 
-      ? this.metrics.apiResponseTime.reduce((a, b) => a + b, 0) / this.metrics.apiResponseTime.length 
+    const avgApiResponseTime = this.metrics.apiResponseTime.length > 0
+      ? this.metrics.apiResponseTime.reduce((a, b) => a + b, 0) / this.metrics.apiResponseTime.length
       : 0;
-    
-    const latestMemory = this.metrics.memoryUsage.length > 0 
-      ? this.metrics.memoryUsage[this.metrics.memoryUsage.length - 1] 
+
+    const latestMemory = this.metrics.memoryUsage.length > 0
+      ? this.metrics.memoryUsage[this.metrics.memoryUsage.length - 1]
       : null;
-    
+
     const recentRenderTime = this.metrics.renderTime
       .filter(rt => Date.now() - rt.timestamp < 60000) // 過去1分
       .reduce((a, b) => a + b.duration, 0);
-    
+
     this.dashboard.innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
         <h3 style="margin: 0; color: #4CAF50;">Performance Monitor</h3>
@@ -250,10 +250,10 @@ class PerformanceMonitor {
       userAgent: navigator.userAgent,
       url: window.location.href
     };
-    
+
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    
+
     const a = document.createElement('a');
     a.href = url;
     a.download = `performance-metrics-${Date.now()}.json`;
@@ -273,7 +273,7 @@ class PerformanceMonitor {
       userInteractions: 0,
       errors: 0
     };
-    
+
     this.updateDashboard();
   }
 

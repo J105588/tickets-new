@@ -513,7 +513,9 @@ if (typeof window !== 'undefined') {
         adminManageSchedule,
         adminManageMaster,
         adminSendSummaryEmails,
-        adminResetPerformance
+        adminResetPerformance,
+        adminGetMaintenanceSchedule,
+        adminSetMaintenanceSchedule
     };
 }
 
@@ -617,6 +619,23 @@ export function subscribeToDeadline(onUpdate) {
             }
         )
         .subscribe();
+}
+
+// System Lock (Scheduled Maintenance)
+export async function adminGetMaintenanceSchedule() {
+    return await jsonpRequest(GAS_API_URLS[0], {
+        action: 'getMaintenanceSchedule'
+    });
+}
+
+export async function adminSetMaintenanceSchedule(enabled, start, end, password) {
+    return await jsonpRequest(GAS_API_URLS[0], {
+        action: 'setMaintenanceSchedule',
+        enabled: enabled,
+        start: start,
+        end: end,
+        password: password
+    });
 }
 
 // Ensure global access for admin.js

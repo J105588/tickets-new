@@ -12,18 +12,18 @@ class EnhancedStatusMonitor {
     this.lastCheckedTimeslots = new Map(); // 前回の状態を詳細に記録
     this.checkTimer = null;
     this.isRunning = false;
-    
+
     // 容量閾値設定（設定から取得）
     this.capacityThresholds = {
       warning: ENHANCED_MONITORING_CONFIG.defaultWarningThreshold,
       critical: ENHANCED_MONITORING_CONFIG.defaultCriticalThreshold,
       full: 0
     };
-    
+
     // 通知履歴（重複通知を防ぐ）
     this.notificationHistory = new Map();
     this.notificationCooldown = ENHANCED_MONITORING_CONFIG.defaultNotificationCooldown;
-    
+
     // 統計情報
     this.statistics = {
       totalChecks: 0,
@@ -32,13 +32,13 @@ class EnhancedStatusMonitor {
       averageEmptySeats: 0,
       capacityTrends: []
     };
-    
+
     // APIキャッシュの参照
     this.apiCache = apiCache;
-    
+
     // 設定を読み込み
     this.loadSettings();
-    
+
     // グローバル関数として公開
     if (typeof window !== 'undefined') {
       window.EnhancedStatusMonitor = this;
@@ -65,13 +65,13 @@ class EnhancedStatusMonitor {
   // 監視開始
   start() {
     if (this.isRunning) return;
-    
+
     this.isRunning = true;
     debugLog('[EnhancedStatusMonitor] 強化監視開始');
-    
+
     // 即座に1回チェック
     this.checkAllStatuses();
-    
+
     // 定期チェックを開始
     this.checkTimer = setInterval(() => {
       this.checkAllStatuses();
@@ -81,10 +81,10 @@ class EnhancedStatusMonitor {
   // 監視停止
   stop() {
     if (!this.isRunning) return;
-    
+
     this.isRunning = false;
     debugLog('[EnhancedStatusMonitor] 強化監視停止');
-    
+
     if (this.checkTimer) {
       clearInterval(this.checkTimer);
       this.checkTimer = null;
@@ -95,7 +95,7 @@ class EnhancedStatusMonitor {
   async checkAllStatuses() {
     try {
       debugLog('[EnhancedStatusMonitor] 全公演ステータス詳細チェック開始');
-      
+
       // APIキャッシュを使用してデータを取得
       const response = await this.apiCache.callAPI('getFullCapacityTimeslots', [], true);
       if (!response || !response.success) {
@@ -105,12 +105,12 @@ class EnhancedStatusMonitor {
 
       const allTimeslots = response.allTimeslots || [];
       const summary = response.summary || {};
-      
+
       // 統計情報を更新
       this.statistics.totalChecks++;
       this.statistics.lastCheckTime = new Date();
       this.statistics.averageEmptySeats = summary.totalEmpty / summary.totalChecked || 0;
-      
+
       // 容量トレンドを記録（直近10回分）
       this.statistics.capacityTrends.push({
         timestamp: new Date(),
@@ -118,11 +118,11 @@ class EnhancedStatusMonitor {
         totalOccupied: summary.totalOccupied,
         totalSeats: summary.totalSeats
       });
-      
+
       if (this.statistics.capacityTrends.length > 10) {
         this.statistics.capacityTrends.shift();
       }
-      
+
       debugLog('[EnhancedStatusMonitor] チェック結果:', {
         totalChecked: summary.totalChecked,
         totalSeats: summary.totalSeats,
@@ -134,7 +134,7 @@ class EnhancedStatusMonitor {
 
       // 各公演の状態変化を分析
       const statusChanges = await this.analyzeStatusChanges(allTimeslots);
-      
+
       // 通知が必要な状態変化を処理
       if (statusChanges.length > 0) {
         await this.handleStatusChanges(statusChanges);
@@ -153,11 +153,11 @@ class EnhancedStatusMonitor {
   // ステータス変化を分析
   async analyzeStatusChanges(currentTimeslots) {
     const changes = [];
-    
+
     for (const timeslot of currentTimeslots) {
       const key = `${timeslot.group}|${timeslot.day}|${timeslot.timeslot}`;
       const previous = this.lastCheckedTimeslots.get(key);
-      
+
       if (!previous) {
         // 初回チェック
         this.lastCheckedTimeslots.set(key, {
@@ -169,10 +169,10 @@ class EnhancedStatusMonitor {
         });
         continue;
       }
-      
+
       // 変化を検出
       const changes_detected = [];
-      
+
       if (previous.emptySeats !== timeslot.emptySeats) {
         changes_detected.push({
           type: 'empty_seats',
@@ -181,7 +181,7 @@ class EnhancedStatusMonitor {
           change: timeslot.emptySeats - previous.emptySeats
         });
       }
-      
+
       if (previous.isFull !== timeslot.isFull) {
         changes_detected.push({
           type: 'capacity_status',
@@ -189,11 +189,11 @@ class EnhancedStatusMonitor {
           to: timeslot.isFull ? 'full' : 'available'
         });
       }
-      
+
       // 容量レベル変化を検出
       const previousLevel = this.getCapacityLevel(previous.emptySeats);
       const currentLevel = this.getCapacityLevel(timeslot.emptySeats);
-      
+
       if (previousLevel !== currentLevel) {
         changes_detected.push({
           type: 'capacity_level',
@@ -201,7 +201,7 @@ class EnhancedStatusMonitor {
           to: currentLevel
         });
       }
-      
+
       if (changes_detected.length > 0) {
         changes.push({
           timeslot: timeslot,
@@ -209,7 +209,7 @@ class EnhancedStatusMonitor {
           previous: previous
         });
       }
-      
+
       // 状態を更新
       this.lastCheckedTimeslots.set(key, {
         emptySeats: timeslot.emptySeats,
@@ -219,7 +219,7 @@ class EnhancedStatusMonitor {
         lastChecked: new Date()
       });
     }
-    
+
     return changes;
   }
 
@@ -234,10 +234,10 @@ class EnhancedStatusMonitor {
   // ステータス変化を処理
   async handleStatusChanges(changes) {
     const notifications = [];
-    
+
     for (const change of changes) {
       const { timeslot, changes: changeDetails } = change;
-      
+
       // 通知が必要な変化を特定
       for (const detail of changeDetails) {
         if (this.shouldNotify(detail, timeslot)) {
@@ -249,7 +249,7 @@ class EnhancedStatusMonitor {
         }
       }
     }
-    
+
     // 通知を送信
     if (notifications.length > 0) {
       await this.sendStatusNotifications(notifications);
@@ -260,29 +260,29 @@ class EnhancedStatusMonitor {
   shouldNotify(change, timeslot) {
     const key = `${timeslot.group}|${timeslot.day}|${timeslot.timeslot}`;
     const now = Date.now();
-    
+
     // 見本演劇はメール送信対象外
     if (timeslot.group === '見本演劇') {
       return false;
     }
-    
+
     // クールダウンチェック
     const lastNotification = this.notificationHistory.get(key);
     if (lastNotification && (now - lastNotification) < this.notificationCooldown) {
       return false;
     }
-    
+
     // 通知条件チェック
     switch (change.type) {
       case 'capacity_status':
         return change.to === 'full'; // 満席になった時のみ通知
-      
+
       case 'capacity_level':
         return ['critical', 'full'].includes(change.to); // 緊急または満席レベル
-      
+
       case 'empty_seats':
         return change.to <= this.capacityThresholds.warning; // 警告レベル以下
-      
+
       default:
         return false;
     }
@@ -293,15 +293,15 @@ class EnhancedStatusMonitor {
     switch (change.type) {
       case 'capacity_status':
         return change.to === 'full' ? 'high' : 'medium';
-      
+
       case 'capacity_level':
-        return change.to === 'full' ? 'high' : 
-               change.to === 'critical' ? 'medium' : 'low';
-      
+        return change.to === 'full' ? 'high' :
+          change.to === 'critical' ? 'medium' : 'low';
+
       case 'empty_seats':
         return change.to === 0 ? 'high' :
-               change.to <= this.capacityThresholds.critical ? 'medium' : 'low';
-      
+          change.to <= this.capacityThresholds.critical ? 'medium' : 'low';
+
       default:
         return 'low';
     }
@@ -311,13 +311,13 @@ class EnhancedStatusMonitor {
   async sendStatusNotifications(notifications) {
     try {
       debugLog('[EnhancedStatusMonitor] ステータス通知送信開始');
-      
+
       // 優先度順にソート
       notifications.sort((a, b) => {
         const priorityOrder = { high: 3, medium: 2, low: 1 };
         return priorityOrder[b.priority] - priorityOrder[a.priority];
       });
-      
+
       const emailData = {
         emails: this.notificationEmails,
         notifications: notifications,
@@ -327,7 +327,7 @@ class EnhancedStatusMonitor {
 
       // APIキャッシュを使用してメール送信（キャッシュは使用しない）
       const response = await this.apiCache.callAPI('sendStatusNotificationEmail', [emailData], false);
-      
+
       if (response && response.success) {
         debugLog('[EnhancedStatusMonitor] ステータス通知送信成功:', {
           sentTo: response.sentTo,
@@ -335,13 +335,13 @@ class EnhancedStatusMonitor {
           failureCount: response.failureCount,
           notificationCount: notifications.length
         });
-        
+
         // 通知履歴を更新
         notifications.forEach(notification => {
           const key = `${notification.timeslot.group}|${notification.timeslot.day}|${notification.timeslot.timeslot}`;
           this.notificationHistory.set(key, Date.now());
         });
-        
+
         this.statistics.totalNotifications += notifications.length;
       } else {
         console.error('[EnhancedStatusMonitor] ステータス通知送信失敗:', response?.message);
@@ -379,12 +379,12 @@ class EnhancedStatusMonitor {
   // 監視間隔を変更
   setCheckInterval(intervalMs) {
     this.checkInterval = intervalMs;
-    
+
     if (this.isRunning) {
       this.stop();
       this.start();
     }
-    
+
     debugLog('[EnhancedStatusMonitor] 監視間隔変更:', intervalMs + 'ms');
   }
 

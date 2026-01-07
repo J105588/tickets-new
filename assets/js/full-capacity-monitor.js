@@ -11,10 +11,10 @@ class FullCapacityMonitor {
     this.lastCheckedTimeslots = new Set();
     this.checkTimer = null;
     this.isRunning = false;
-    
+
     // 設定を読み込み
     this.loadSettings();
-    
+
     // グローバル関数として公開
     if (typeof window !== 'undefined') {
       window.FullCapacityMonitor = this;
@@ -41,13 +41,13 @@ class FullCapacityMonitor {
   // 監視開始
   start() {
     if (this.isRunning) return;
-    
+
     this.isRunning = true;
     debugLog('[FullCapacityMonitor] 監視開始');
-    
+
     // 即座に1回チェック
     this.checkFullCapacity();
-    
+
     // 定期チェックを開始
     this.checkTimer = setInterval(() => {
       this.checkFullCapacity();
@@ -57,10 +57,10 @@ class FullCapacityMonitor {
   // 監視停止
   stop() {
     if (!this.isRunning) return;
-    
+
     this.isRunning = false;
     debugLog('[FullCapacityMonitor] 監視停止');
-    
+
     if (this.checkTimer) {
       clearInterval(this.checkTimer);
       this.checkTimer = null;
@@ -71,7 +71,7 @@ class FullCapacityMonitor {
   async checkFullCapacity() {
     try {
       debugLog('[FullCapacityMonitor] 全公演満席検知チェック開始');
-      
+
       const response = await GasAPI.getFullCapacityTimeslots();
       if (!response || !response.success) {
         console.warn('[FullCapacityMonitor] 満席検知API失敗:', response?.message);
@@ -81,7 +81,7 @@ class FullCapacityMonitor {
       const fullTimeslots = response.fullTimeslots || [];
       const allTimeslots = response.allTimeslots || [];
       const summary = response.summary || {};
-      
+
       debugLog('[FullCapacityMonitor] チェック結果:', {
         totalChecked: summary.totalChecked,
         fullCapacity: summary.fullCapacity,
@@ -91,7 +91,7 @@ class FullCapacityMonitor {
       });
 
       const currentTimeslots = new Set();
-      
+
       // 現在の満席時間帯をセットに変換
       fullTimeslots.forEach(timeslot => {
         const key = `${timeslot.group}|${timeslot.day}|${timeslot.timeslot}`;
@@ -103,12 +103,12 @@ class FullCapacityMonitor {
       for (const key of currentTimeslots) {
         if (!this.lastCheckedTimeslots.has(key)) {
           const [group, day, timeslot] = key.split('|');
-          const timeslotData = fullTimeslots.find(t => 
+          const timeslotData = fullTimeslots.find(t =>
             t.group === group && t.day === day && t.timeslot === timeslot
           );
-          newFullTimeslots.push({ 
-            group, 
-            day, 
+          newFullTimeslots.push({
+            group,
+            day,
             timeslot,
             totalSeats: timeslotData?.totalSeats || 0,
             occupiedSeats: timeslotData?.occupiedSeats || 0,
@@ -140,7 +140,7 @@ class FullCapacityMonitor {
   async handleNewFullCapacity(newFullTimeslots) {
     // Service Worker通知
     this.notifyServiceWorker(newFullTimeslots);
-    
+
     // メール通知（設定されている場合）
     if (this.isEnabled && this.notificationEmails.length > 0) {
       await this.sendEmailNotification(newFullTimeslots);
@@ -171,7 +171,7 @@ class FullCapacityMonitor {
   async sendEmailNotification(newFullTimeslots) {
     try {
       debugLog('[FullCapacityMonitor] メール通知送信開始');
-      
+
       const emailData = {
         emails: this.notificationEmails,
         fullTimeslots: newFullTimeslots,
@@ -179,7 +179,7 @@ class FullCapacityMonitor {
       };
 
       const response = await GasAPI._callApi('sendFullCapacityEmail', [emailData]);
-      
+
       if (response && response.success) {
         debugLog('[FullCapacityMonitor] メール通知送信成功:', {
           sentTo: response.sentTo,
@@ -198,7 +198,7 @@ class FullCapacityMonitor {
   async updateNotificationSettings(enabled) {
     try {
       const response = await GasAPI.setFullCapacityNotification(enabled);
-      
+
       if (response && response.success) {
         // ハードコーディングされたメールアドレスを使用
         this.notificationEmails = [
@@ -207,10 +207,10 @@ class FullCapacityMonitor {
           'staff@example.com'
         ];
         this.isEnabled = enabled;
-        
+
         // 設定をローカルストレージに保存
         localStorage.setItem('full_capacity_notification_enabled', enabled.toString());
-        
+
         debugLog('[FullCapacityMonitor] 通知設定更新:', { emails: this.notificationEmails, enabled });
         return true;
       } else {
@@ -242,12 +242,12 @@ class FullCapacityMonitor {
   // 監視間隔を変更
   setCheckInterval(intervalMs) {
     this.checkInterval = intervalMs;
-    
+
     if (this.isRunning) {
       this.stop();
       this.start();
     }
-    
+
     debugLog('[FullCapacityMonitor] 監視間隔変更:', intervalMs + 'ms');
   }
 }

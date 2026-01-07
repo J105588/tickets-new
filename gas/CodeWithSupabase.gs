@@ -53,6 +53,27 @@ function doPost(e) {
         case 'cancel_reservation':
           response = cancelReservation(params.id, params.passcode);
           break;
+        case 'getSystemLock':
+          response = getSystemLock();
+          break;
+        case 'setSystemLock':
+          response = setSystemLock(params.shouldLock, params.password);
+          break;
+        case 'getMaintenanceSchedule':
+          response = getMaintenanceSchedule();
+          break;
+        case 'setMaintenanceSchedule':
+          response = setMaintenanceSchedule(params.enabled, params.start, params.end, params.password);
+          break;
+        case 'delete_schedule':
+          response = adminDeleteSchedule(params.id);
+          break;
+        case 'admin_reset_performance':
+          response = adminResetPerformance(params.performanceId);
+          break;
+        case 'admin_generate_invite_token':
+          response = adminGenerateInviteToken(params.minutes);
+          break;
         default:
           throw new Error("不明なアクション: " + action);
       }
@@ -80,6 +101,8 @@ function doPost(e) {
         'reportError': reportError,
         'getSystemLock': getSystemLock,
         'setSystemLock': setSystemLock,
+        'getMaintenanceSchedule': getMaintenanceSchedule,
+        'setMaintenanceSchedule': setMaintenanceSchedule,
         'execDangerCommand': execDangerCommand,
         'initiateDangerCommand': initiateDangerCommand,
         'confirmDangerCommand': confirmDangerCommand,
@@ -279,6 +302,19 @@ function doGet(e) {
                  response = { success: false, error: 'パスワードが違います' };
                }
             }
+            break;
+
+          case 'getSystemLock':
+            response = getSystemLock();
+            break;
+          case 'setSystemLock':
+            response = setSystemLock(e.parameter.shouldLock, e.parameter.password);
+            break;
+          case 'getMaintenanceSchedule':
+            response = getMaintenanceSchedule();
+            break;
+          case 'setMaintenanceSchedule':
+            response = setMaintenanceSchedule(e.parameter.enabled, e.parameter.start, e.parameter.end, e.parameter.password);
             break;
 
           case 'get_all_schedules':

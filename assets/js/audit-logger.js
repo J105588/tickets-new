@@ -18,7 +18,7 @@ class AuditLogger {
   start() {
     if (this.started) return;
     this.started = true;
-    try { this._restoreQueue(); } catch (_) {}
+    try { this._restoreQueue(); } catch (_) { }
     this._installGlobalEventCapture();
     this.timer = setInterval(() => this.flush(), this.flushIntervalMs);
   }
@@ -28,7 +28,7 @@ class AuditLogger {
     this.timer = null;
     this.started = false;
     this.boundHandlers.forEach(({ target, type, handler, opts }) => {
-      try { target.removeEventListener(type, handler, opts); } catch (_) {}
+      try { target.removeEventListener(type, handler, opts); } catch (_) { }
     });
     this.boundHandlers = [];
   }
@@ -54,13 +54,13 @@ class AuditLogger {
         // 即時フラッシュ（非同期）
         Promise.resolve().then(() => this.flush());
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   async flush() {
     if (!this.queue.length) return;
     // オフライン時はスキップ
-    try { if (typeof navigator !== 'undefined' && navigator.onLine === false) return; } catch (_) {}
+    try { if (typeof navigator !== 'undefined' && navigator.onLine === false) return; } catch (_) { }
 
     const batch = this.queue.splice(0, Math.min(this.maxBatchSize, this.queue.length));
     if (!batch.length) return;
@@ -101,7 +101,7 @@ class AuditLogger {
         const t = e.target;
         const info = this._elementInfo(t);
         this.log('ui', 'click', info);
-      } catch (_) {}
+      } catch (_) { }
     }, true);
 
     // 変更
@@ -110,7 +110,7 @@ class AuditLogger {
         const t = e.target;
         const info = this._elementInfo(t);
         this.log('ui', 'change', info);
-      } catch (_) {}
+      } catch (_) { }
     }, true);
 
     // ナビゲーション
@@ -122,12 +122,12 @@ class AuditLogger {
     add(window, 'error', (e) => {
       try {
         this.log('error', 'window_error', { message: e && e.message, source: e && e.filename, lineno: e && e.lineno });
-      } catch (_) {}
+      } catch (_) { }
     }, true);
     add(window, 'unhandledrejection', (e) => {
       try {
         this.log('error', 'unhandledrejection', { reason: (e && e.reason && (e.reason.message || e.reason)) || '' });
-      } catch (_) {}
+      } catch (_) { }
     }, true);
   }
 
@@ -159,7 +159,7 @@ class AuditLogger {
   _persistQueue() {
     try {
       localStorage.setItem('audit.queue', JSON.stringify(this.queue));
-    } catch (_) {}
+    } catch (_) { }
   }
 
   _restoreQueue() {
@@ -169,7 +169,7 @@ class AuditLogger {
         const arr = JSON.parse(raw);
         if (Array.isArray(arr)) this.queue = arr;
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   async _postBatch(entries) {
@@ -214,7 +214,7 @@ class AuditLogger {
   _sanitizeMeta(meta) {
     try {
       const plain = {};
-      const allow = ['params','success','error','url','tag','id','cls','name','role','text'];
+      const allow = ['params', 'success', 'error', 'url', 'tag', 'id', 'cls', 'name', 'role', 'text'];
       for (const k of allow) {
         if (meta && meta[k] !== undefined) {
           let v = meta[k];

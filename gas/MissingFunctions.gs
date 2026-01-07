@@ -8,14 +8,32 @@
 /**
  * システムロック状態を取得する
  */
+/**
+ * システムロック状態を取得する
+ */
 function getSystemLock() {
   try {
-    const props = PropertiesService.getScriptProperties();
-    const locked = props.getProperty('SYSTEM_LOCKED') === 'true';
-    const lockedAt = props.getProperty('SYSTEM_LOCKED_AT') || null;
+    // Supabaseから取得
+    // setting_key=eq.SYSTEM_LOCK
+    // settings: { setting_key, setting_value, updated_at }
+    const endpoint = 'settings?setting_key=eq.SYSTEM_LOCK&select=setting_value,updated_at';
+    const response = supabaseIntegration._request(endpoint);
+    
+    // データがない、またはエラーの場合はデフォルトロック解除
+    if (!response.success || !response.data || response.data.length === 0) {
+      return { success: true, locked: false, lockedAt: null };
+    }
+    
+    const record = response.data[0];
+    const locked = record.setting_value === 'true';
+    const lockedAt = locked ? record.updated_at : null;
+    
     return { success: true, locked, lockedAt };
+
   } catch (e) {
     Logger.log('getSystemLock Error: ' + e.message);
+    // 取得エラー時は安全のためロック状態とみなすか、あるいはエラーを返すか。
+    // クライアント側はエラー時ロック維持する挙動なのでエラーを返す。
     return { success: false, error: e.message };
   }
 }
@@ -63,14 +81,31 @@ function setSystemLock(shouldLock, password) {
       return { success: false, message: '認証に失敗しました' };
     }
 
-    if (shouldLock === true) {
-      props.setProperty('SYSTEM_LOCKED', 'true');
-      props.setProperty('SYSTEM_LOCKED_AT', new Date().toISOString());
+    // Upsert (Insert or Update)
+    // settings table UNIQUE(setting_key)
+    const payload = {
+      setting_key: 'SYSTEM_LOCK',
+      setting_value: shouldLock ? 'true' : 'false',
+      updated_at: new Date().toISOString()
+    };
+    
+    // on_conflict=setting_key
+    const endpoint = 'settings?on_conflict=setting_key';
+    const options = {
+      method: 'POST',
+      body: payload,
+      headers: { 'Prefer': 'resolution=merge-duplicates' }, // Upsert
+      useServiceRole: true // RLS might restrict write
+    };
+    
+    const response = supabaseIntegration._request(endpoint, options);
+
+    if (response.success) {
+        return { success: true, locked: shouldLock === true };
     } else {
-      props.setProperty('SYSTEM_LOCKED', 'false');
-      props.deleteProperty('SYSTEM_LOCKED_AT');
+        throw new Error(response.error || 'Supabase update failed');
     }
-    return { success: true, locked: shouldLock === true };
+
   } catch (e) {
     Logger.log('setSystemLock Error: ' + e.message);
     return { success: false, error: e.message };
@@ -1116,8 +1151,92 @@ function getAllTimeslotsForGroup(group) {
     
     return Array.from(uniqueMap.values());
     
+    
   } catch (e) {
     Logger.log('getAllTimeslotsForGroup Error: ' + e.message);
     return [];
+  }
+}
+
+// ===============================================================
+// === メンテナンスモード (Scheduled Maintenance) ===
+// ===============================================================
+
+/**
+ * メンテナンススケジュールを取得する
+ */
+function getMaintenanceSchedule() {
+  try {
+    const endpoint = 'settings?key=eq.MAINTENANCE_SCHEDULE&select=value,updated_at';
+    const response = supabaseIntegration._request(endpoint);
+    
+    if (!response.success || !response.data || response.data.length === 0) {
+      // Default: disabled
+      return { success: true, enabled: false, start: null, end: null };
+    }
+    
+    const record = response.data[0];
+    let schedule = { enabled: false, start: null, end: null };
+    
+    try {
+        if (record.value) {
+            schedule = JSON.parse(record.value);
+        }
+    } catch (e) {
+        console.warn('Failed to parse maintenance schedule:', e);
+    }
+    
+    return { success: true, ...schedule };
+
+  } catch (e) {
+    Logger.log('getMaintenanceSchedule Error: ' + e.message);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * メンテナンススケジュールを設定する
+ */
+function setMaintenanceSchedule(enabled, start, end, password) {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const superAdminPassword = props.getProperty('SUPERADMIN_PASSWORD');
+    
+    // Validate password (requires Super Admin)
+    if (!superAdminPassword || password !== superAdminPassword) {
+      return { success: false, message: '認証に失敗しました' };
+    }
+
+    const payloadVal = JSON.stringify({
+        enabled: enabled === true || enabled === 'true',
+        start: start || null,
+        end: (end && end !== 'null') ? end : null
+    });
+
+    const payload = {
+      key: 'MAINTENANCE_SCHEDULE',
+      value: payloadVal,
+      updated_at: new Date().toISOString()
+    };
+    
+    const endpoint = 'settings?on_conflict=key';
+    const options = {
+      method: 'POST',
+      body: payload,
+      headers: { 'Prefer': 'resolution=merge-duplicates' },
+      useServiceRole: true
+    };
+    
+    const response = supabaseIntegration._request(endpoint, options);
+
+    if (response.success) {
+        return { success: true };
+    } else {
+        throw new Error(response.error || 'Supabase update failed');
+    }
+
+  } catch (e) {
+    Logger.log('setMaintenanceSchedule Error: ' + e.message);
+    return { success: false, error: e.message };
   }
 }
