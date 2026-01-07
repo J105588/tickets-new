@@ -1,17 +1,12 @@
 /**
  * maintenance-check.js
- * 
- * すべての公開ページで読み込まれ、メンテナンス（計画停止）状態をチェックします。
+ * * すべての公開ページで読み込まれ、メンテナンス（計画停止）状態をチェックします。
  * GAS API (getMaintenanceSchedule) または Supabase (settings table) を参照します。
- * 
- * 動作:
+ * * 動作:
  * 1. ページ読み込み時にメンテナンス状態を確認
  * 2. 期間内の場合、画面全体をロックするオーバーレイを表示
  * 3. 終了予定時刻を表示
  */
-
-// maintenance-check.js
-// すべての公開ページで読み込まれ、メンテナンス（計画停止）状態をチェックします。
 
 (async function () {
     // 管理画面では常に実行しない
@@ -135,15 +130,17 @@
         const overlay = document.createElement('div');
         overlay.id = 'maintenance-overlay';
 
-        // Premium Solid Design
+        // Updated Premium Visuals
         overlay.style.cssText = `
             position: fixed; inset: 0; width: 100vw; height: 100vh;
-            background: #f8f9fa; 
+            background-color: #f3f4f6;
+            background-image: radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%), 
+                              radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.15) 0px, transparent 50%);
             z-index: 2147483647;
             display: flex; align-items: center; justify-content: center;
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            color: #333;
-            animation: fadeIn 0.3s ease-out;
+            color: #1f2937;
+            animation: fadeIn 0.5s ease-out;
         `;
 
         let endTimeStr = '未定';
@@ -156,81 +153,97 @@
             }
         }
 
-        // Icon
-        const iconHtml = window.FontAwesome ? '<i class="fas fa-tools" style="font-size: 3rem; color: #6366f1;"></i>' :
-            `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>`;
+        const iconHtml = window.FontAwesome ? '<i class="fas fa-hammer" style="font-size: 2.5rem; color: #4f46e5;"></i>' :
+            `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>`;
 
         overlay.innerHTML = `
             <style>
                 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-                @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+                @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
                 .maint-card {
-                    background: white;
-                    padding: 40px;
-                    border-radius: 20px;
-                    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+                    background: rgba(255, 255, 255, 0.8);
+                    backdrop-filter: blur(20px);
+                    -webkit-backdrop-filter: blur(20px);
+                    padding: 48px 32px;
+                    border-radius: 24px;
+                    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
                     text-align: center;
-                    max-width: 480px;
+                    max-width: 440px;
                     width: 90%;
-                    border: 1px solid rgba(0,0,0,0.05);
+                    border: 1px solid rgba(255, 255, 255, 0.4);
                 }
-                .maint-icon-wrapper {
-                    width: 80px; height: 80px;
-                    background: #e0e7ff;
-                    border-radius: 50%;
+                .maint-icon-container {
+                    width: 96px; height: 96px;
+                    background: #ffffff;
+                    border-radius: 24px;
                     display: flex; align-items: center; justify-content: center;
-                    margin: 0 auto 24px;
-                    animation: pulse 2s infinite;
+                    margin: 0 auto 32px;
+                    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+                    animation: float 4s ease-in-out infinite;
                 }
                 .maint-title {
-                    font-size: 1.75rem; font-weight: 700; margin-bottom: 12px; color: #111827;
+                    font-size: 1.5rem; font-weight: 800; margin-bottom: 16px; color: #111827; letter-spacing: -0.025em;
                 }
                 .maint-desc {
-                    font-size: 1rem; color: #6b7280; line-height: 1.6; margin-bottom: 32px;
+                    font-size: 0.95rem; color: #4b5563; line-height: 1.6; margin-bottom: 32px;
                 }
-                .maint-time-box {
-                    background: #f3f4f6;
-                    padding: 16px;
-                    border-radius: 12px;
-                    display: inline-block;
-                    width: 100%;
+                .maint-status-badge {
+                    display: inline-flex; align-items: center; gap: 6px;
+                    background: #eef2ff; color: #4338ca;
+                    padding: 6px 14px; border-radius: 9999px;
+                    font-size: 0.75rem; font-weight: 700; margin-bottom: 20px;
+                    text-transform: uppercase; letter-spacing: 0.05em;
+                }
+                .maint-status-dot {
+                    width: 8px; height: 8px; background: #6366f1; border-radius: 50%;
+                    animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+                }
+                @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+                .maint-time-card {
+                    background: #ffffff;
+                    padding: 20px;
+                    border-radius: 16px;
+                    border: 1px solid #f3f4f6;
+                    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.02);
                 }
                 .maint-time-label {
-                    display: block; font-size: 0.85rem; font-weight: 600; color: #4b5563; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px;
+                    display: block; font-size: 0.75rem; font-weight: 600; color: #9ca3af; margin-bottom: 4px;
                 }
                 .maint-time-val {
-                    font-size: 1.25rem; font-weight: 700; color: #4338ca;
+                    font-size: 1.15rem; font-weight: 700; color: #111827;
                 }
                 .maint-btn {
-                    margin-top: 32px;
-                    background: white; border: 1px solid #d1d5db; color: #374151;
-                    padding: 10px 20px; border-radius: 8px; font-weight: 500;
+                    margin-top: 32px; width: 100%;
+                    background: #111827; color: white;
+                    padding: 14px 24px; border-radius: 12px; font-weight: 600;
                     cursor: pointer; transition: all 0.2s;
-                    display: inline-flex; align-items: center; gap: 8px;
+                    border: none; display: flex; align-items: center; justify-content: center; gap: 10px;
                 }
-                .maint-btn:hover { background: #f9fafb; border-color: #9ca3af; }
+                .maint-btn:hover { background: #1f2937; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+                .maint-btn:active { transform: translateY(0px); }
             </style>
 
             <div class="maint-card">
-                <div class="maint-icon-wrapper">
+                <div class="maint-status-badge">
+                    <span class="maint-status-dot"></span>
+                    Maintenance
+                </div>
+                <div class="maint-icon-container">
                     ${iconHtml}
                 </div>
-                <h1 class="maint-title">システムメンテナンス中</h1>
+                <h1 class="maint-title">ただいまメンテナンス中です</h1>
                 <p class="maint-desc">
-                    現在、サービス向上のためメンテナンスを実施しております。<br>
-                    ご不便をおかけしますが、終了までしばらくお待ちください。
+                    現在システムメンテナンスを行っております。</br>ご不便をおかけしますが、再開まで今しばらくお待ちください。
                 </p>
-                <div class="maint-time-box">
+                <div class="maint-time-card">
                     <span class="maint-time-label">終了予定時刻</span>
                     <span class="maint-time-val">${endTimeStr}</span>
                 </div>
                 
-                <div style="margin-top: 20px;">
-                    <button class="maint-btn" onclick="location.reload()">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                        再読み込み
-                    </button>
-                </div>
+                <button class="maint-btn" onclick="location.reload()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                    最新の状態を確認する
+                </button>
             </div>
         `;
 
