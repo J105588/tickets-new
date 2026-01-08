@@ -401,8 +401,13 @@ function drawSeatMap(seatMap) {
   const viewportWidth = window.innerWidth;
   const containerWidth = container.clientWidth;
 
+  // Optimize for Admin/Embed mode (smaller padding)
+  const isEmbed = urlParams.get('embed') === 'true' || urlParams.get('admin') === 'true';
+  const paddingRatio = isEmbed ? 0.1 : 0.4;
+  const minPadding = isEmbed ? 50 : 200;
+
   // 左側の余白：座席図の左端がスクロールバーの0位置に来るように調整
-  const leftPaddingWidth = Math.max(containerWidth * 0.4, 200); // コンテナ幅の40%または最小200px
+  const leftPaddingWidth = Math.max(containerWidth * paddingRatio, minPadding); // コンテナ幅の40%(Admin:10%)または最小200px(Admin:50px)
 
   // 右側の余白：左側と同じ幅にして中央配置を維持
   const rightPaddingWidth = leftPaddingWidth;

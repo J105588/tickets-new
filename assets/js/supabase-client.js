@@ -227,6 +227,32 @@ export function subscribeToReservationUpdates(bookingId, onUpdate) {
     return channel;
 }
 
+export function subscribeToBookingEvents(bookingId, onUpdate) {
+    const sb = getSupabase();
+    if (!sb) return null;
+
+    console.log(`Subscribing to SIGNAL updates for booking_id=${bookingId}`);
+
+    const channel = sb.channel(`signal-${bookingId}`)
+        .on(
+            'postgres_changes',
+            {
+                event: 'INSERT', // Signals are only INSERTs
+                schema: 'public',
+                table: 'booking_events',
+                filter: `booking_id=eq.${bookingId}`
+            },
+            (payload) => {
+                console.log('Realtime SIGNAL received:', payload);
+                // payload.new contains { status: 'checked_in', ... }
+                if (onUpdate) onUpdate(payload.new);
+            }
+        )
+        .subscribe();
+
+    return channel;
+}
+
 export async function checkInReservation(id, passcode) {
     const sb = getSupabase();
     if (!sb) return { success: false, error: 'System Error' };

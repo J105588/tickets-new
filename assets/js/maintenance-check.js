@@ -9,10 +9,19 @@
  */
 
 (async function () {
-    // 管理画面では常に実行しない
+    // 管理画面またはAdminモードパラメータがある場合は実行しない
     if (window.location.pathname.includes('admin.html') || window.location.pathname.includes('admin-login.html')) {
         return;
     }
+    // Check for admin/embed mode in URL to bypass maintenance (for iframes in admin dashboard)
+    // Security: Bypass solely based on authenticated session, not URL parameters.
+    // The previous URL check (admin=true) is removed to prevent unauthorized bypass.
+    // Also bypass if admin session exists in sessionStorage (same origin)
+    try {
+        if (sessionStorage.getItem('admin_session') || sessionStorage.getItem('superadmin_session')) {
+            return;
+        }
+    } catch (e) { }
 
     const BYPASS_SESSION_KEY = 'maintenance_bypass_active';
     let currentSchedule = null;

@@ -18,7 +18,7 @@ function backupDatabase() {
     
     // 1. データ取得 (Supabaseから全データを取得)
     // 依存関係の逆順（子から親）ではなく、バックアップは順不同でOK。リストア時に順序制御。
-    const tables = ['bookings', 'seats', 'performances', 'groups', 'event_dates', 'time_slots', 'settings'];
+    const tables = ['bookings', 'seats', 'performances', 'groups', 'event_dates', 'time_slots', 'settings', 'booking_events'];
     const backupData = {};
     
     tables.forEach(table => {
@@ -233,7 +233,7 @@ function restoreDatabase(backupSpreadsheetId, restoreKey) {
     
     // 依存関係順序 (削除はこの逆、挿入はこの順序)
     // 親から順に挿入する
-    const insertOrder = ['groups', 'event_dates', 'time_slots', 'performances', 'bookings', 'seats', 'settings'];
+    const insertOrder = ['groups', 'event_dates', 'time_slots', 'performances', 'bookings', 'booking_events', 'seats', 'settings'];
     const deleteOrder = [...insertOrder].reverse();
     
     // 1. 全データ削除 (Truncate)

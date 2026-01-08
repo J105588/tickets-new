@@ -4,7 +4,7 @@
  */
 
 import { apiUrlManager } from './config.js';
-import { subscribeToSeatUpdates, subscribeToReservationUpdates, getBookingForScan, toDisplaySeatId } from './supabase-client.js';
+import { subscribeToSeatUpdates, subscribeToBookingEvents, getBookingForScan, toDisplaySeatId } from './supabase-client.js';
 
 
 function initReservationStatus() {
@@ -143,16 +143,16 @@ function showDetails(data) {
             }
         });
 
-        subscribeToReservationUpdates(data.id, (newBooking) => {
-            console.log('Booking update:', newBooking);
-            if (newBooking.status === 'checked_in') {
+        subscribeToBookingEvents(data.id, (eventPayload) => {
+            console.log('Signal received:', eventPayload);
+            if (eventPayload.status === 'checked_in') {
                 updateUIAsCheckedIn();
-            } else if (newBooking.status === 'cancelled') {
+            } else if (eventPayload.status === 'cancelled') {
                 updateUIAsCancelled();
             }
         });
 
-        // POLLING FALLBACK: Check every 3 seconds "pseudo-instantly"
+        // POLLING FALLBACK: Check every 10 seconds
         // This ensures updates even if WebSocket drops or is blocked
         const pollingInterval = setInterval(async () => {
             // Stop polling if already checked in (UI updated)
@@ -166,7 +166,7 @@ function showDetails(data) {
                 updateUIAsCheckedIn();
                 clearInterval(pollingInterval);
             }
-        }, 3000);
+        }, 10000);
     }
 
     // Initial check

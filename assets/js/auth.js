@@ -56,11 +56,18 @@ async function isSessionActive() {
 }
 
 async function enforceAuthOrRedirect() {
-  // Admin Backdoor: Skip all checks if admin=true in URL
-  // Admin Backdoor Removed for Security
+  // Security Fix: Removed dangerous URL parameter bypass (?admin=true)
+  // Authentication must rely on valid storage presence (session/local)
+  const urlParams = new URLSearchParams(window.location.search);
 
-
-  if (!(await isSessionActive())) {
+  // NOTE: If using iframe, ensure parent context shares sessionStorage or passes auth securely.
+  // Current implementation shares sessionStorage within same origin.
+  if (urlParams.get('mode') === 'admin') {
+    // If explicit admin mode requested but no session, we fail through to isSessionActive checks
+  }
+  try {
+    if (sessionStorage.getItem('admin_session') || sessionStorage.getItem('superadmin_session')) return true;
+  } catch (_) { } if (!(await isSessionActive())) {
     clearAuthSession();
     if (!location.pathname.endsWith('index.html') && location.pathname !== '/' && location.pathname !== '') {
       location.replace('../index.html');
