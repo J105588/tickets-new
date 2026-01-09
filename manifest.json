@@ -1,8 +1,8 @@
 {
   "name": "市川学園座席管理システム",
-  "short_name": "國枝座席管理",
-  "description": "國枝ホール向けの座席予約・チェックイン・当日券発行システム",
-  "version": "32.0.0",
+  "short_name": "NAZUNAP",
+  "description": "國枝ホール向けの座席管理システム",
+  "version": "32.0.4",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#ffffff",

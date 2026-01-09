@@ -427,12 +427,12 @@ function generateAdminInviteToken(validMinutes = 30) {
  * @return {boolean}
  */
 function validateAdminToken(token) {
-  if (!token) return false;
+  if (!token) return { success: false, error: 'Token missing' };
   
   try {
     const decoded = Utilities.newBlob(Utilities.base64DecodeWebSafe(token)).getDataAsString();
     const parts = decoded.split('_');
-    if (parts.length !== 2) return false;
+    if (parts.length !== 2) return { success: false, error: 'Invalid token format' };
     
     const expiryStr = parts[0];
     const signatureHex = parts[1];
@@ -441,19 +441,19 @@ function validateAdminToken(token) {
     const expectedSig = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, expiryStr + ADMIN_TOKEN_SECRET);
     const expectedHex = expectedSig.map(b => ('0' + (b & 0xFF).toString(16)).slice(-2)).join('');
     
-    if (signatureHex !== expectedHex) return false; // Tampered
+    if (signatureHex !== expectedHex) return { success: false, error: 'Invalid signature' }; // Tampered
     
     // 2. Check Expiry
     const expiry = parseInt(expiryStr);
     const now = new Date().getTime();
     
-    if (now > expiry) return false; // Expired
+    if (now > expiry) return { success: false, error: 'Token expired', expiry: expiry, now: now }; // Expired
     
-    return true;
+    return { success: true };
     
   } catch (e) {
     console.warn('Token validation error', e);
-    return false;
+    return { success: false, error: 'Validation exception: ' + e.message };
   }
 }
 

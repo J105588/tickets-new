@@ -74,6 +74,9 @@ function doPost(e) {
         case 'admin_generate_invite_token':
           response = adminGenerateInviteToken(params.minutes);
           break;
+        case 'validate_invite_token':
+          response = validateAdminToken(params.token);
+          break;
         default:
           throw new Error("不明なアクション: " + action);
       }
@@ -380,6 +383,10 @@ function doGet(e) {
              response = generateAdminInviteToken(mins);
              break;
 
+          case 'validate_invite_token':
+             response = validateAdminToken(e.parameter.token);
+             break;
+
           case 'admin_deadline_settings':
              var op = e.parameter.op; // 'get' or 'save'
              if (op === 'save') {
@@ -426,9 +433,9 @@ function doGet(e) {
       if (!funcName) {
         // デフォルトステータス
         response = {
-          status: 'OK',
-          app: 'Ticket Reserve System',
-          version: '3.1',
+          status: 'active',
+          app: 'NAZUNAP',
+          version: '32.0.4',
           mode: 'Supabase'
         };
       } else {
@@ -502,12 +509,7 @@ function doGet(e) {
   } else {
     // CORS Header
     return ContentService.createTextOutput(outputStr)
-      .setMimeType(ContentService.MimeType.JSON)
-      .setHeaders({
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type",
-        "Access-Control-Allow-Methods": "POST, GET, OPTIONS"
-      });
+      .setMimeType(ContentService.MimeType.JSON);
   }
 }
 

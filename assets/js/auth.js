@@ -98,7 +98,7 @@ function mountLoginUI() {
   wrapper.style.cssText = 'position:fixed;inset:0;background:#fff;display:flex;align-items:center;justify-content:center;z-index:20000;';
   wrapper.innerHTML = `
     <div style="background:#fff;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.25);max-width:360px;width:92%;padding:24px 20px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;">
-      <div style="font-size:18px;font-weight:600;margin-bottom:14px;text-align:center;">市川学園座席管理システムへ ようこそ</div>
+      <div style="font-size:18px;font-weight:600;margin-bottom:14px;text-align:center;">NAZUNAP へようこそ</div>
       <div style="display:flex;flex-direction:column;gap:10px;">
         <label style="font-size:13px;color:#555;">ユーザーID</label>
         <input id="auth-user-id" type="text" autocomplete="username" inputmode="text" style="padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none;" />
@@ -263,19 +263,32 @@ async function showOpeningCeremony() {
       ].join(';') + ';';
 
       const title = document.createElement('div');
-      title.textContent = '市川学園座席管理システム';
+      title.textContent = 'NAZUNAP';
       title.style.cssText = [
-        'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif',
-        'letter-spacing:0.35em',
-        'text-indent:0.35em',
-        'font-weight:600',
-        'font-size:clamp(14px, 1.8vw, 18px)',
+        'font-family:"Noe Display", "Playfair Display", "Times New Roman", serif',
+        'letter-spacing:0.05em',
+        'font-weight:700',
+        'font-size:clamp(28px, 5vw, 48px)', // サイズを縮小
         'opacity:0',
-        'color:#333'
+        'color:#111',
+        'text-shadow: 0 4px 20px rgba(0,0,0,0.08)',
+        'margin-bottom:4px' // サブタイトルとの間隔
+      ].join(';') + ';';
+
+      const subtitle = document.createElement('div');
+      subtitle.textContent = '市川学園座席管理システム';
+      subtitle.style.cssText = [
+        'font-family:"YuMincho", "Hiragino Mincho ProN", "Yu Mincho", "MS PMincho", serif',
+        'letter-spacing:0.4em',
+        'font-size:clamp(11px, 1.4vw, 14px)',
+        'opacity:0',
+        'color:#666',
+        'transform:translateY(10px)'
       ].join(';') + ';';
 
       wrapper.appendChild(crest);
       wrapper.appendChild(title);
+      wrapper.appendChild(subtitle);
       overlay.appendChild(wrapper);
       document.body.appendChild(overlay);
 
@@ -292,6 +305,7 @@ async function showOpeningCeremony() {
         crest.style.opacity = '1';
         crest.style.transform = 'none';
         title.style.opacity = '1';
+        subtitle.style.opacity = '1';
         setTimeout(finish, 600);
       };
 
@@ -318,28 +332,36 @@ async function showOpeningCeremony() {
         return;
       }
 
-      // まず画面を即時覆う（モーダルを隠す）
+      // まず画面を即時覆う
       overlay.style.opacity = '1';
       overlay.style.pointerEvents = 'auto';
 
-      // 少し遅延してからコンテンツのみゆっくりフェードイン
+      // 順次フェードイン
       setTimeout(() => {
         requestAnimationFrame(() => {
-          // 紋章のゆっくりフェードイン
+          // 1. 紋章
           crest.style.transition = 'transform 1200ms cubic-bezier(0.22, 1, 0.36, 1), opacity 1200ms ease';
           crest.style.opacity = '1';
           crest.style.transform = 'scale(1) translateY(0)';
 
-          // タイトルの遅延淡入
+          // 2. メインタイトル (NAZUNAP)
           setTimeout(() => {
-            title.style.transition = 'opacity 900ms ease';
+            title.style.transition = 'opacity 1000ms ease, transform 1000ms cubic-bezier(0.22, 1, 0.36, 1)';
             title.style.opacity = '1';
-          }, 350);
+            title.style.transform = 'translateY(0)';
+          }, 300);
 
-          // 合計約3.5秒後にフェードアウト
-          setTimeout(finish, 3500);
+          // 3. サブタイトル (システム名)
+          setTimeout(() => {
+            subtitle.style.transition = 'opacity 800ms ease, transform 800ms ease';
+            subtitle.style.opacity = '1';
+            subtitle.style.transform = 'translateY(0)';
+          }, 600);
+
+          // フェードアウト
+          setTimeout(finish, 3800);
         });
-      }, 350); // リロード完了後、少し間を空ける
+      }, 350);
     } catch (_) {
       resolve();
     }

@@ -4,7 +4,11 @@
  */
 
 import { apiUrlManager } from './config.js';
-import { fetchMasterDataFromSupabase, fetchPerformancesFromSupabase, fetchSeatsFromSupabase, getServerTime, subscribeToDeadline, toDisplaySeatId } from './supabase-client.js';
+import { fetchMasterDataFromSupabase, fetchPerformancesFromSupabase, fetchSeatsFromSupabase, getServerTime, subscribeToDeadline, toDisplaySeatId, adminDeadlineSettings, validateInviteToken } from './supabase-client.js';
+
+// ... (existing code)
+
+
 
 // 状態管理
 const state = {
@@ -16,7 +20,8 @@ const state = {
     token: new URLSearchParams(window.location.search).get('token'),
     serverOffset: 0,
     globalDeadline: null,
-    isExpired: false
+    isExpired: false,
+    tokenIsValid: null // null:checking/none, true:valid, false:invalid
 };
 
 // DOM Elements
@@ -42,12 +47,23 @@ const navigation = {
 // 初期化
 document.addEventListener('DOMContentLoaded', async () => {
     await initTimeSync(); // Sync first
+    if (state.token) {
+        await verifyToken();
+    }
     await initializeMasterData();
     populateFormDropdowns();
     initStep1();
     initStep2();
     startDeadlineMonitoring(); // Start loop
 });
+
+async function verifyToken() {
+    const res = await validateInviteToken(state.token);
+    state.tokenIsValid = res.success;
+    if (!res.success) {
+        console.warn('Invite token invalid/expired', res);
+    }
+}
 
 async function initTimeSync() {
     const serverNow = await getServerTime(); // Fetch RPC
@@ -76,6 +92,7 @@ function startDeadlineMonitoring() {
 
 function checkDeadlineStatus() {
     if (!state.globalDeadline) {
+        handleActive(); // Ensure form is visible if deadline is cleared
         updateDeadlineUI(false);
         return;
     }
@@ -119,7 +136,7 @@ function checkDeadlineStatus() {
 }
 
 function handleExpiration(deadlineText = '') {
-    if (state.token) {
+    if (state.token && state.tokenIsValid === true) {
         // Token valid -> Warn but allow
         const dInfo = document.getElementById('deadline-info');
         if (dInfo) {
@@ -131,18 +148,27 @@ function handleExpiration(deadlineText = '') {
         }
         // Show form if hidden
         document.querySelector('.progress-bar').style.display = 'flex';
-        if (document.getElementById('step-1').style.display === 'none') {
-            // If we were on step 1, show it. If user is deeper, don't reset.
-            // Simplest: just ensure container is visible. 
-            // But wait, step-1 might not be active step.
-            // Just unhide the progress bar and let current step show.
+        // Ensure steps are visible if hidden
+        // Simple unhide of current step container is needed if blocked previously
+        if (document.querySelector('.step-content.active').style.display === 'none') {
+            document.querySelector('.step-content.active').style.display = 'block';
         }
     } else {
         // Block
         document.querySelector('.progress-bar').style.display = 'none';
         document.querySelector('.step-content.active').style.display = 'none'; // Hide current step
-        document.getElementById('reservation-closed-message').style.display = 'block';
+        const msgContainer = document.getElementById('reservation-closed-message');
+        msgContainer.style.display = 'block';
         document.getElementById('deadline-info').style.display = 'none'; // Hide info in favor of big error
+
+        // Update message if token was invalid
+        const msgHeader = msgContainer.querySelector('h2');
+        if (state.token && state.tokenIsValid === false) {
+            msgHeader.innerHTML = '<i class="fas fa-times-circle"></i> 招待リンクの有効期限が切れています';
+        } else {
+            // Reset to default just in case
+            msgHeader.innerHTML = '<i class="fas fa-clock"></i> 予約受付は終了しました';
+        }
     }
 }
 
@@ -180,8 +206,15 @@ async function initializeMasterData() {
         masterGroups = result.data.groups;
         masterDates = result.data.dates || [];
 
-        // Initial Deadline Set (Monitoring loop handles logic)
-        state.globalDeadline = result.data.global_deadline;
+        // Fetch fresh deadline (bypass cache)
+        const deadlineRes = await adminDeadlineSettings('get');
+        if (deadlineRes.success) {
+            state.globalDeadline = deadlineRes.deadline;
+        } else {
+            // Fallback to cached if fresh fetch fails
+            state.globalDeadline = result.data.global_deadline;
+        }
+
         checkDeadlineStatus(); // Force check after load
 
         populateGroupSelect();

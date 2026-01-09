@@ -409,7 +409,9 @@ class GasAPI {
       // Even if useSupabase is true, for THIS specific administrative action, we fallback to GAS.
     }
     // Call GAS Action
-    return await this._callAction('admin_deadline_settings', { op: 'save', value: value });
+    const op = (value === 'get') ? 'get' : 'save';
+    const val = (value === 'get') ? null : value;
+    return await this._callAction('admin_deadline_settings', { op: op, value: val });
   }
 
   static _reportError(errorMessage) {

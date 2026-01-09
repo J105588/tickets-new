@@ -1022,7 +1022,7 @@ window.copyInviteLink = function () {
 // --- Global Deadline ---
 window.loadDeadlineSettings = async function () {
     try {
-        const res = await adminDeadlineSettings('get');
+        const res = await GasAPI.adminDeadlineSettings('get');
         if (res.success && res.deadline) {
             // datetime-local expects YYYY-MM-DDTHH:mm
             // Supabase/GAS might return ISO string (UTC) or ISO-like string.

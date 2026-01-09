@@ -572,6 +572,14 @@ export async function adminGenerateInviteToken(minutes = 30) {
     });
 }
 
+export async function validateInviteToken(token) {
+    if (!token) return { success: false, error: 'Token missing' };
+    return await jsonpRequest(GAS_API_URLS[0], {
+        action: 'validate_invite_token',
+        token: token
+    });
+}
+
 // Unified Admin/Client Settings Access (Direct DB)
 export async function adminDeadlineSettings(op, value = null) {
     const sb = getSupabase();
