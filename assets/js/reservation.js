@@ -150,9 +150,9 @@ function handleExpiration(deadlineText = '') {
         document.querySelector('.progress-bar').style.display = 'flex';
         // Ensure steps are visible if hidden
         // Simple unhide of current step container is needed if blocked previously
-        if (document.querySelector('.step-content.active').style.display === 'none') {
-            document.querySelector('.step-content.active').style.display = 'block';
-        }
+        // NOTE: removed style.display override to prevent breaking CSS transitions
+        const activeContent = document.querySelector('.step-content.active');
+        if (activeContent) activeContent.style.display = '';
     } else {
         // Block
         document.querySelector('.progress-bar').style.display = 'none';
@@ -176,7 +176,9 @@ function handleActive() {
     // Re-open if extended
     document.getElementById('reservation-closed-message').style.display = 'none';
     document.querySelector('.progress-bar').style.display = 'flex';
-    document.querySelector('.step-content.active').style.display = 'block';
+    // Remove the inline style so the CSS .active class can properly rule
+    const activeContent = document.querySelector('.step-content.active');
+    if (activeContent) activeContent.style.display = '';
     updateDeadlineUI(true);
 }
 
@@ -698,6 +700,21 @@ function createSeatElement(seat) {
     seatEl.dataset.id = seat.seat_id;
     seatEl.innerText = toDisplaySeatId(seat.seat_id); // UI Translation
 
+    // S14〜S25を視覚的に隠す（存在はするが、見えず押せない）
+    const sMatch = seat.seat_id.match(/^S(\d+)$/);
+    if (sMatch) {
+        const seatNum = parseInt(sMatch[1], 10);
+        if (seatNum >= 14 && seatNum <= 25) {
+            seatEl.style.opacity = '0';
+            seatEl.style.pointerEvents = 'none';
+            seatEl.style.cursor = 'default';
+            seatEl.style.backgroundColor = 'transparent';
+            seatEl.style.boxShadow = 'none';
+            seatEl.style.border = 'none';
+            seatEl.innerText = ''; // 文字も消す
+        }
+    }
+
     // スタイルはCSSクラスで制御
     seatEl.addEventListener('click', () => handleSeatClick(seat));
 
@@ -878,7 +895,10 @@ function fetchJsonp(url, params, callback) {
 // ==========================================
 function showStep(stepNum) {
     // コンテンツ切り替え
-    Object.values(pages).forEach(el => el.classList.remove('active'));
+    Object.values(pages).forEach(el => {
+        el.classList.remove('active');
+        el.style.display = ''; // インラインスタイルをリセット
+    });
     pages[stepNum].classList.add('active');
 
     // プログレスバー更新

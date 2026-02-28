@@ -218,12 +218,17 @@ BEGIN
     INSERT INTO seats (performance_id, seat_id, row_letter, seat_number, status)
     VALUES (p_performance_id, 'F' || seat_num, 'F', seat_num, 'available');
   END LOOP;
-  -- G-S列: 各38席
-  FOR row_letter IN   SELECT unnest(ARRAY['G','H','I','J','K','L','M','N','O','P','Q','R','S']) LOOP
+  -- G-R列: 各38席
+  FOR row_letter IN   SELECT unnest(ARRAY['G','H','I','J','K','L','M','N','O','P','Q','R']) LOOP
       FOR seat_num IN 1..38 LOOP
         INSERT INTO seats (performance_id, seat_id, row_letter, seat_number, status)
         VALUES (p_performance_id, row_letter || seat_num, row_letter, seat_num, 'available');
       END LOOP;
+  END LOOP;
+  -- S列: 38席
+  FOR seat_num IN 1..38 LOOP
+    INSERT INTO seats (performance_id, seat_id, row_letter, seat_number, status)
+    VALUES (p_performance_id, 'S' || seat_num, 'S', seat_num, 'available');
   END LOOP;
 END;
 $$ LANGUAGE plpgsql;
@@ -394,11 +399,11 @@ AS $$
 BEGIN
   UPDATE bookings
   SET name = p_name,
-  email = p_email,
-  grade_class = p_grade_class,
-  club_affiliation = p_club_affiliation,
-  notes = p_notes,
-  status = COALESCE(p_status, status)
+      email = p_email,
+      grade_class = p_grade_class,
+      club_affiliation = p_club_affiliation,
+      notes = p_notes,
+      status = COALESCE(p_status, status)
   WHERE id = p_id;
 
   IF NOT FOUND THEN

@@ -5,7 +5,7 @@
 const SEAT_CONFIG = {
   // 総座席数
   totalSeats: 692,
-  
+
   // 列ごとの座席数設定
   rows: {
     'A': { start: 6, end: 33, count: 28 },    // A列: 6-33番（28席）
@@ -28,7 +28,7 @@ const SEAT_CONFIG = {
     'R': { start: 1, end: 38, count: 38 },    // R列: 1-38番（38席）
     'S': { start: 1, end: 38, count: 38 }     // S列: 1-38番（38席）
   },
-  
+
   // 通路位置
   aisles: [
     { row: 'C', seat: 13 },  // C列13番と14番の間
@@ -36,7 +36,7 @@ const SEAT_CONFIG = {
     { row: 'C', seat: 25 },  // C列25番と26番の間
     { row: 'C', seat: 26 }
   ],
-  
+
   // 座席状態の定義
   seatStatus: {
     AVAILABLE: 'available',      // 予約可能
@@ -45,7 +45,7 @@ const SEAT_CONFIG = {
     WALKIN: 'walkin',           // 当日券
     BLOCKED: 'blocked'          // 使用不可
   },
-  
+
   // 座席状態の色設定
   seatColors: {
     available: '#28a745',    // 緑: 予約可能
@@ -64,7 +64,7 @@ function generateSeatId(row, seatNumber) {
 // 全座席リスト生成関数
 function generateAllSeats() {
   const seats = [];
-  
+
   Object.keys(SEAT_CONFIG.rows).forEach(row => {
     const config = SEAT_CONFIG.rows[row];
     for (let seatNum = config.start; seatNum <= config.end; seatNum++) {
@@ -76,53 +76,53 @@ function generateAllSeats() {
       });
     }
   });
-  
+
   return seats;
 }
 
 // 座席配置の検証関数
 function validateSeatConfig() {
   let totalCount = 0;
-  
+
   Object.keys(SEAT_CONFIG.rows).forEach(row => {
     const config = SEAT_CONFIG.rows[row];
     const actualCount = config.end - config.start + 1;
-    
+
     if (actualCount !== config.count) {
       console.error(`座席数不一致: ${row}列 - 設定: ${config.count}, 実際: ${actualCount}`);
       return false;
     }
-    
+
     totalCount += config.count;
   });
-  
+
   if (totalCount !== SEAT_CONFIG.totalSeats) {
     console.error(`総座席数不一致: 設定: ${SEAT_CONFIG.totalSeats}, 実際: ${totalCount}`);
     return false;
   }
-  
+
   console.log(`座席設定検証完了: ${totalCount}席`);
   return true;
 }
 
-// 座席の可視性チェック（通路の考慮）
+// 座席の可視性チェック（通路の考慮など）
 function isSeatVisible(row, seatNumber) {
   // 通路位置のチェック
   const aislePositions = SEAT_CONFIG.aisles.filter(aisle => aisle.row === row);
-  
+
   for (const aisle of aislePositions) {
     if (seatNumber === aisle.seat || seatNumber === aisle.seat + 1) {
       return false; // 通路位置は非表示
     }
   }
-  
+
   return true;
 }
 
 // 座席の表示用スタイル生成
 function generateSeatStyle(seat) {
   const color = SEAT_CONFIG.seatColors[seat.status] || SEAT_CONFIG.seatColors.available;
-  
+
   return {
     backgroundColor: color,
     color: '#ffffff',
@@ -143,19 +143,19 @@ function generateSeatStyle(seat) {
 // 座席マップ生成関数
 function generateSeatMap(seats) {
   const seatMap = {};
-  
+
   seats.forEach(seat => {
     if (!seatMap[seat.row]) {
       seatMap[seat.row] = [];
     }
     seatMap[seat.row].push(seat);
   });
-  
+
   // 各列を座席番号順にソート
   Object.keys(seatMap).forEach(row => {
     seatMap[row].sort((a, b) => a.seatNumber - b.seatNumber);
   });
-  
+
   return seatMap;
 }
 
@@ -169,7 +169,7 @@ function generateSeatStatistics(seats) {
     walkin: 0,
     blocked: 0
   };
-  
+
   seats.forEach(seat => {
     switch (seat.status) {
       case SEAT_CONFIG.seatStatus.AVAILABLE:
@@ -189,7 +189,7 @@ function generateSeatStatistics(seats) {
         break;
     }
   });
-  
+
   return stats;
 }
 
@@ -212,12 +212,12 @@ function updateSeatStatus(seats, seatId, newStatus, additionalData = {}) {
 // 座席一括更新関数
 function updateMultipleSeats(seats, updates) {
   const results = [];
-  
+
   updates.forEach(update => {
     const result = updateSeatStatus(seats, update.seatId, update.status, update.data);
     results.push({ seatId: update.seatId, success: !!result, seat: result });
   });
-  
+
   return results;
 }
 
@@ -234,7 +234,7 @@ function filterSeatsByStatuses(seats, statuses) {
 // 座席検索関数（部分一致）
 function searchSeats(seats, query) {
   const lowerQuery = query.toLowerCase();
-  return seats.filter(seat => 
+  return seats.filter(seat =>
     seat.id.toLowerCase().includes(lowerQuery) ||
     seat.row.toLowerCase().includes(lowerQuery) ||
     seat.seatNumber.toString().includes(query)
@@ -300,7 +300,7 @@ if (typeof window !== 'undefined') {
     sortSeats,
     exportSeats
   };
-  
+
   // 設定の検証
   validateSeatConfig();
 }

@@ -1076,6 +1076,22 @@ function createSeatElement(seatData) {
     }
   }
 
+  // S14〜S25を視覚的に隠す（存在はするが、見えず押せない）
+  const sMatch = seatData.id.match(/^S(\d+)$/);
+  if (sMatch) {
+    const seatNum = parseInt(sMatch[1], 10);
+    if (seatNum >= 14 && seatNum <= 25) {
+      // visibility:hidden では周囲のレイアウトが崩れる報告があったため、opacity: 0に変更
+      seat.style.opacity = '0';
+      seat.style.pointerEvents = 'none';
+      seat.style.cursor = 'default';
+      seat.style.backgroundColor = 'transparent';
+      seat.style.boxShadow = 'none';
+      // 余分にクリック反応などが飛ばないためのお守り
+      seat.dataset.status = 'blocked';
+    }
+  }
+
   // fuck 山田一
   // 座席IDを表示
   const seatIdEl = document.createElement('div');
