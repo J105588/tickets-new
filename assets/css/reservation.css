@@ -49,6 +49,12 @@ body {
     font-family: 'Inter', 'Noto Sans JP', sans-serif;
     color: var(--text-main);
     background-color: #000;
+    /* Static fallback to ensure iOS loads the image immediately before JS */
+    background-image: url('https://www.ichigaku.ac.jp/wp-content/uploads/2021/09/01-scaled.jpg');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
     padding: 20px;
     line-height: 1.6;
     position: relative;
@@ -84,7 +90,7 @@ body {
 /* 6 Images x 8s each = 48s total duration */
 .bg-slideshow span:nth-child(1) {
     background-image: url('https://www.ichigaku.ac.jp/wp-content/uploads/2021/09/01-scaled.jpg');
-    animation-delay: 0s;
+    animation: imageAnimationFirst 48s linear infinite 0s;
 }
 
 .bg-slideshow span:nth-child(2) {
@@ -119,24 +125,53 @@ body {
         animation-timing-function: ease-in;
     }
 
-    8% {
+    4% {
         opacity: 1;
-        transform: scale(1.02);
+        transform: scale(1.04);
         animation-timing-function: ease-out;
     }
 
-    17% {
+    16% {
         opacity: 1;
         transform: scale(1.01);
     }
 
-    25% {
+    20% {
         opacity: 0;
-        transform: scale(1);
+        transform: scale(1.00);
     }
 
     100% {
         opacity: 0;
+    }
+}
+
+@keyframes imageAnimationFirst {
+    0% {
+        opacity: 1;
+        transform: scale(1.04);
+    }
+
+    16% {
+        opacity: 1;
+        transform: scale(1.01);
+    }
+
+    20% {
+        opacity: 0;
+        transform: scale(1.00);
+    }
+
+    96% {
+        opacity: 0;
+        transform: scale(1.05);
+        animation-timing-function: ease-in;
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1.04);
+        animation-timing-function: ease-out;
     }
 }
 
