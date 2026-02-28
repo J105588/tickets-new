@@ -118,6 +118,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             showLoginOverlay();
         } else {
             updateActivityAndInit();
+
+            // Inactivity Watcher Loop
+            setInterval(() => {
+                const last = parseInt(sessionStorage.getItem('admin_last_active') || '0', 10);
+                if (last && (new Date().getTime() - last) > SESSION_TIMEOUT_MS) {
+                    alert('一定時間操作がなかったため、自動的にログアウトしました。');
+                    sessionStorage.removeItem('admin_session');
+                    sessionStorage.removeItem('admin_verified_at');
+                    sessionStorage.removeItem('admin_last_active');
+                    showLoginOverlay();
+                }
+            }, 60 * 1000); // Check every minute
         }
     }
 

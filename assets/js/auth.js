@@ -79,15 +79,56 @@ async function enforceAuthOrRedirect() {
 }
 
 function startInactivityWatcher() {
-  const reset = () => recordActivity();
+  const reset = () => {
+    recordActivity();
+    try {
+      if (sessionStorage.getItem('admin_session') || sessionStorage.getItem('superadmin_session')) {
+        sessionStorage.setItem('admin_last_active', String(Date.now()));
+      }
+    } catch (_) { }
+  };
   ['click', 'keydown', 'scroll', 'mousemove', 'touchstart', 'visibilitychange'].forEach(evt => {
     try { window.addEventListener(evt, reset, { passive: true }); } catch (_) { }
   });
   setInterval(async () => {
+    // Standard User Auth Check
     if (!(await isSessionActive())) {
-      clearAuthSession();
-      location.replace('../index.html');
+      let isOnlyAdmin = false;
+      try {
+        isOnlyAdmin = !!(sessionStorage.getItem('admin_session') || sessionStorage.getItem('superadmin_session'));
+      } catch (_) { }
+
+      if (!isOnlyAdmin) {
+        clearAuthSession();
+        location.replace('../index.html');
+        return;
+      }
     }
+
+    // Admin Auth Check
+    try {
+      const hasAdmin = sessionStorage.getItem('admin_session') || sessionStorage.getItem('superadmin_session');
+      if (hasAdmin) {
+        const lastAdminActive = parseInt(sessionStorage.getItem('admin_last_active') || '0', 10);
+        if (lastAdminActive && (Date.now() - lastAdminActive) > AUTH_TIMEOUT_MS) {
+          alert('一定時間操作がなかったため、自動的にログアウトしました。');
+          sessionStorage.removeItem('admin_session');
+          sessionStorage.removeItem('superadmin_session');
+          sessionStorage.removeItem('admin_verified_at');
+          sessionStorage.removeItem('admin_last_active');
+          location.replace('admin-login.html'); // redirect properly based on path if needed
+          // If they are on index or walkin, reloading to index is safer
+          if (location.pathname.endsWith('index.html') || location.pathname === '/' || location.pathname === '') {
+            location.replace('./');
+          } else if (location.pathname.includes('/pages/')) {
+            location.replace('admin-login.html');
+          } else {
+            location.replace('pages/admin-login.html');
+          }
+        }
+      }
+    } catch (_) { }
+
   }, 60 * 1000);
 }
 

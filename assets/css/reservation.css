@@ -989,13 +989,25 @@ p {
     }
 
     .modal-header {
-        padding: 1rem 1.25rem;
+        padding: 0.8rem 1rem;
+    }
+
+    .modal-header h3 {
+        font-size: 1.25rem;
+    }
+
+    .btn-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 1.1rem;
     }
 
     .modal-body .seat-legend {
-        padding: 12px;
-        gap: 10px;
+        padding: 10px;
+        gap: 8px;
         justify-content: flex-start;
+        flex-wrap: nowrap;
+        overflow-x: auto;
     }
 
     .legend-item {
@@ -1036,6 +1048,22 @@ p {
         align-self: flex-start;
         font-size: 1.05rem;
         word-break: break-all;
+    }
+
+    .modal-footer {
+        padding: 1rem;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .modal-selection-info {
+        font-size: 1rem;
+        text-align: center;
+    }
+
+    .modal-footer .btn {
+        width: 100%;
+        margin: 0;
     }
 }
 
