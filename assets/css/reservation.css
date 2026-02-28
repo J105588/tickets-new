@@ -48,16 +48,96 @@ body {
     min-height: 100vh;
     font-family: 'Inter', 'Noto Sans JP', sans-serif;
     color: var(--text-main);
-    background-color: var(--bg-base);
-    background-image: url('https://www.ichigaku.ac.jp/wp-content/uploads/2021/09/01-scaled.jpg');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    background-repeat: no-repeat;
+    background-color: #000;
     padding: 20px;
     line-height: 1.6;
     position: relative;
     overflow-x: hidden;
+}
+
+/* Slideshow Background */
+.bg-slideshow {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -2;
+    pointer-events: none;
+    background-color: #000;
+}
+
+.bg-slideshow span {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0;
+    z-index: -2;
+    animation: imageAnimation 48s linear infinite 0s;
+}
+
+/* 6 Images x 8s each = 48s total duration */
+.bg-slideshow span:nth-child(1) {
+    background-image: url('https://www.ichigaku.ac.jp/wp-content/uploads/2021/09/01-scaled.jpg');
+    animation-delay: 0s;
+}
+
+.bg-slideshow span:nth-child(2) {
+    background-image: url('https://www.ichigaku.ac.jp/wp-content/uploads/2021/09/07.jpg');
+    animation-delay: 8s;
+}
+
+.bg-slideshow span:nth-child(3) {
+    background-image: url('https://www.ichigaku.ac.jp/wp-content/uploads/2021/09/11.jpg');
+    animation-delay: 16s;
+}
+
+.bg-slideshow span:nth-child(4) {
+    background-image: url('https://www.ichigaku.ac.jp/wp-content/uploads/2021/09/14-scaled.jpg');
+    animation-delay: 24s;
+}
+
+.bg-slideshow span:nth-child(5) {
+    background-image: url('https://www.ichigaku.ac.jp/wp-content/uploads/2021/09/12-scaled.jpg');
+    animation-delay: 32s;
+}
+
+.bg-slideshow span:nth-child(6) {
+    background-image: url('https://www.ichigaku.ac.jp/wp-content/uploads/2021/09/13.jpg');
+    animation-delay: 40s;
+}
+
+@keyframes imageAnimation {
+    0% {
+        opacity: 0;
+        transform: scale(1.05);
+        animation-timing-function: ease-in;
+    }
+
+    8% {
+        opacity: 1;
+        transform: scale(1.02);
+        animation-timing-function: ease-out;
+    }
+
+    17% {
+        opacity: 1;
+        transform: scale(1.01);
+    }
+
+    25% {
+        opacity: 0;
+        transform: scale(1);
+    }
+
+    100% {
+        opacity: 0;
+    }
 }
 
 /* Semi-transparent black overlay for readability */
