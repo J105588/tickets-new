@@ -809,8 +809,8 @@ document.getElementById('reservation-form').addEventListener('submit', async (e)
     if (!confirm('この内容で予約を確定しますか？')) return;
 
     // Validation
-    const name = document.getElementById('res-name').value;
-    const email = document.getElementById('res-email').value;
+    const name = document.getElementById('res-name').value.trim();
+    const email = document.getElementById('res-email').value.trim();
     const gradeClass = getGradeClassValue();
     const club = document.getElementById('res-club-select').value;
 

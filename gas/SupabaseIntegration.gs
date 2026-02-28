@@ -61,9 +61,20 @@ class SupabaseIntegration {
     }
   }
 
+  // ==========================
+  // Custom RPC (For transaction-safe operations)
+  // ==========================
+  
+  rpc(functionName, payload) {
+    return this._request(`rpc/${functionName}`, {
+      method: 'POST',
+      body: payload
+    });
+  }
+
   // 公演データの取得
   getPerformance(group, day, timeslot) {
-    const endpoint = `performances?group_name=eq.${encodeURIComponent(group)}&day=eq.${day}&timeslot=eq.${timeslot}&select=*`;
+    const endpoint = `performances?group_name=eq.${encodeURIComponent(group)}&day=eq.${encodeURIComponent(day)}&timeslot=eq.${encodeURIComponent(timeslot)}&select=*`;
     return this._request(endpoint, { useServiceRole: true });
   }
 
@@ -82,9 +93,9 @@ class SupabaseIntegration {
 
   // 座席データの取得（既存のデータ構造に合わせた形式）
   getSeats(performanceId, status = null) {
-    let endpoint = `seats?performance_id=eq.${performanceId}&select=*,bookings(notes)`;
+    let endpoint = `seats?performance_id=eq.${encodeURIComponent(performanceId)}&select=*,bookings(notes)`;
     if (status) {
-      endpoint += `&status=eq.${status}`;
+      endpoint += `&status=eq.${encodeURIComponent(status)}`;
     }
     return this._request(endpoint);
   }
@@ -96,7 +107,7 @@ class SupabaseIntegration {
       updated_at: new Date().toISOString()
     };
     
-    return this._request(`seats?performance_id=eq.${performanceId}&seat_id=eq.${seatId}`, {
+    return this._request(`seats?performance_id=eq.${encodeURIComponent(performanceId)}&seat_id=eq.${encodeURIComponent(seatId)}`, {
       method: 'PATCH',
       body: data
     });
@@ -219,7 +230,7 @@ class SupabaseIntegration {
 
   // 予約データの取得（ID指定）
   getBooking(bookingId) {
-    const endpoint = `bookings?id=eq.${bookingId}&select=*,seats(seat_id,row_letter,seat_number)`;
+    const endpoint = `bookings?id=eq.${encodeURIComponent(bookingId)}&select=*,seats(seat_id,row_letter,seat_number)`;
     const result = this._request(endpoint, {
       method: 'GET',
       useServiceRole: true
@@ -233,7 +244,7 @@ class SupabaseIntegration {
 
   // 予約情報の取得（IDとパスコード）- RLS回避のためService Roleを使用
   getBookingByCredentials(bookingId, passcode) {
-    const query = `id=eq.${bookingId}&passcode=eq.${passcode}`;
+    const query = `id=eq.${encodeURIComponent(bookingId)}&passcode=eq.${encodeURIComponent(passcode)}`;
     const result = this._request(`bookings?select=*,seats(seat_id,row_letter,seat_number),performances(group_name,day,timeslot)&${query}`, {
       method: 'GET',
       useServiceRole: true // 機密情報取得のため管理者権限を使用
@@ -247,7 +258,7 @@ class SupabaseIntegration {
   // 予約ステータスの更新（および関連座席の更新）
   updateBookingStatus(bookingId, status) {
     // 1. 予約ステータス更新
-    const bookingUpdate = this._request(`bookings?id=eq.${bookingId}`, {
+    const bookingUpdate = this._request(`bookings?id=eq.${encodeURIComponent(bookingId)}`, {
       method: 'PATCH',
       body: {
         status: status,
@@ -260,7 +271,7 @@ class SupabaseIntegration {
     // 2. 関連座席のステータス更新（チェックインの場合）
     if (status === 'checked_in') {
       // 予約に紐付く座席を取得して更新するのが確実だが、ここでは簡易的にbooking_idで更新
-      const seatUpdate = this._request(`seats?booking_id=eq.${bookingId}`, {
+      const seatUpdate = this._request(`seats?booking_id=eq.${encodeURIComponent(bookingId)}`, {
         method: 'PATCH',
         body: {
           status: 'checked_in',
@@ -280,7 +291,7 @@ class SupabaseIntegration {
       updated_at: new Date().toISOString()
     };
     
-    return this._request(`bookings?id=eq.${bookingId}`, {
+    return this._request(`bookings?id=eq.${encodeURIComponent(bookingId)}`, {
       method: 'PATCH',
       body: data
     });

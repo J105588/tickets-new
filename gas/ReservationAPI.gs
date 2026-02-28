@@ -91,71 +91,56 @@ function createReservation(data) {
       return { success: false, error: `以下の座席は既に予約されています: ${unavailable.map(s=>s.seat_id).join(', ')}` };
     }
 
-    // 3. 予約データの作成 (bookingsテーブル)
-    const passcode = Math.floor(1000 + Math.random() * 9000).toString(); // 4桁の数字
-    
-    // ランダムな予約ID (6桁) を生成して衝突しないか確認しながら保存
-    // 注意: 本来はDB側でUUIDを使うのがベストだが、既存互換維持のため数値ID生成
-    let bookingResult;
+    // 3. 予約データの作成と座席確保を1つのトランザクションで実行 (RPC呼び出し)
+    // ランダムな予約ID (6桁) を生成 (既存互換維持のため数値ID生成)
+    let rpcResult;
     let retries = 0;
     while(retries < 3) {
       const randomId = Math.floor(100000 + Math.random() * 900000); 
-      const bookingData = {
-        id: randomId, // 明示的にIDを指定
-        performance_id: performanceId,
-        name: data.name,
-        email: data.email,
-        grade_class: data.grade_class,
-        club_affiliation: data.club_affiliation,
-        passcode: passcode,
-        status: 'confirmed'
+      
+      const payload = {
+        p_id: randomId,
+        p_group: data.group,
+        p_day: data.day,
+        p_timeslot: data.timeslot,
+        p_name: data.name,
+        p_email: data.email,
+        p_grade_class: data.grade_class || null,
+        p_club_affiliation: data.club_affiliation || null,
+        p_seats: seatIds,
+        p_reserved_by: data.name
       };
       
-      bookingResult = supabaseIntegration.createBooking(bookingData);
+      rpcResult = supabaseIntegration.rpc('create_reservation', payload);
       
       // 成功したらループ抜ける
-      if (bookingResult.success && bookingResult.data && bookingResult.data.length > 0) {
+      if (rpcResult.success && rpcResult.data && rpcResult.data.success) {
         break;
       }
       
       // エラーチェック（重複エラーならリトライ、それ以外は失敗）
-      // Supabase(Postgres)の重複エラーコードは23505だが、GAS経由のエラーメッセージで判断
-      if (bookingResult.error && bookingResult.error.includes('duplicate key')) {
+      if (rpcResult.data && rpcResult.data.error && rpcResult.data.error.includes('duplicate key')) {
          retries++;
-         console.log('Booking ID collision, retrying...', randomId);
+         console.log('Booking ID collision in RPC, retrying...', randomId);
          continue;
+      } else if (rpcResult.data && !rpcResult.data.success) {
+          // RPC内部のエラー (座席重複など)
+          return { success: false, error: rpcResult.data.error };
       } else {
-         // その他のエラー
-         return { success: false, error: '予約データの作成に失敗しました: ' + (bookingResult.error || '不明なエラー') };
+         return { success: false, error: '予約処理中にエラーが発生しました: ' + (rpcResult.error || '不明なエラー') };
       }
     }
 
-    if (!bookingResult || !bookingResult.success) {
-       return { success: false, error: '予約IDの生成に失敗しました。もう一度お試しください。' };
+    if (!rpcResult || !rpcResult.success || !rpcResult.data || !rpcResult.data.success) {
+       return { success: false, error: '予約処理中にエラーが発生しました。もう一度お試しください。' };
     }
     
-    const bookingId = bookingResult.data[0].id; // 新しく作成された予約ID
+    // RPCの結果を確認
+    const responseData = rpcResult.data;
+    const bookingId = responseData.data.booking_id;
+    const passcode = responseData.data.passcode;
 
-    // 4. 座席ステータスの更新 (seatsテーブル)
-    // booking_id と status='reserved', reserved_by=name を更新
-    const updates = seatIds.map(seatId => ({
-      seatId: seatId,
-      data: { 
-        status: 'reserved',
-        reserved_by: data.name,
-        booking_id: bookingId,
-        reserved_at: new Date().toISOString()
-      }
-    }));
-    
-    const seatUpdateResult = supabaseIntegration.updateMultipleSeats(performanceId, updates);
-    if (!seatUpdateResult.success) {
-      // 致命的エラー: 予約レコードはできたが座席が更新できなかった -> 実際はロールバックが必要だが簡略化
-      console.error(`CRITICAL: Booking ${bookingId} created but seats failed to update.`);
-      return { success: false, error: '座席の確保に失敗しました。管理者に連絡してください。' };
-    }
-
-    // 5. 完了メールの送信
+    // 4. 完了メールの送信
     sendReservationEmail(data.email, {
       name: data.name,
       group: data.group,

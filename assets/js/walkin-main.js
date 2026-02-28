@@ -102,7 +102,7 @@ window.onload = async () => {
   document.getElementById('performance-info').textContent = `${groupName} ${DAY}日目 ${displayTimeslot}`;
   document.getElementById('reservation-details').innerHTML = `
     座席が確保されました<br>
-    ${groupName} ${DAY}日目 ${displayTimeslot}
+    ${escapeHTML(groupName)} ${DAY}日目 ${displayTimeslot}
   `;
 
   // 当日券モードのアクセス制限をチェック
@@ -425,7 +425,7 @@ function showSuccessNotification(message) {
   notification.innerHTML = `
     <div class="notification-content" style="display: flex; align-items: center; gap: 10px;">
       <span class="notification-icon" style="font-size: 1.2em; color: #28a745;">✓</span>
-      <span class="notification-message" style="flex: 1; font-size: 0.9em;">${message}</span>
+      <span class="notification-message" style="flex: 1; font-size: 0.9em;">${escapeHTML(message).replace(/\n/g, '<br>')}</span>
       <button class="notification-close" onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; color: #155724; font-size: 1.2em; cursor: pointer; padding: 0; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: background-color 0.2s;">×</button>
     </div>
   `;
@@ -460,7 +460,7 @@ function showErrorNotification(message) {
   notification.innerHTML = `
     <div class="notification-content" style="display: flex; align-items: center; gap: 10px;">
       <span class="notification-icon" style="font-size: 1.2em; color: #dc3545;">✗</span>
-      <span class="notification-message" style="flex: 1; font-size: 0.9em;">${message}</span>
+      <span class="notification-message" style="flex: 1; font-size: 0.9em;">${escapeHTML(message).replace(/\n/g, '<br>')}</span>
       <button class="notification-close" onclick="this.parentElement.parentElement.remove()" style="background: none; border: none; color: #721c24; font-size: 1.2em; cursor: pointer; padding: 0; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border-radius: 50%; transition: background-color 0.2s;">×</button>
     </div>
   `;

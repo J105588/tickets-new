@@ -2,7 +2,7 @@
   "name": "市川学園座席管理システム",
   "short_name": "NAZUNAP",
   "description": "國枝ホール向けの座席管理システム",
-  "version": "32.0.4",
+  "version": "32.0.5",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#ffffff",

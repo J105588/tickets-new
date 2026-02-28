@@ -36,6 +36,17 @@ let masterData = {
     schedules: []
 };
 
+// --- Utils ---
+function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // --- Initialization ---
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -375,7 +386,7 @@ function renderGroups() {
         const statusBadge = g.is_active ? '<span class="badge badge-active">有効</span>' : '<span class="badge badge-inactive">無効</span>';
         tr.innerHTML = `
             <td>${g.display_order}</td>
-            <td>${g.name}</td>
+            <td>${escapeHTML(g.name)}</td>
             <td>${statusBadge}</td>
             <td>
                 <button class="btn-sm" onclick="openGroupModal(${g.id})">編集</button>
@@ -397,7 +408,7 @@ function renderDates() {
         const statusBadge = d.is_active !== false ? '<span class="badge badge-active">有効</span>' : '<span class="badge badge-inactive">無効</span>';
         tr.innerHTML = `
             <td>${d.display_order}</td>
-            <td>${d.date_label}</td>
+            <td>${escapeHTML(d.date_label)}</td>
             <td>${statusBadge}</td>
             <td>
                 <button class="btn-sm" onclick="openDateModal(${d.id})">編集</button>
@@ -422,10 +433,10 @@ function renderSchedules() {
     sorted.forEach(s => {
         const tr = document.createElement('tr');
         // Timeslot is now just a string
-        const timeDisplay = s.timeslot;
+        const timeDisplay = escapeHTML(s.timeslot);
 
         tr.innerHTML = `
-            <td>${s.group_name}</td>
+            <td>${escapeHTML(s.group_name)}</td>
             <td>${s.day} (ID:${s.day})</td>
             <td><span class="badge">${timeDisplay}</span></td>
             <td>

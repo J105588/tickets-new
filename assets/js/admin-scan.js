@@ -15,6 +15,25 @@ const state = {
     currentBooking: null
 };
 
+// Utils
+function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+const globalLoader = document.getElementById('global-loader');
+function showLoader() {
+    if (globalLoader) globalLoader.style.display = 'flex';
+}
+function hideLoader() {
+    if (globalLoader) globalLoader.style.display = 'none';
+}
+
 // UI Elements
 const setupSection = document.getElementById('setup-section');
 const scanSection = document.getElementById('scan-section');
@@ -35,57 +54,162 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+    const loginOverlay = document.getElementById('login-overlay');
 
-    if (!session) {
-        window.location.href = 'admin-login.html';
-        return;
-    }
-
-    const now = new Date().getTime();
-    if (now - parseInt(lastActive) > SESSION_TIMEOUT_MS) {
-        alert('一定時間操作がなかったため、ログアウトしました。');
-        sessionStorage.removeItem('admin_session');
-        sessionStorage.removeItem('admin_verified_at');
-        sessionStorage.removeItem('admin_last_active');
-        window.location.href = 'admin-login.html';
-        return;
-    }
-
-    // Update activity
-    const updateActivity = () => {
-        sessionStorage.setItem('admin_last_active', new Date().getTime().toString());
+    const showLoginOverlay = () => {
+        if (loginOverlay) loginOverlay.style.display = 'flex';
     };
 
-    let activityThrottle = false;
-    ['mousedown', 'keydown', 'touchstart'].forEach(evt => {
-        document.addEventListener(evt, () => {
-            if (!activityThrottle) {
-                updateActivity();
-                activityThrottle = true;
-                setTimeout(() => activityThrottle = false, 10000);
+    const hideLoginOverlay = () => {
+        if (loginOverlay) loginOverlay.style.display = 'none';
+    };
+
+    let isInitialized = false;
+    async function updateActivityAndInit() {
+        const updateActivity = () => {
+            sessionStorage.setItem('admin_last_active', new Date().getTime().toString());
+        };
+
+        if (!isInitialized) {
+            let activityThrottle = false;
+            ['mousedown', 'keydown', 'touchstart'].forEach(evt => {
+                document.addEventListener(evt, () => {
+                    if (!activityThrottle) {
+                        updateActivity();
+                        activityThrottle = true;
+                        setTimeout(() => activityThrottle = false, 10000);
+                    }
+                });
+            });
+            updateActivity();
+
+            // 1. Master Data
+            showLoader();
+            await initializeMasterData();
+            hideLoader();
+
+            // 2. Setup inputs
+            initSetup();
+
+            // 3. Event Listeners
+            document.getElementById('btn-change-mode').addEventListener('click', exitScanMode);
+
+            // Tab switching
+            document.querySelectorAll('.tab').forEach(btn => {
+                btn.addEventListener('click', (e) => switchTab(e.target.dataset.tab));
+            });
+
+            // Manual check
+            document.getElementById('btn-manual-check').addEventListener('click', handleManualCheck);
+
+            isInitialized = true;
+        }
+    }
+
+    if (!session) {
+        showLoginOverlay();
+    } else {
+        const now = new Date().getTime();
+        if (now - parseInt(lastActive) > SESSION_TIMEOUT_MS) {
+            alert('一定時間操作がなかったため、ログアウトしました。');
+            sessionStorage.removeItem('admin_session');
+            sessionStorage.removeItem('admin_verified_at');
+            sessionStorage.removeItem('admin_last_active');
+            showLoginOverlay();
+        } else {
+            updateActivityAndInit();
+        }
+    }
+
+    // Login Form Handler
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const passwordInput = document.getElementById('admin-password');
+            const password = passwordInput.value.trim();
+            const btn = document.getElementById('btn-login');
+            const errorMsg = document.getElementById('login-error-msg');
+
+            if (!password) {
+                alert('パスワードを入力してください');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerText = '確認中...';
+            errorMsg.style.display = 'none';
+            errorMsg.innerText = '';
+
+            try {
+                const apiUrl = apiUrlManager.getCurrentUrl();
+                showLoader();
+                fetchJsonpLogin(apiUrl, { action: 'verify_admin_password', password: password }, async (res) => {
+                    hideLoader();
+                    if (res && res.success) {
+                        sessionStorage.setItem('admin_session', 'active');
+                        sessionStorage.setItem('admin_verified_at', new Date().toISOString());
+                        sessionStorage.setItem('admin_last_active', new Date().getTime().toString());
+                        btn.innerText = 'ログイン成功';
+                        btn.style.background = '#10b981';
+                        setTimeout(() => {
+                            hideLoginOverlay();
+                            updateActivityAndInit();
+                        }, 500);
+                    } else {
+                        errorMsg.style.display = 'block';
+                        errorMsg.innerText = res.error || 'パスワードが違います';
+                        btn.disabled = false;
+                        btn.innerText = 'ログイン';
+                        passwordInput.value = '';
+                        passwordInput.focus();
+                    }
+                });
+            } catch (err) {
+                hideLoader();
+                errorMsg.style.display = 'block';
+                errorMsg.innerText = 'System Error: ' + err.message;
+                btn.disabled = false;
+                btn.innerText = 'ログイン';
             }
         });
-    });
+    }
 
-    updateActivity();
-
-
-    // 1. Master Data
-    await initializeMasterData();
-
-    // 2. Setup inputs
-    initSetup();
-
-    // 3. Event Listeners
-    document.getElementById('btn-change-mode').addEventListener('click', exitScanMode);
-
-    // Tab switching
-    document.querySelectorAll('.tab').forEach(btn => {
-        btn.addEventListener('click', (e) => switchTab(e.target.dataset.tab));
-    });
-
-    // Manual check
-    document.getElementById('btn-manual-check').addEventListener('click', handleManualCheck);
+    // Helper for JSONP Login
+    function fetchJsonpLogin(url, params, callback, timeout = 10000) {
+        const callbackName = 'jsonp_login_' + Math.round(100000 * Math.random());
+        let isCompleted = false;
+        window[callbackName] = function (data) {
+            if (isCompleted) return;
+            isCompleted = true;
+            delete window[callbackName];
+            const el = document.getElementById(callbackName);
+            if (el) document.body.removeChild(el);
+            callback(data);
+        };
+        const script = document.createElement('script');
+        const queryString = Object.keys(params).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&');
+        script.src = `${url}?${queryString}&callback=${callbackName}`;
+        script.id = callbackName;
+        script.onerror = () => {
+            if (isCompleted) return;
+            isCompleted = true;
+            delete window[callbackName];
+            const el = document.getElementById(callbackName);
+            if (el) document.body.removeChild(el);
+            callback({ success: false, error: 'Network Error (Script Load Failed)' });
+        };
+        document.body.appendChild(script);
+        setTimeout(() => {
+            if (!isCompleted) {
+                isCompleted = true;
+                delete window[callbackName];
+                const el = document.getElementById(callbackName);
+                if (el) document.body.removeChild(el);
+                callback({ success: false, error: 'Request Timed Out (Backend may be sleeping or undeployed)' });
+            }
+        }, timeout);
+    }
 
     // Confirm actions
     document.getElementById('btn-confirm-checkin').addEventListener('click', executeCheckIn);
@@ -291,15 +415,15 @@ function renderConfirmation(booking) {
     const isTargetMatch = (perf.group_name === state.group && perf.timeslot === state.timeslot && perf.day == state.day);
 
     let html = `
-        <div style="font-size:1.4rem; font-weight:800; margin-bottom:0.5rem; text-align:center;">${booking.name} 様</div>
+        <div style="font-size:1.4rem; font-weight:800; margin-bottom:0.5rem; text-align:center;">${escapeHTML(booking.name)} 様</div>
         <div style="font-size:1rem; color:var(--text-sub); margin-bottom:1.5rem; text-align:center;">
-             ${booking.grade_class || ''} 
+             ${escapeHTML(booking.grade_class || '')} 
         </div>
         
         <div style="background:#f8fafc; padding:1rem; border-radius:12px; margin-bottom:1rem;">
              <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:8px;">
                 <span style="color:var(--text-sub)">公演</span>
-                <span style="font-weight:600">${perf.group_name}</span>
+                <span style="font-weight:600">${escapeHTML(perf.group_name)}</span>
              </div>
              <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:8px;">
                 <span style="color:var(--text-sub)">日時</span>
@@ -367,9 +491,10 @@ async function executeCheckIn() {
 
     btn.disabled = true;
     btn.innerText = '送信中...';
+    showLoader();
 
-    // Direct Supabase RPC Check-in (Fast)
     const result = await checkInReservation(booking.id, booking.passcode);
+    hideLoader();
 
     btn.disabled = false;
     btn.innerText = 'チェックイン';
@@ -454,7 +579,9 @@ let performanceScanData = [];
 async function fetchScannablePerformances(group, inputs) {
     try {
         const apiUrl = apiUrlManager.getCurrentUrl();
+        showLoader();
         fetchJsonp(apiUrl, { action: 'get_performances', group }, (json) => {
+            hideLoader();
             if (json.success) {
                 performanceScanData = json.data;
                 const days = [...new Set(performanceScanData.map(p => p.day))].sort();
@@ -471,7 +598,7 @@ async function fetchScannablePerformances(group, inputs) {
                 alert('データ取得失敗');
             }
         });
-    } catch (e) { console.error(e); }
+    } catch (e) { hideLoader(); console.error(e); }
 }
 
 function updateTimeslotOptionsForScan(inputs) {
@@ -497,15 +624,35 @@ function checkSetupValidity(inputs) {
 }
 
 // JSONP Helper (Still needed for performance fetching via GAS if not ported yet)
-function fetchJsonp(url, params, callback) {
+// JSONP Helper (Still needed for performance fetching via GAS if not ported yet)
+function fetchJsonp(url, params, callback, timeout = 10000) {
     const callbackName = 'jsonp_scan_' + Math.round(100000 * Math.random());
+    let isCompleted = false;
     window[callbackName] = function (data) {
+        if (isCompleted) return;
+        isCompleted = true;
         delete window[callbackName];
-        document.body.removeChild(script);
+        if (script.parentNode) document.body.removeChild(script);
         callback(data);
     };
     const script = document.createElement('script');
     const queryString = Object.keys(params).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&');
     script.src = `${url}?${queryString}&callback=${callbackName}`;
+    script.id = callbackName;
+    script.onerror = () => {
+        if (isCompleted) return;
+        isCompleted = true;
+        delete window[callbackName];
+        if (script.parentNode) document.body.removeChild(script);
+        callback({ success: false, error: 'Network Error (Script Load Failed)' });
+    };
     document.body.appendChild(script);
+    setTimeout(() => {
+        if (!isCompleted) {
+            isCompleted = true;
+            delete window[callbackName];
+            if (script.parentNode) document.body.removeChild(script);
+            callback({ success: false, error: 'Request Timed Out' });
+        }
+    }, timeout);
 }

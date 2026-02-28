@@ -10,12 +10,23 @@ let autoRefreshInterval = null;
 let isAutoRefreshEnabled = false;
 let lastFullKeySet = new Set();
 
+// Utils
+function escapeHTML(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // 初期化
 window.onload = async () => {
   try {
     // サイドバー読み込み
     loadSidebar();
-    
+
     // グローバル関数を登録
     window.toggleSidebar = toggleSidebar;
     window.refreshLogs = refreshLogs;
@@ -28,21 +39,21 @@ window.onload = async () => {
     window.saveFullCapacitySettings = saveFullCapacitySettings;
     window.testFullCapacityNotification = testFullCapacityNotification;
     window.manualFullCapacityCheck = manualFullCapacityCheck;
-    
+
     // 初期データ読み込み
     await loadStatistics();
     await loadLogs();
-    
+
     // フィルター用の操作一覧を取得
     await loadOperationList();
-    
+
     // イベントリスナー設定
     setupEventListeners();
-    
+
     console.log('ログ表示システム初期化完了');
 
     // 満席監視（30秒毎、ログページのみ）
-    try { setInterval(checkFullTimeslotsAndNotify, 30000); } catch (_) {}
+    try { setInterval(checkFullTimeslotsAndNotify, 30000); } catch (_) { }
 
     // SWへ最高管理者モード登録（ログ画面はsuperadminのみアクセス想定）
     try {
@@ -50,10 +61,10 @@ window.onload = async () => {
         navigator.serviceWorker.controller.postMessage({ type: 'REGISTER_SUPERADMIN' });
         // ページ離脱時に解除
         window.addEventListener('beforeunload', () => {
-          try { navigator.serviceWorker.controller.postMessage({ type: 'UNREGISTER_SUPERADMIN' }); } catch(_) {}
+          try { navigator.serviceWorker.controller.postMessage({ type: 'UNREGISTER_SUPERADMIN' }); } catch (_) { }
         });
       }
-    } catch (_) {}
+    } catch (_) { }
   } catch (error) {
     console.error('初期化エラー:', error);
     showError('初期化に失敗しました: ' + error.message);
@@ -67,9 +78,9 @@ try {
       if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage({ type: 'FULL_ALERT', group, day, timeslot });
       }
-    } catch (_) {}
+    } catch (_) { }
   };
-} catch (_) {}
+} catch (_) { }
 
 // イベントリスナー設定
 function setupEventListeners() {
@@ -85,14 +96,14 @@ function setupEventListeners() {
   if (dateEnd) dateEnd.addEventListener('change', () => updateLogsTable());
   const errToggle = document.getElementById('error-highlight-toggle');
   if (errToggle) errToggle.addEventListener('change', () => updateLogsTable());
-  
+
   // モーダル外クリックで閉じる
   document.getElementById('log-detail-modal').addEventListener('click', (e) => {
     if (e.target.id === 'log-detail-modal') {
       closeLogDetail();
     }
   });
-  
+
   // ESCキーでモーダルを閉じる
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -106,11 +117,11 @@ function setupEventListeners() {
       navigator.serviceWorker.addEventListener('message', (event) => {
         const data = event.data || {};
         if (data.type === 'FULL_ALERT') {
-          try { showFullAlertBanner(data); } catch (_) {}
+          try { showFullAlertBanner(data); } catch (_) { }
         }
       });
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 async function checkFullTimeslotsAndNotify() {
@@ -127,13 +138,13 @@ async function checkFullTimeslotsAndNotify() {
           if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
             navigator.serviceWorker.controller.postMessage({ type: 'FULL_ALERT', group, day, timeslot });
           }
-        } catch (_) {}
+        } catch (_) { }
         // ページ内バナーも即時表示
-        try { showFullAlertBanner({ group, day, timeslot }); } catch (_) {}
+        try { showFullAlertBanner({ group, day, timeslot }); } catch (_) { }
       }
     }
     lastFullKeySet = current;
-  } catch (_) {}
+  } catch (_) { }
 }
 
 // 統計情報を読み込み（最適化版）
@@ -141,21 +152,21 @@ async function loadStatistics() {
   try {
     console.log('統計情報を読み込み中...');
     const response = await GasAPI._callApi('getClientAuditStatistics', []);
-    
+
     if (response && response.success) {
       console.log('統計情報取得成功:', response.statistics);
       updateStatistics(response.statistics);
-      
+
       // 統計情報のキャッシュを更新
       try {
         localStorage.setItem('audit_statistics_cache', JSON.stringify({
           data: response.statistics,
           timestamp: Date.now()
         }));
-      } catch (_) {}
+      } catch (_) { }
     } else {
       console.warn('統計情報の取得に失敗:', response?.message || 'Unknown error');
-      
+
       // キャッシュから復元を試行
       const cachedStats = getCachedStatistics();
       if (cachedStats) {
@@ -170,13 +181,13 @@ async function loadStatistics() {
         });
       }
     }
-    
+
     // 満席監視統計も読み込み
     await loadFullCapacityStatistics();
-    
+
   } catch (error) {
     console.error('統計情報読み込みエラー:', error);
-    
+
     // キャッシュから復元を試行
     const cachedStats = getCachedStatistics();
     if (cachedStats) {
@@ -197,7 +208,7 @@ async function loadStatistics() {
 async function loadFullCapacityStatistics() {
   try {
     const response = await GasAPI._callApi('getFullCapacityTimeslots', []);
-    
+
     if (response && response.success) {
       const summary = response.summary || {};
       updateFullCapacityStatistics(summary);
@@ -215,17 +226,17 @@ async function loadFullCapacityStatistics() {
 function updateFullCapacityStatistics(summary) {
   const fullCapacityCard = document.getElementById('full-capacity-card');
   const fullCapacityCount = document.getElementById('full-capacity-count');
-  
+
   if (fullCapacityCard && fullCapacityCount) {
     const fullCapacity = summary.fullCapacity || 0;
     const totalChecked = summary.totalChecked || 0;
-    
+
     fullCapacityCount.textContent = `${fullCapacity}/${totalChecked}`;
-    
+
     // 満席がある場合のみ表示
     if (totalChecked > 0) {
       fullCapacityCard.style.display = 'block';
-      
+
       // 満席がある場合は警告色
       if (fullCapacity > 0) {
         fullCapacityCard.classList.add('error');
@@ -251,7 +262,7 @@ function getCachedStatistics() {
         return parsed.data;
       }
     }
-  } catch (_) {}
+  } catch (_) { }
   return null;
 }
 
@@ -260,18 +271,18 @@ function updateStatistics(stats) {
   // 総操作数
   const totalOps = stats.totalOperations || 0;
   document.getElementById('total-operations').textContent = totalOps.toLocaleString();
-  
+
   // 成功数
   const successCount = stats.successCount || 0;
   document.getElementById('success-count').textContent = successCount.toLocaleString();
-  
+
   // エラー数
   const errorCount = stats.errorCount || 0;
   document.getElementById('error-count').textContent = errorCount.toLocaleString();
-  
+
   // 最終更新時刻
   document.getElementById('last-update').textContent = new Date().toLocaleTimeString('ja-JP');
-  
+
   // デバッグ情報をコンソールに出力
   console.log('統計情報更新:', {
     totalOperations: totalOps,
@@ -286,12 +297,12 @@ function updateStatistics(stats) {
 async function loadLogs() {
   try {
     showLoading(true);
-    
+
     const limit = parseInt(document.getElementById('limit-filter').value) || 100;
     const type = document.getElementById('operation-filter').value || null;
     const status = document.getElementById('status-filter').value || null;
     const response = await GasAPI._callApi('getClientAuditLogs', [limit, type, status]);
-    
+
     if (response.success) {
       currentLogs = response.logs || [];
       updateLogsTable();
@@ -312,16 +323,16 @@ async function loadLogs() {
 async function loadOperationList() {
   try {
     const response = await GasAPI._callApi('getOperationLogs', [1000]); // 多めに取得
-    
+
     if (response.success && response.logs) {
       const operations = [...new Set(response.logs.map(log => log.type))].sort();
       const operationFilter = document.getElementById('operation-filter');
-      
+
       // 既存のオプションをクリア（"すべて"以外）
       while (operationFilter.children.length > 1) {
         operationFilter.removeChild(operationFilter.lastChild);
       }
-      
+
       // 操作一覧を追加
       operations.forEach(operation => {
         const option = document.createElement('option');
@@ -338,24 +349,24 @@ async function loadOperationList() {
 // ログテーブルを更新
 function updateLogsTable() {
   const tbody = document.getElementById('logs-table-body');
-  
+
   const filtered = getFilteredLogs();
 
   if (filtered.length === 0) {
     tbody.innerHTML = '<tr><td colspan="7" class="no-data">ログがありません</td></tr>';
     return;
   }
-  
-  const isHighlightEnabled = (() => { try { return document.getElementById('error-highlight-toggle')?.checked !== false; } catch(_) { return true; } })();
+
+  const isHighlightEnabled = (() => { try { return document.getElementById('error-highlight-toggle')?.checked !== false; } catch (_) { return true; } })();
 
   tbody.innerHTML = filtered.map(log => {
     const timestamp = new Date(log.timestamp).toLocaleString('ja-JP');
     const shortMeta = truncateJson(log.metadata, 80);
-    
+
     // エラーログかどうかを判定
     const isError = isErrorLog(log);
     const errorLevel = getErrorLevel(log);
-    
+
     // エラーレベルに応じたクラス設定
     let rowClass = '';
     if (isHighlightEnabled && isError) {
@@ -373,7 +384,7 @@ function updateLogsTable() {
           rowClass = 'error-row';
       }
     }
-    
+
     // エラーレベル表示用のアイコン
     let errorIcon = '';
     if (isHighlightEnabled && isError) {
@@ -391,16 +402,16 @@ function updateLogsTable() {
           errorIcon = '<span class="error-icon error" title="エラー">⚠️</span>';
       }
     }
-    
+
     return `
       <tr class="${rowClass}">
-        <td>${timestamp}</td>
-        <td>${log.type}</td>
-        <td>${errorIcon}${log.action}</td>
-        <td><code>${shortMeta}</code></td>
-        <td>${log.sessionId || '-'}</td>
-        <td>${log.ipAddress || '-'}</td>
-        <td><button class="detail-btn" onclick="showLogDetail('${log.timestamp}')">詳細</button></td>
+        <td>${escapeHTML(timestamp)}</td>
+        <td>${escapeHTML(log.type)}</td>
+        <td>${errorIcon}${escapeHTML(log.action)}</td>
+        <td><code>${escapeHTML(shortMeta)}</code></td>
+        <td>${escapeHTML(log.sessionId || '-')}</td>
+        <td>${escapeHTML(log.ipAddress || '-')}</td>
+        <td><button class="detail-btn" onclick="showLogDetail('${escapeHTML(log.timestamp)}')">詳細</button></td>
       </tr>
     `;
   }).join('');
@@ -413,8 +424,8 @@ function getFilteredLogs() {
   const endStr = document.getElementById('date-end')?.value || '';
   let startTs = null;
   let endTs = null;
-  try { if (startStr) { startTs = new Date(startStr + 'T00:00:00').getTime(); } } catch(_) {}
-  try { if (endStr) { endTs = new Date(endStr + 'T23:59:59.999').getTime(); } } catch(_) {}
+  try { if (startStr) { startTs = new Date(startStr + 'T00:00:00').getTime(); } } catch (_) { }
+  try { if (endStr) { endTs = new Date(endStr + 'T23:59:59.999').getTime(); } } catch (_) { }
 
   return currentLogs.filter(log => {
     // 日付範囲
@@ -422,7 +433,7 @@ function getFilteredLogs() {
       const ts = new Date(log.timestamp).getTime();
       if (startTs && ts < startTs) return false;
       if (endTs && ts > endTs) return false;
-    } catch(_) {}
+    } catch (_) { }
 
     // テキスト検索
     if (text) {
@@ -431,7 +442,7 @@ function getFilteredLogs() {
         String(log.action || ''),
         String(log.sessionId || ''),
         String(log.ipAddress || ''),
-        (() => { try { return JSON.stringify(JSON.parse(log.metadata || '{}')); } catch(_) { return String(log.metadata || ''); } })(),
+        (() => { try { return JSON.stringify(JSON.parse(log.metadata || '{}')); } catch (_) { return String(log.metadata || ''); } })(),
         String(log.userAgent || '')
       ].join(' ').toLowerCase();
       if (!haystack.includes(text)) return false;
@@ -443,31 +454,31 @@ function getFilteredLogs() {
 
 // フィルタークリア
 function clearFilters() {
-  try { document.getElementById('operation-filter').value = ''; } catch(_) {}
-  try { document.getElementById('status-filter').value = ''; } catch(_) {}
-  try { document.getElementById('text-filter').value = ''; } catch(_) {}
-  try { document.getElementById('date-start').value = ''; } catch(_) {}
-  try { document.getElementById('date-end').value = ''; } catch(_) {}
+  try { document.getElementById('operation-filter').value = ''; } catch (_) { }
+  try { document.getElementById('status-filter').value = ''; } catch (_) { }
+  try { document.getElementById('text-filter').value = ''; } catch (_) { }
+  try { document.getElementById('date-start').value = ''; } catch (_) { }
+  try { document.getElementById('date-end').value = ''; } catch (_) { }
   updateLogsTable();
 }
 
 // CSVエクスポート（最適化版）
 function exportLogsCSV() {
   const rows = getFilteredLogs();
-  if (!rows || rows.length === 0) { 
-    alert('エクスポート対象のログがありません'); 
-    return; 
+  if (!rows || rows.length === 0) {
+    alert('エクスポート対象のログがありません');
+    return;
   }
-  
+
   // プログレスバーを表示
   showExportProgress();
-  
+
   // 非同期でCSV生成（UIブロックを防ぐ）
   setTimeout(() => {
     try {
-      const headers = ['timestamp','type','action','metadata','sessionId','ipAddress','userAgent'];
+      const headers = ['timestamp', 'type', 'action', 'metadata', 'sessionId', 'ipAddress', 'userAgent'];
       const csvRows = [headers.join(',')];
-      
+
       // バッチ処理でメモリ効率を向上
       const batchSize = 100;
       for (let i = 0; i < rows.length; i += batchSize) {
@@ -475,17 +486,17 @@ function exportLogsCSV() {
         const batchCsv = batch.map(r => headers.map(h => {
           let v = r[h];
           if (h === 'metadata') {
-            try { 
-              v = JSON.stringify(JSON.parse(r.metadata || '{}')); 
-            } catch(_) { 
-              v = String(r.metadata || ''); 
+            try {
+              v = JSON.stringify(JSON.parse(r.metadata || '{}'));
+            } catch (_) {
+              v = String(r.metadata || '');
             }
           }
           if (h === 'timestamp') {
-            try { 
-              v = new Date(r.timestamp).toISOString(); 
-            } catch(_) { 
-              v = String(r.timestamp || ''); 
+            try {
+              v = new Date(r.timestamp).toISOString();
+            } catch (_) {
+              v = String(r.timestamp || '');
             }
           }
           const s = String(v == null ? '' : v);
@@ -494,35 +505,35 @@ function exportLogsCSV() {
           const esc = s.replace(/"/g, '""');
           return needsQuote ? '"' + esc + '"' : esc;
         }).join(','));
-        
+
         csvRows.push(...batchCsv);
-        
+
         // プログレス更新
         updateExportProgress(i + batch.length, rows.length);
       }
 
       const csv = csvRows.join('\n');
-      
+
       // BOM付きUTF-8でエンコード（Excel対応）
       const bom = '\uFEFF';
       const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      
+
       // ファイル名に日時を含める
       const now = new Date();
       const dateStr = now.toISOString().slice(0, 19).replace(/:/g, '-');
       a.download = `audit_logs_${dateStr}.csv`;
-      
+
       document.body.appendChild(a);
       a.click();
-      setTimeout(() => { 
-        URL.revokeObjectURL(url); 
-        a.remove(); 
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+        a.remove();
         hideExportProgress();
       }, 0);
-      
+
     } catch (error) {
       console.error('CSVエクスポートエラー:', error);
       alert('CSVエクスポート中にエラーが発生しました: ' + error.message);
@@ -544,12 +555,12 @@ function showExportProgress() {
 function updateExportProgress(current, total) {
   const progressBar = document.getElementById('export-progress-bar');
   const progressText = document.getElementById('export-progress-text');
-  
+
   if (progressBar) {
     const percentage = Math.round((current / total) * 100);
     progressBar.style.width = percentage + '%';
   }
-  
+
   if (progressText) {
     progressText.textContent = `エクスポート中... ${current}/${total} (${Math.round((current / total) * 100)}%)`;
   }
@@ -568,45 +579,45 @@ function isErrorLog(log) {
   try {
     // アクション名での判定
     const actionLower = (log.action || '').toLowerCase();
-    if (actionLower.includes('error') || actionLower.includes('fail') || 
-        actionLower.includes('exception') || actionLower.includes('timeout')) {
+    if (actionLower.includes('error') || actionLower.includes('fail') ||
+      actionLower.includes('exception') || actionLower.includes('timeout')) {
       return true;
     }
-    
+
     // メタデータでの判定
     if (log.metadata && log.metadata !== 'null') {
       const metaObj = JSON.parse(log.metadata);
-      
+
       // 明示的なエラーフラグ
       if (metaObj.success === false || metaObj.error || metaObj.failed) {
         return true;
       }
-      
+
       // エラーメッセージの存在
       if (metaObj.errorMessage || metaObj.errorMsg || metaObj.message) {
         const errorMsg = (metaObj.errorMessage || metaObj.errorMsg || metaObj.message || '').toLowerCase();
-        if (errorMsg.includes('error') || errorMsg.includes('fail') || 
-            errorMsg.includes('exception') || errorMsg.includes('timeout')) {
+        if (errorMsg.includes('error') || errorMsg.includes('fail') ||
+          errorMsg.includes('exception') || errorMsg.includes('timeout')) {
           return true;
         }
       }
-      
+
       // HTTPステータスコードでの判定
       if (metaObj.statusCode && metaObj.statusCode >= 400) {
         return true;
       }
-      
+
       // レスポンス時間での判定（タイムアウト）
       if (metaObj.responseTime && metaObj.responseTime > 10000) {
         return true;
       }
     }
-    
+
     // セッションIDが異常な場合
     if (log.sessionId === 'nosession' || !log.sessionId) {
       return true;
     }
-    
+
     return false;
   } catch (e) {
     // JSON解析エラーの場合はエラーとして扱う
@@ -618,27 +629,27 @@ function isErrorLog(log) {
 function getErrorLevel(log) {
   try {
     const actionLower = (log.action || '').toLowerCase();
-    
+
     // 致命的エラー
     if (actionLower.includes('critical') || actionLower.includes('fatal')) {
       return 'critical';
     }
-    
+
     // タイムアウトエラー
     if (actionLower.includes('timeout')) {
       return 'timeout';
     }
-    
+
     // ネットワークエラー
     if (actionLower.includes('network') || actionLower.includes('connection')) {
       return 'network';
     }
-    
+
     // 一般的なエラー
     if (isErrorLog(log)) {
       return 'error';
     }
-    
+
     return 'normal';
   } catch (e) {
     return 'error';
@@ -648,7 +659,7 @@ function getErrorLevel(log) {
 // JSON文字列を短縮
 function truncateJson(jsonStr, maxLength) {
   if (!jsonStr || jsonStr === 'null') return '-';
-  
+
   try {
     const parsed = JSON.parse(jsonStr);
     const str = JSON.stringify(parsed, null, 2);
@@ -667,14 +678,14 @@ function updateLogsCount() {
 function showLogDetail(timestamp) {
   const log = currentLogs.find(l => l.timestamp === timestamp);
   if (!log) return;
-  
+
   // エラーログかどうかを判定
   const isError = isErrorLog(log);
-  
+
   // モーダルにデータを設定
   document.getElementById('detail-timestamp').textContent = new Date(log.timestamp).toLocaleString('ja-JP');
   document.getElementById('detail-operation').textContent = `${log.type} / ${log.action}`;
-  
+
   // ステータス表示（エラーの場合は赤色で強調）
   const statusElement = document.getElementById('detail-status');
   if (isError) {
@@ -682,9 +693,9 @@ function showLogDetail(timestamp) {
   } else {
     statusElement.innerHTML = '<span class="status-success">成功</span>';
   }
-  
+
   document.getElementById('detail-ip').textContent = log.ipAddress || '-';
-  
+
   // JSON表示
   try {
     const meta = JSON.parse(log.metadata);
@@ -692,11 +703,11 @@ function showLogDetail(timestamp) {
   } catch (e) {
     document.getElementById('detail-parameters').textContent = log.metadata;
   }
-  
+
   document.getElementById('detail-result').textContent = '';
-  
+
   document.getElementById('detail-useragent').textContent = log.userAgent;
-  
+
   // モーダルを表示
   document.getElementById('log-detail-modal').classList.add('show');
 }
@@ -713,7 +724,7 @@ function showFullAlertBanner(data) {
   el.textContent = text;
   el.style.display = '';
   // 一定時間後に自動で隠す
-  setTimeout(() => { try { el.style.display = 'none'; } catch (_) {} }, 8000);
+  setTimeout(() => { try { el.style.display = 'none'; } catch (_) { } }, 8000);
 }
 
 // ログ詳細を閉じる
@@ -736,7 +747,7 @@ async function refreshLogs() {
 function toggleAutoRefresh() {
   isAutoRefreshEnabled = !isAutoRefreshEnabled;
   const button = document.getElementById('auto-refresh-btn');
-  
+
   if (isAutoRefreshEnabled) {
     button.textContent = '自動更新: ON';
     button.classList.add('active');
@@ -765,7 +776,7 @@ function showLoading(show) {
 function showError(message) {
   const errorContainer = document.getElementById('error-container');
   const errorMessage = document.getElementById('error-message');
-  
+
   if (errorContainer && errorMessage) {
     errorMessage.textContent = message;
     errorContainer.style.display = 'flex';
@@ -799,7 +810,7 @@ window.addEventListener('beforeunload', () => {
 function showFullCapacitySettings() {
   const modal = document.getElementById('full-capacity-settings-modal');
   if (!modal) return;
-  
+
   // 現在の設定を読み込み
   const settings = fullCapacityMonitor.getSettings();
   const emailsDisplay = document.getElementById('notification-emails-display');
@@ -807,16 +818,16 @@ function showFullCapacitySettings() {
     emailsDisplay.textContent = settings.emails ? settings.emails.join('\n') : '設定されていません';
   }
   document.getElementById('notification-enabled').checked = settings.enabled;
-  
+
   // 監視間隔を設定
   const intervalSelect = document.getElementById('check-interval');
   intervalSelect.value = settings.checkInterval;
-  
+
   // 現在の状態を表示
   const statusElement = document.getElementById('monitor-status');
   statusElement.textContent = settings.isRunning ? '監視中' : '停止中';
   statusElement.style.color = settings.isRunning ? '#28a745' : '#dc3545';
-  
+
   modal.classList.add('show');
 }
 
@@ -832,17 +843,17 @@ function closeFullCapacitySettings() {
 async function saveFullCapacitySettings() {
   const enabled = document.getElementById('notification-enabled').checked;
   const interval = parseInt(document.getElementById('check-interval').value);
-  
+
   try {
     const success = await fullCapacityMonitor.updateNotificationSettings(enabled);
-    
+
     if (success) {
       // 監視間隔を更新
       fullCapacityMonitor.setCheckInterval(interval);
-      
+
       alert('設定を保存しました。');
       closeFullCapacitySettings();
-      
+
       // 設定に応じて監視を開始/停止
       if (enabled) {
         fullCapacityMonitor.start();
@@ -867,7 +878,7 @@ async function testFullCapacityNotification() {
       'manager@example.com',
       'staff@example.com'
     ];
-    
+
     // テスト用の満席データを作成
     const testFullTimeslots = [{
       group: 'テスト公演',
