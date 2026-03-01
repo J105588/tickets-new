@@ -152,21 +152,27 @@ function showDetails(data) {
             }
         });
 
-        // POLLING FALLBACK: Check every 10 seconds
+        // POLLING FALLBACK: Check every 3 seconds
         // This ensures updates even if WebSocket drops or is blocked
         const pollingInterval = setInterval(async () => {
-            // Stop polling if already checked in (UI updated)
-            if (document.getElementById('status-badge').className.includes('checked_in')) {
+            // Stop polling if already checked in or cancelled (UI updated)
+            if (document.getElementById('status-badge').className.includes('checked_in') ||
+                document.getElementById('status-badge').className.includes('cancelled')) {
                 clearInterval(pollingInterval);
                 return;
             }
 
-            const res = await getBookingForScan(data.id);
-            if (res.success && res.data.status === 'checked_in') {
-                updateUIAsCheckedIn();
-                clearInterval(pollingInterval);
+            const res = await getBookingForScan(data.id, data.passcode);
+            if (res.success) {
+                if (res.data.status === 'checked_in') {
+                    updateUIAsCheckedIn();
+                    clearInterval(pollingInterval);
+                } else if (res.data.status === 'cancelled') {
+                    updateUIAsCancelled();
+                    clearInterval(pollingInterval);
+                }
             }
-        }, 10000);
+        }, 3000);
     }
 
     // Initial check

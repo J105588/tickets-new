@@ -54,11 +54,16 @@ function getAdminReservations(filters) {
 
     if (filters.search && filters.search.trim()) {
       const term = filters.search.trim();
+      const isNumeric = /^\d+$/.test(term);
+      
       // Use ilike for case-insensitive partial match on name and email.
-      // Note: Cast id to text if needed, but Supabase might struggle with mixed types in OR. 
-      // For now, search name and email.
-      // Syntax: or=(name.ilike.*term*,email.ilike.*term*)
-      const searchCond = `or=(name.ilike.*${encodeURIComponent(term)}*,email.ilike.*${encodeURIComponent(term)}*)`;
+      // If term is numeric, also search exactly by ID.
+      let searchCond = `or=(name.ilike.*${encodeURIComponent(term)}*,email.ilike.*${encodeURIComponent(term)}*`;
+      if (isNumeric) {
+        searchCond += `,id.eq.${term}`;
+      }
+      searchCond += `)`;
+      
       endpoint += '&' + searchCond;
     }
 

@@ -43,7 +43,14 @@ const targetTimeslot = document.getElementById('target-timeslot');
 
 // Init
 document.addEventListener('DOMContentLoaded', async () => {
-    // 0. Session Check (Idle Timeout)
+    // 0. Session Check (Handoff & Idle Timeout)
+    if (localStorage.getItem('admin_scan_handoff') === 'true') {
+        localStorage.removeItem('admin_scan_handoff');
+        sessionStorage.setItem('admin_session', 'active');
+        sessionStorage.setItem('admin_verified_at', new Date().toISOString());
+        sessionStorage.setItem('admin_last_active', new Date().getTime().toString());
+    }
+
     const session = sessionStorage.getItem('admin_session');
     let lastActive = sessionStorage.getItem('admin_last_active');
 
@@ -223,9 +230,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }, timeout);
     }
 
-    // Confirm actions
-    document.getElementById('btn-confirm-checkin').addEventListener('click', executeCheckIn);
-    document.getElementById('btn-cancel-checkin').addEventListener('click', hideResultModal);
 });
 
 let masterGroups = [];
@@ -401,12 +405,10 @@ async function fetchBookingAndConfirm(id, passcode) {
 
     if (result.success) {
         state.currentBooking = result.data;
-        renderConfirmation(result.data);
+        await processScanResult(result.data);
     } else {
         // Fallback to error
-        // Fallback to error
         showResultModal('エラー', `<p style="color:var(--danger);text-align:center;font-weight:bold;font-size:1.2rem;">${result.error || 'データが見つかりません'}</p>`, 'error');
-        document.getElementById('btn-confirm-checkin').style.display = 'none';
 
         // Auto-close error after 2s
         setTimeout(() => {
@@ -417,104 +419,88 @@ async function fetchBookingAndConfirm(id, passcode) {
     }
 }
 
-function renderConfirmation(booking) {
+async function processScanResult(booking) {
     const perf = booking.performances || {};
-    // seats is now an array of objects from RPC
-    const rawSeats = booking.seats && booking.seats.length > 0 ? booking.seats.map(s => s.seat_id).join(', ') : '-';
-    const seats = toDisplaySeatId(rawSeats);
 
     // Status Logic
     const isTargetMatch = (perf.group_name === state.group && perf.timeslot === state.timeslot && perf.day == state.day);
 
-    let html = `
-        <div style="font-size:1.4rem; font-weight:800; margin-bottom:0.5rem; text-align:center;">${escapeHTML(booking.name)} 様</div>
-        <div style="font-size:1rem; color:var(--text-sub); margin-bottom:1.5rem; text-align:center;">
-             ${escapeHTML(booking.grade_class || '')} 
-        </div>
-        
-        <div style="background:#f8fafc; padding:1rem; border-radius:12px; margin-bottom:1rem;">
-             <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:8px;">
-                <span style="color:var(--text-sub)">公演</span>
-                <span style="font-weight:600">${escapeHTML(perf.group_name)}</span>
-             </div>
-             <div style="display:flex; justify-content:space-between; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:8px;">
-                <span style="color:var(--text-sub)">日時</span>
-                <span style="font-weight:600">${perf.day}日目 ${perf.timeslot}</span>
-             </div>
-             <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-                <span style="color:var(--text-sub)">座席</span>
-                <span style="font-weight:800; font-size:1.2rem; color:var(--primary)">${seats}</span>
-             </div>
-        </div>
-        
-        <div style="text-align:center; margin-top:10px;">
-            ${getStatusBadge(booking.status)}
-        </div>
-    `;
-
+    // Hide any existing buttons
     const btn = document.getElementById('btn-confirm-checkin');
-
-    // Reset buttons
-    btn.className = 'btn-lg btn-success'; // Reset style
-    btn.style.display = 'inline-block'; // Default to visible
+    if (btn) btn.style.display = 'none';
 
     if (!isTargetMatch) {
-        html += `<div style="background:#fee2e2; color:#b91c1c; padding:1.2rem; border-radius:8px; margin-top:15px; font-weight:bold; text-align:center; border:2px solid #ef4444;">
-            <i class="fas fa-exclamation-triangle" style="font-size:1.5rem; margin-bottom:5px; display:block;"></i>
-            公演情報が一致しません<br>
-            <span style="font-size:0.9rem; color:#7f1d1d; display:block; margin-top:5px;">
-                チケット: ${perf.group_name} ${perf.day}日目 ${perf.timeslot}<br>
-                設定: ${state.group} ${state.day}日目 ${state.timeslot}
-            </span>
-        </div>`;
-        btn.style.display = 'none'; // DISABLE CHECKIN for mismatch
-        showResultModal('入場不可', html, 'error');
-        // Auto-close error after 3s
+        // NG: 別公演
+        const html = `
+            <div style="text-align: center; color: var(--danger, #ef4444); animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+                <i class="fas fa-times-circle" style="font-size: 8rem; margin-bottom: 20px;"></i>
+                <div style="font-weight:bold; font-size:1.8rem; color:#b91c1c;">公演が異なります</div>
+            </div>
+        `;
+        showResultModal('', html, 'error');
+        // Auto-close error after 2s
         setTimeout(() => {
             const overlay = document.getElementById('result-overlay');
-            // Only close if it's still the mismatch error (simple check)
-            if (overlay.style.display === 'flex' && document.getElementById('res-title').innerText === '入場不可') {
+            if (overlay.style.display === 'flex' && document.getElementById('res-content').innerHTML.includes('公演が異なります')) {
                 hideResultModal();
             }
-        }, 3000);
+        }, 2000);
         return;
     }
 
     if (booking.status === 'checked_in') {
-        // Auto-close enabled for already checked-in (1.5s)
-        renderSuccessState('既にチェックイン済みです', true);
+        // すでにチェックイン済みの場合
+        const html = `
+            <div style="text-align: center; color: var(--success, #10b981); animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+                <i class="fas fa-check-circle" style="font-size: 8rem; margin-bottom: 20px;"></i>
+                <div style="font-weight:bold; font-size:1.8rem; color:var(--text-sub);">※チェックイン済</div>
+            </div>
+        `;
+        showResultModal('', html, 'success');
+        // Auto-close enabled for already checked-in (2s)
+        setTimeout(() => {
+            const overlay = document.getElementById('result-overlay');
+            if (overlay.style.display === 'flex' && document.getElementById('res-content').innerHTML.includes('チェックイン済')) {
+                hideResultModal();
+            }
+        }, 2000);
         return;
+
     } else if (booking.status === 'cancelled') {
-        html += `<div style="color:var(--danger); font-weight:bold; margin-top:10px; font-size:1.2rem; text-align:center;">キャンセルされた予約です</div>`;
-        btn.style.display = 'none';
-        showResultModal('エラー', html, 'error');
-        // Auto-close error after 3s
-        setTimeout(() => { if (state.currentBooking && state.currentBooking.id === booking.id) hideResultModal(); }, 3000);
+        // NG: キャンセル済み
+        const html = `
+            <div style="text-align: center; color: var(--danger, #ef4444); animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+                <i class="fas fa-times-circle" style="font-size: 8rem; margin-bottom: 20px;"></i>
+                <div style="font-weight:bold; font-size:1.8rem; color:#b91c1c;">予約がキャンセルされています</div>
+            </div>
+        `;
+        showResultModal('', html, 'error');
+        // Auto-close error after 2s
+        setTimeout(() => { if (state.currentBooking && state.currentBooking.id === booking.id) hideResultModal(); }, 2000);
+        return;
+
     } else {
-        btn.style.display = 'inline-block';
-        showResultModal('予約確認', html, 'normal');
-    }
-}
+        // OK: 未チェックイン -> オートチェックイン実行
+        // Show processing UI briefly (or just keep scanner overlay loader)
+        showLoader();
 
-async function executeCheckIn() {
-    if (!state.currentBooking) return;
-    const booking = state.currentBooking;
-    const btn = document.getElementById('btn-confirm-checkin');
+        const result = await checkInReservation(booking.id, booking.passcode);
+        hideLoader();
 
-    btn.disabled = true;
-    btn.innerText = '送信中...';
-    showLoader();
-
-    const result = await checkInReservation(booking.id, booking.passcode);
-    hideLoader();
-
-    btn.disabled = false;
-    btn.innerText = 'チェックイン';
-
-    if (result.success) {
-        renderSuccessState('入場OK', true);
-    } else {
-        alert('失敗: ' + (result.error || '不明なエラー'));
+        if (result.success) {
+            // 文字なし・チェックマークのみ
+            renderSuccessState('', true);
+        } else {
+            // エラー時
+            const html = `
+                <div style="text-align: center; color: var(--danger, #ef4444); animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+                    <i class="fas fa-times-circle" style="font-size: 8rem; margin-bottom: 20px;"></i>
+                    <div style="font-weight:bold; font-size:1.5rem; color:#b91c1c;">処理失敗</div>
+                </div>
+            `;
+            showResultModal('', html, 'error');
+            setTimeout(() => hideResultModal(), 2000);
+        }
     }
 }
 
@@ -523,23 +509,23 @@ async function executeCheckIn() {
 function renderSuccessState(msg, autoClose) {
     const html = `
         <div style="padding:2rem 0; text-align:center; animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
-            <i class="fas fa-check-circle" style="font-size: 6rem; color: var(--success); margin-bottom: 20px; display:block;"></i>
-            <div style="font-size: 2rem; font-weight: 800; color: var(--text-main); line-height:1.2;">${msg}</div>
+            <i class="fas fa-check-circle" style="font-size: 9rem; color: var(--success); display:block;"></i>
         </div>
     `;
 
     // Hide buttons for pure success view
-    document.getElementById('btn-confirm-checkin').style.display = 'none';
-    document.getElementById('btn-cancel-checkin').style.display = 'none';
+    const confirmBtn = document.getElementById('btn-confirm-checkin');
+    const cancelBtn = document.getElementById('btn-cancel-checkin');
+
+    if (confirmBtn) confirmBtn.style.display = 'none';
+    if (cancelBtn) cancelBtn.style.display = 'none';
 
     showResultModal('', html, 'success'); // No title needed for big icon
 
     if (autoClose) {
         setTimeout(() => {
             hideResultModal();
-            // Restore buttons for next time
-            document.getElementById('btn-confirm-checkin').style.display = 'inline-block';
-            document.getElementById('btn-cancel-checkin').style.display = 'inline-block';
+            // Buttons are kept hidden by default in auto-check-in logic
         }, 1500); // 1.5s Close
     }
 }
@@ -567,10 +553,6 @@ function hideResultModal() {
     // Reset card classes
     const card = document.querySelector('#result-overlay .result-card');
     card.classList.remove('success', 'error', 'warning');
-
-    // Restore buttons
-    document.getElementById('btn-confirm-checkin').style.display = 'inline-block';
-    document.getElementById('btn-cancel-checkin').style.display = 'inline-block';
 }
 
 

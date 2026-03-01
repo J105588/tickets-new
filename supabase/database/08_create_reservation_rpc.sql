@@ -35,11 +35,14 @@ BEGIN
 
   -- 2. Check Seat Availability & Lock
   SELECT COUNT(*) INTO v_seat_count
-  FROM seats
-  WHERE performance_id = v_perf_id
-    AND seat_id = ANY(p_seats)
-    AND status = 'available'
-  FOR UPDATE;
+  FROM (
+    SELECT 1
+    FROM seats
+    WHERE performance_id = v_perf_id
+      AND seat_id = ANY(p_seats)
+      AND status = 'available'
+    FOR UPDATE
+  ) locked_seats;
 
   IF v_seat_count <> array_length(p_seats, 1) THEN
     RETURN jsonb_build_object('success', false, 'error', '選択された座席の一部は既に予約されています');
