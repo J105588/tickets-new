@@ -26,6 +26,39 @@
             text-align: center;
         }
 
+        .login-card h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text, #1f2937);
+            margin-bottom: 2rem;
+            margin-top: 0;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            font-size: 1rem;
+            font-family: inherit;
+            color: var(--text, #1f2937);
+            background-color: var(--surface-2, #f9fafb);
+            border: 1px solid var(--border, #e5e7eb);
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            box-sizing: border-box;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary, #3b82f6);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+            background-color: transparent;
+        }
+
         .error {
             color: #ef4444;
             margin-top: 1rem;
