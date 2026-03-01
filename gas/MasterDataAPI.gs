@@ -120,13 +120,34 @@ function saveTimeSlot(data) {
  * @param {number} id
  */
 function deleteMaster(table, id) {
-  // テーブル名検証
   const allowed = ['groups', 'event_dates', 'time_slots'];
   if (!allowed.includes(table)) {
     return { success: false, error: 'Invalid table for delete: ' + table };
   }
 
   try {
+    // ---------------------------------------------------------
+    // セーフガード: 関連する公演データが存在する場合は削除させない
+    // ---------------------------------------------------------
+    if (table === 'groups') {
+      // 団体を削除する場合: groupsテーブルから name を取得し、performances の group_name と一致するものがあるかチェック
+      const groupRes = supabaseIntegration._request(`groups?id=eq.${id}&select=name`, { method: 'GET', useServiceRole: true });
+      if (groupRes.success && groupRes.data && groupRes.data.length > 0) {
+        const groupName = groupRes.data[0].name;
+        const perfCheck = supabaseIntegration._request(`performances?group_name=eq.${encodeURIComponent(groupName)}&select=id`, { method: 'GET', useServiceRole: true });
+        if (perfCheck.success && perfCheck.data && perfCheck.data.length > 0) {
+          return { success: false, error: 'この団体に関連する公演データが存在するため削除できません。先に公演を削除してください。' };
+        }
+      }
+    } else if (table === 'event_dates') {
+      // 日程を削除する場合: performances の day に一致するものがあるかチェック
+      const perfCheck = supabaseIntegration._request(`performances?day=eq.${id}&select=id`, { method: 'GET', useServiceRole: true });
+      if (perfCheck.success && perfCheck.data && perfCheck.data.length > 0) {
+        return { success: false, error: 'この日程に関連する公演データが存在するため削除できません。先に公演を削除してください。' };
+      }
+    }
+    // time_slots は現在予約システム側の performances テーブルとは直接外部キー等で連携していないためスルー（仕様変更があれば追加）
+
     const options = {
       method: 'DELETE',
       useServiceRole: true
@@ -246,18 +267,40 @@ function saveSchedule(data) {
  */
 function deleteSchedule(id) {
   try {
-     // 関連する座席データも削除する必要があるが、Supabase側でCASCADE設定されているか確認。
-     // GAS側で明示的に消すのが安全。
-     // まず座席削除
+     // まず関連する予約データ(bookings)を削除
+     const bookingsDel = supabaseIntegration._request(`bookings?performance_id=eq.${id}`, {
+        method: 'DELETE',
+        useServiceRole: true
+     });
+     
+     if (!bookingsDel.success) {
+       return { success: false, error: '関連予約の削除に失敗しました: ' + bookingsDel.error };
+     }
+
+     // 孤立した予約データ（残骸）の掃除
+     supabaseIntegration._request(`bookings?performance_id=is.null`, {
+        method: 'DELETE',
+        useServiceRole: true
+     });
+
+     // 次に関連する座席(seats)を削除
      const seatsDel = supabaseIntegration._request(`seats?performance_id=eq.${id}`, {
         method: 'DELETE',
         useServiceRole: true
      });
      
      if (!seatsDel.success) {
-       // 座席削除失敗しても公演削除トライするか？一応エラー返す
        return { success: false, error: '関連座席の削除に失敗しました: ' + seatsDel.error };
      }
+
+     // ---------------------------------------------------------
+     // 追加: DBの制約等により既に performance_id が NULL になって
+     // 孤立した座席データ（残骸）が存在する場合、一緒に掃除する
+     // ---------------------------------------------------------
+     supabaseIntegration._request(`seats?performance_id=is.null`, {
+        method: 'DELETE',
+        useServiceRole: true
+     });
 
      // 公演削除
      const perfDel = supabaseIntegration._request(`performances?id=eq.${id}`, {

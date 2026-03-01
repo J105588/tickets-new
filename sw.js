@@ -1,5 +1,5 @@
 // sw.js - 静的資産キャッシュとオフライン表示の強化版（PWA更新通知対応）
-const CACHE_NAME = 'nazunap-v32.0.5';
+const CACHE_NAME = 'nazunap-v32.0.6';
 // 自己修復（self-heal）機能のフラグ（デフォルトOFF。クライアントからメッセージでONにできる）
 let SELF_HEAL_ENABLED = false;
 // 最高管理者モードのクライアント（window client id の集合）
@@ -163,17 +163,11 @@ self.addEventListener('fetch', (event) => {
 				if (cached && !isReservationStatus) return cached;
 
 				// navigation preload があれば先に利用
-				let response = undefined;
-				const preloadPromise = event.preloadResponse;
-				if (preloadPromise) {
-					// preload の解決/キャンセルを確実に待つ
-					const settlePreload = preloadPromise
-						.then(r => { response = r; })
-						.catch(() => { response = undefined; });
-					// settle を確実に待機してから次へ
-					await settlePreload;
-				}
-				if (!response) {
+				const preloadResponse = await event.preloadResponse;
+				let response;
+				if (preloadResponse) {
+					response = preloadResponse;
+				} else {
 					response = await fetch(req);
 				}
 

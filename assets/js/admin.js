@@ -47,8 +47,6 @@ function escapeHTML(str) {
         .replace(/'/g, '&#39;');
 }
 
-// --- Initialization ---
-
 document.addEventListener('DOMContentLoaded', async () => {
     // 0. Session Check (Idle Timeout)
     const session = sessionStorage.getItem('admin_session');
@@ -564,8 +562,11 @@ window.saveChanges = async function () {
     const btn = document.getElementById('btn-save-changes');
     btn.innerText = '保存中...';
     btn.disabled = true;
+    showOverlayLoader();
 
     const res = await adminUpdateBooking(updates);
+
+    hideOverlayLoader();
     if (res.success) {
         alert('保存しました');
         closeModal('modal-edit');
@@ -579,7 +580,9 @@ window.saveChanges = async function () {
 
 async function handleCancel(id) {
     if (!confirm('本当にキャンセルしますか？')) return;
+    showOverlayLoader();
     const res = await adminCancelBooking(id);
+    hideOverlayLoader();
     if (res.success) {
         alert('キャンセルしました');
         closeModal('modal-edit');
@@ -591,24 +594,21 @@ async function handleCancel(id) {
 
 window.changeSeat = async function () {
     if (!selectedBooking) return;
-    const displaySeatsStr = document.getElementById('edit-seat').value.trim();
-    if (!displaySeatsStr) return alert('座席IDを入力してください');
-
-    // Convert Display -> DB
-    const dbSeatsStr = toDbSeatId(displaySeatsStr);
-
-    if (!confirm(`座席を「${displaySeatsStr}」に変更しますか？\n（システムID: ${dbSeatsStr}）\n\n注意: 旧座席は開放されます。新座席が空いていない場合はエラーになります。`)) return;
+    const dbSeatsStr = document.getElementById('edit-seat-db').value;
+    if (!dbSeatsStr) return alert('DB形式の座席IDが指定されていません');
 
     const btn = document.querySelector('button[onclick="changeSeat()"]');
     const originalText = btn.innerText;
     btn.innerText = '変更中...';
     btn.disabled = true;
+    showOverlayLoader();
 
     // Split by comma or space
     const newSeats = dbSeatsStr.split(/[,、\s]+/).map(s => s.trim()).filter(s => s);
 
     const res = await adminSwapSeats(selectedBooking.id, newSeats);
 
+    hideOverlayLoader();
     if (res.success) {
         alert('座席を変更しました');
         closeModal('modal-edit'); // Close to refresh data cleanly via applyFilters
@@ -667,9 +667,11 @@ window.resendEmail = function () {
     if (!confirm('確認メールを再送しますか？')) return;
     const btn = document.getElementById('btn-resend-email');
     btn.innerText = '送信中...';
+    showOverlayLoader();
     // Use JSONP wrapper (assuming implemented in client or adminResendEmail wrapper uses it)
     // adminResendEmail in supabase-client.js uses jsonpRequest
     adminResendEmail(selectedBooking.id).then(res => {
+        hideOverlayLoader();
         alert(res.success ? 'メールを再送しました' : '送信失敗: ' + res.error);
         btn.innerText = 'メール再送';
     });
@@ -705,8 +707,10 @@ window.saveGroup = async function () {
     if (id) data.id = parseInt(id);
     if (!data.name) return alert('名前は必須です');
 
+    showOverlayLoader();
     // Check local duplicate for names if needed, or rely on DB
     const res = await adminManageMaster('groups', 'save', data);
+    hideOverlayLoader();
     if (res.success) {
         alert('保存しました');
         closeModal('modal-group');
@@ -728,7 +732,7 @@ window.openDateModal = function (id = null) {
     const delBtn = document.getElementById('btn-delete-date');
     if (delBtn) {
         delBtn.style.display = id ? 'inline-block' : 'none';
-        delBtn.onclick = () => deleteDateEntry(id);
+        delBtn.onclick = () => deleteItem('event_dates', id);
     }
 
     document.getElementById('modal-date').classList.add('active');
@@ -745,7 +749,9 @@ window.saveDate = async function () {
     if (id) data.id = parseInt(id);
     if (!data.date_label) return alert('ラベルは必須です');
 
+    showOverlayLoader();
     const res = await adminManageMaster('event_dates', 'save', data);
+    hideOverlayLoader();
     if (res.success) {
         alert('保存しました');
         closeModal('modal-date');
@@ -824,7 +830,9 @@ window.saveSchedule = async function () {
         if (!isNaN(max)) data.max_seats = max;
     }
 
+    showOverlayLoader();
     const res = await adminManageSchedule(data);
+    hideOverlayLoader();
     if (res.success) {
         alert('保存しました');
         closeModal('modal-schedule');
@@ -836,7 +844,9 @@ window.saveSchedule = async function () {
 
 window.deleteScheduleEntry = async function (id) {
     if (!confirm('本当に削除しますか？')) return;
+    showOverlayLoader();
     const res = await adminDeleteSchedule(id);
+    hideOverlayLoader();
     if (res.success) {
         alert('削除しました');
         loadMasterData();
@@ -848,8 +858,10 @@ window.deleteScheduleEntry = async function (id) {
 window.deleteItem = async function (type, id) {
     if (!confirm('本当に削除しますか？\n(関連する予約データ等がある場合、整合性エラーになる可能性があります)')) return;
 
+    showOverlayLoader();
     try {
         const res = await adminManageMaster(type, 'delete', { id: id });
+        hideOverlayLoader();
         if (res.success) {
             alert('削除しました');
             // Close generic modals if open
@@ -861,6 +873,7 @@ window.deleteItem = async function (type, id) {
             alert('削除エラー: ' + res.error);
         }
     } catch (e) {
+        hideOverlayLoader();
         alert('システムエラー: ' + e.message);
     }
 };
@@ -892,8 +905,10 @@ window.resetPerformance = async function (id) {
         btn.disabled = true;
     }
 
+    showOverlayLoader();
     try {
         const res = await adminResetPerformance(id);
+        hideOverlayLoader();
         if (res.success) {
             alert(res.message || '初期化しました');
             loadMasterData(); // Refresh all
@@ -901,6 +916,7 @@ window.resetPerformance = async function (id) {
             alert('初期化エラー: ' + res.error);
         }
     } catch (e) {
+        hideOverlayLoader();
         alert('エラーが発生しました: ' + e.message);
     } finally {
         if (btn) {
@@ -988,6 +1004,7 @@ window.sendSummaryEmails = async function () {
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 送信中...';
 
+    showOverlayLoader();
     try {
         // Process in chunks
         for (let i = 0; i < jobs.length; i += batchSize) {
@@ -1014,6 +1031,7 @@ window.sendSummaryEmails = async function () {
     } catch (e) {
         alert('送信中にエラーが発生しました: ' + e.message);
     } finally {
+        hideOverlayLoader();
         btn.innerHTML = originalText;
         btn.disabled = false;
     }
@@ -1070,6 +1088,7 @@ window.generateInviteLink = async function () {
     btn.innerText = '発行中...';
     btn.disabled = true;
 
+    showOverlayLoader();
     try {
         const res = await adminGenerateInviteToken(mins);
         if (res.success) {
@@ -1086,6 +1105,7 @@ window.generateInviteLink = async function () {
     } catch (e) {
         alert('エラー: ' + e.message);
     } finally {
+        hideOverlayLoader();
         btn.innerText = originalText;
         btn.disabled = false;
     }

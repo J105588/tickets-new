@@ -507,6 +507,7 @@ export async function adminManageSchedule(scheduleData) {
     }
 }
 
+
 // Direct Supabase Access for Rebooking (Bypassing GAS)
 export async function getBookingWithSeats(bookingId) {
     // Use RPC 'get_booking_for_scan' to bypass RLS and fetch full details

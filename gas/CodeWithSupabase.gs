@@ -435,7 +435,7 @@ function doGet(e) {
         response = {
           status: 'active',
           app: 'NAZUNAP',
-          version: '32.0.4',
+          version: '32.0.6',
           mode: 'Supabase'
         };
       } else {
@@ -1258,10 +1258,18 @@ async function generateSeatsForPerformance(performanceId) {
       'S': { start: 1, end: 38, count: 38 }
     };
     
+    const allSeats = [];
+
     // 各列の座席を生成
     for (const [row, config] of Object.entries(seatConfig)) {
       for (let seatNum = config.start; seatNum <= config.end; seatNum++) {
         const seatId = `${row}${seatNum}`;
+        
+        // ユーザー指示に基づき、S14〜S25の座席は物理的に作成しない
+        if (row === 'S' && seatNum >= 14 && seatNum <= 25) {
+          continue;
+        }
+
         const seatData = {
           performance_id: performanceId,
           seat_id: seatId,
@@ -1272,15 +1280,24 @@ async function generateSeatsForPerformance(performanceId) {
           updated_at: new Date().toISOString()
         };
         
-        // 座席を作成
-        await supabaseIntegration._request('seats', {
-          method: 'POST',
-          body: seatData
-        });
+        allSeats.push(seatData);
       }
     }
     
-    Logger.log(`座席データ生成完了: 公演ID ${performanceId}`);
+    if (allSeats.length > 0) {
+      // 複数行を一括挿入 (Bulk Insert)
+      const res = await supabaseIntegration._request('seats', {
+        method: 'POST',
+        headers: { 'Prefer': 'return=minimal' }, // レスポンスデータ量を減らす
+        body: allSeats,
+        useServiceRole: true
+      });
+      if (!res.success) {
+        throw new Error('バルクインサート失敗: ' + res.error);
+      }
+    }
+    
+    Logger.log(`座席データ生成完了: 公演ID ${performanceId}, 作成件数 ${allSeats.length}`);
     
   } catch (e) {
     Logger.log(`generateSeatsForPerformance Error: ${e.message}`);

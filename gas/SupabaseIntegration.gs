@@ -299,4 +299,4 @@ class SupabaseIntegration {
 }
 
 // グローバルインスタンス
-const supabaseIntegration = new SupabaseIntegration();
+var supabaseIntegration = new SupabaseIntegration();

@@ -181,6 +181,11 @@ async function generateSeatsForPerformanceSettings(performanceId) {
     // 各列の座席を生成
     for (const [row, config] of Object.entries(seatConfig)) {
       for (let seatNum = config.start; seatNum <= config.end; seatNum++) {
+        // S14〜S25は作成しない
+        if (row === 'S' && seatNum >= 14 && seatNum <= 25) {
+          continue;
+        }
+        
         try {
           const seatId = `${row}${seatNum}`;
           const seatData = {
