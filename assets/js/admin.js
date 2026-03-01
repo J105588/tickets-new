@@ -134,8 +134,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.logout = logout;
     window.loadMasterData = loadMasterData;
     window.applyFilters = applyFilters;
+    window.masterData = masterData; // ドリルダウンUIからアクセス可能に
 
-    window.applyFilters = applyFilters;
     window.deleteItem = deleteItem;
     window.deleteDateEntry = (id) => deleteItem('event_dates', id);
 
@@ -173,8 +173,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 // --- Data Loading ---
 
 async function loadMasterData() {
-    const loader = document.getElementById('loading');
-    if (loader) loader.style.display = 'block';
+
+    showOverlayLoader();
 
     const [mRes, sRes] = await Promise.all([
         fetchMasterDataFromSupabase(),
@@ -199,7 +199,12 @@ async function loadMasterData() {
     applyFilterOptions();
     renderSettingsTables();
 
-    if (loader) loader.style.display = 'none';
+    hideOverlayLoader();
+
+    // ドリルダウンUIコールバック
+    if (typeof window.onMasterDataLoaded === 'function') {
+        window.onMasterDataLoaded(masterData);
+    }
 }
 
 function applyFilterOptions() {
@@ -251,42 +256,76 @@ function applyFilterOptions() {
 
 // --- Dashboard Logic ---
 
+// Race condition防止: リクエストごとに増加するトークン
+let _currentRequestToken = 0;
+
+function showOverlayLoader() {
+    const el = document.getElementById('loading');
+    if (el) el.classList.add('overlay-active');
+}
+function hideOverlayLoader() {
+    const el = document.getElementById('loading');
+    if (el) el.classList.remove('overlay-active');
+}
+
 window.applyFilters = async function (isBackground = false) {
-    const group = document.getElementById('filter-group').value;
-    const day = document.getElementById('filter-day').value;
-    const search = document.getElementById('filter-search').value.trim();
+    const group = (document.getElementById('filter-group') || {}).value || '';
+    const day = (document.getElementById('filter-day') || {}).value || '';
+    const search = ((document.getElementById('filter-search') || {}).value || '').trim();
+
+    // timeslot: ドリルダウン選択情報を取得（window.ddから）
+    const ddState = window.__ddState || {};
+    const timeslot = ddState.timeslot || '';
+
+    // Race condition防止: このリクエストのトークンを記録
+    const myToken = ++_currentRequestToken;
 
     if (!isBackground) {
-        const loading = document.getElementById('loading');
-        if (loading) loading.style.display = 'block';
-        document.getElementById('reservation-table').style.opacity = '0.5';
+        showOverlayLoader();
+        const tbl = document.getElementById('reservation-table');
+        if (tbl) tbl.style.opacity = '0.4';
     }
 
-    // Toggle Clear Button Visibility
-    const btnClear = document.getElementById('btn-clear-filters');
-    if (btnClear) {
-        if (group || day || search) {
-            btnClear.style.display = 'inline-block';
-        } else {
-            btnClear.style.display = 'none';
-        }
-    }
+    const result = await adminGetReservations({
+        group,
+        day,
+        timeslot,   // ← 追加: GAS側でtimeslotでも絞り込める
+        search,
+        limit: 200, // 公演単位なので上限を増やせる
+        page: 0
+    });
 
-    // Default pagination: Get latest 100
-    // Future: Implement 'Load More' button by tracking page offset
-    const result = await adminGetReservations({ group, day, search, limit: 100, page: 0 });
+    // 古いリクエストの結果が返ってきた場合は無視
+    if (myToken !== _currentRequestToken) {
+        console.log(`[applyFilters] Stale response ignored (token ${myToken} vs current ${_currentRequestToken})`);
+        return;
+    }
 
     if (!isBackground) {
-        const loading = document.getElementById('loading');
-        if (loading) loading.style.display = 'none';
-        document.getElementById('reservation-table').style.opacity = '1';
+        hideOverlayLoader();
+        const tbl = document.getElementById('reservation-table');
+        if (tbl) tbl.style.opacity = '1';
     }
 
     if (result.success) {
-        currentReservations = result.data;
+        let data = result.data || [];
+
+        // デバッグ: GASの実際のデータ構造をコンソールで確認（後で削除可）
+        if (data.length > 0) {
+            console.log('[admin] GAS reservation sample:', JSON.stringify(data[0]));
+        } else {
+            console.log('[admin] GAS returned empty data. filters:', { group, day, timeslot });
+        }
+
+        // NOTE: GASはgroup+dayで既に絞り込んでいるため、
+        // クライアント側のtimeslotフィルターはパス不一致で全件除外するリスクがある。
+        // 実際のデータ構造確認後にフィルターを有効化する。
+        // if (timeslot) { data = data.filter(...); }
+
+        currentReservations = data;
         renderReservationTable(currentReservations);
     } else {
-        if (!isBackground) alert('データ取得エラー: ' + result.error);
+        if (!isBackground) console.error('データ取得エラー:', result.error);
     }
 };
 
@@ -317,6 +356,7 @@ function renderReservationTable(data) {
         // Safe DOM Construction
         // Col 1: ID
         const tdId = document.createElement('td');
+        tdId.setAttribute('data-label', 'ID');
         tdId.textContent = r.id; // Safe
         if (r.reservation_id) {
             const br = document.createElement('br');
@@ -331,16 +371,19 @@ function renderReservationTable(data) {
 
         // Col 2: Name (VULNERABLE POINT FIXED)
         const tdName = document.createElement('td');
+        tdName.setAttribute('data-label', '名前');
         tdName.textContent = r.name; // Safe
         tr.appendChild(tdName);
 
         // Col 3: Email (VULNERABLE POINT FIXED)
         const tdEmail = document.createElement('td');
+        tdEmail.setAttribute('data-label', 'メール');
         tdEmail.textContent = r.email; // Safe
         tr.appendChild(tdEmail);
 
         // Col 4: Group
         const tdGroup = document.createElement('td');
+        tdGroup.setAttribute('data-label', '団体・時間');
         tdGroup.textContent = groupInfo;
         if (p) {
             const br = document.createElement('br');
@@ -355,11 +398,13 @@ function renderReservationTable(data) {
 
         // Col 5: Seats
         const tdSeats = document.createElement('td');
+        tdSeats.setAttribute('data-label', '座席');
         tdSeats.textContent = seats;
         tr.appendChild(tdSeats);
 
         // Col 6: Status
         const tdStatus = document.createElement('td');
+        tdStatus.setAttribute('data-label', 'ステータス');
         const spanStatus = document.createElement('span');
         spanStatus.className = `status-badge ${statusClass}`;
         spanStatus.textContent = statusText;
@@ -368,8 +413,9 @@ function renderReservationTable(data) {
 
         // Col 7: Action
         const tdAction = document.createElement('td');
+        tdAction.setAttribute('data-label', '操作');
         const btn = document.createElement('button');
-        btn.className = 'btn-outline btn-sm';
+        btn.className = 'btn btn-secondary btn-sm';
         btn.textContent = '詳細/編集';
         btn.onclick = () => openEditModal(r.id);
         tdAction.appendChild(btn);
@@ -869,14 +915,24 @@ window.resetPerformance = async function (id) {
 
 function switchTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+    // Support both legacy .tab-btn and new sidebar .nav-btn
+    document.querySelectorAll('.tab-btn, .nav-btn').forEach(el => el.classList.remove('active'));
 
     document.getElementById('tab-' + tabId).classList.add('active');
-    // Find button - simple query selector
-    const btns = document.querySelectorAll('.tab-btn');
-    if (tabId === 'dashboard') btns[0].classList.add('active');
+
+    // Activate the matching nav button by ID (new sidebar design)
+    const navBtn = document.getElementById('nav-' + tabId);
+    if (navBtn) navBtn.classList.add('active');
+
+    // Fallback: legacy .tab-btn index-based activation
+    const legacyBtns = document.querySelectorAll('.tab-btn');
+    if (legacyBtns.length > 0) {
+        if (tabId === 'dashboard') legacyBtns[0].classList.add('active');
+        if (tabId === 'settings' && legacyBtns[1]) legacyBtns[1].classList.add('active');
+    }
+
     if (tabId === 'settings') {
-        btns[1].classList.add('active');
         if (window.loadDeadlineSettings) window.loadDeadlineSettings();
         if (window.loadBackupsForUI) window.loadBackupsForUI();
     }
