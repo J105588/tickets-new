@@ -1,6 +1,6 @@
 {
   "name": "市川学園座席管理システム",
-  "short_name": "NAZUNAP",
+  "short_name": "Nチケ",
   "description": "國枝ホール向けの座席管理システム",
   "version": "32.0.5",
   "start_url": "./",

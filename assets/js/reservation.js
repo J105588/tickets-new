@@ -4,7 +4,7 @@
  */
 
 import { apiUrlManager } from './config.js';
-import { fetchMasterDataFromSupabase, fetchPerformancesFromSupabase, fetchSeatsFromSupabase, getServerTime, subscribeToDeadline, toDisplaySeatId, adminDeadlineSettings, validateInviteToken } from './supabase-client.js';
+import { fetchMasterDataFromSupabase, fetchPerformancesFromSupabase, fetchSeatsFromSupabase, subscribeToPerformanceSeats, getServerTime, subscribeToDeadline, toDisplaySeatId, adminDeadlineSettings, validateInviteToken } from './supabase-client.js';
 
 // ... (existing code)
 
@@ -436,6 +436,9 @@ const ZOOM_STEP = 0.2;
 const MAX_ZOOM = 2.0;
 const MIN_ZOOM = 0.4;
 
+let currentSeatSubscription = null;
+let currentPerformanceId = null;
+
 function initStep2() {
     // Open Modal
     const btnOpen = document.getElementById('btn-open-seat-modal');
@@ -514,6 +517,11 @@ function openSeatModal() {
 function closeSeatModal() {
     seatModal.classList.remove('active');
     document.body.style.overflow = '';
+
+    if (currentSeatSubscription) {
+        currentSeatSubscription.unsubscribe();
+        currentSeatSubscription = null;
+    }
 }
 
 async function loadSeatMap() {
@@ -530,7 +538,16 @@ async function loadSeatMap() {
 
         if (!result.success) throw new Error(result.error || 'データ取得失敗');
 
+        currentPerformanceId = result.performanceId;
         renderSeatMap(result.data);
+
+        // Sub realtime updates
+        if (currentSeatSubscription) {
+            currentSeatSubscription.unsubscribe();
+        }
+        currentSeatSubscription = subscribeToPerformanceSeats(currentPerformanceId, (newSeatInfo) => {
+            handleRealtimeSeatUpdate(newSeatInfo);
+        });
 
     } catch (e) {
         console.error(e);
@@ -753,6 +770,33 @@ function handleSeatClick(seat) {
     }
 }
 
+function handleRealtimeSeatUpdate(newSeatInfo) {
+    const seatId = newSeatInfo.seat_id;
+    const newStatus = newSeatInfo.status;
+
+    // UI要素を取得
+    const seatEl = document.querySelector(`.seat[data-id="${seatId}"]`);
+    if (seatEl) {
+        // 全てのステータスクラスを削除して新しいものを付与
+        seatEl.classList.remove('available', 'reserved', 'checked_in', 'blocked', 'walkin');
+        seatEl.classList.add(newStatus);
+    }
+
+    // もしその座席が現在選択中に入っていて、なおかつstatusがavailable以外になったら、選択解除して通知
+    if (state.selectedSeats.includes(seatId) && newStatus !== 'available') {
+        const idx = state.selectedSeats.indexOf(seatId);
+        state.selectedSeats.splice(idx, 1);
+
+        if (seatEl) {
+            seatEl.classList.remove('selected');
+        }
+        updateSelectedSeatsUI();
+
+        // ユーザーに簡易通知
+        alert(`選択中の座席 ${toDisplaySeatId(seatId)} は他の方に予約されました。別の座席を選択してください。`);
+    }
+}
+
 function toggleSeat(seatId, el) {
     const idx = state.selectedSeats.indexOf(seatId);
     if (idx >= 0) {
@@ -850,6 +894,13 @@ document.getElementById('reservation-form').addEventListener('submit', async (e)
                 alert('予約に失敗しました: ' + json.error);
                 btn.disabled = false;
                 btn.innerText = originalText;
+
+                // 重複予約などのエラーだった場合、座席を選び直せるようにStep2(座席選択)へ戻す
+                if (json.error && (json.error.includes('既') || json.error.includes('重複') || json.error.includes('エラー'))) {
+                    // ただし今回は状態をそのままにしてStep2を見せるだけ（座席を選びなおさせる）
+                    // 念のため選んでいた一部の既に予約されている座席はその時点でUI更新されているはず
+                    showStep(2);
+                }
             }
         });
 

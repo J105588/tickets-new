@@ -170,11 +170,36 @@ export async function fetchSeatsFromSupabase(group, day, timeslot) {
 
         if (seatsError) throw seatsError;
 
-        return { success: true, data: seatsData };
+        return { success: true, data: seatsData, performanceId: performanceId };
 
     } catch (e) {
         return { success: false, error: e.message };
     }
+}
+
+export function subscribeToPerformanceSeats(performanceId, onUpdate) {
+    const sb = getSupabase();
+    if (!sb) return null;
+
+    console.log(`Subscribing to updates for performance_id=${performanceId}`);
+
+    const channel = sb.channel(`performance-${performanceId}`)
+        .on(
+            'postgres_changes',
+            {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'seats',
+                filter: `performance_id=eq.${performanceId}`
+            },
+            (payload) => {
+                console.log('Realtime seat update received:', payload);
+                if (onUpdate) onUpdate(payload.new);
+            }
+        )
+        .subscribe();
+
+    return channel;
 }
 
 export function subscribeToSeatUpdates(bookingId, onUpdate) {

@@ -1,4 +1,4 @@
-# 市川学園 座席管理システム（NAZUNAP） v32.0.5 技術仕様書
+# 市川学園 座席管理システム（Nチケ） v32.0.5 技術仕様書
 
 本ドキュメントは、システムアーキテクトおよびバックエンド/フロントエンド・エンジニア向けの**全機能コードレベル解説書**である。
 ネットワーク遮断時の業務継続性（オフライン・ファースト）、強力な排他制御（Mutex Layer）、WebSocketを利用したリアルタイム同期、およびDOMPurifyとRLSを用いた多層防御（Defense in Depth）の実装詳細について、ソースコードの挙動を基に網羅的に解説する。
@@ -502,7 +502,7 @@ CREATE POLICY "Deny Public Write"
 *※注意: フロントエンドから送信されるデータは、`jsonp`パラダイムによりGETリクエストのクエリパラメータとして転送され、最終的にGASが `ContentService.createTextOutput(callback + '(' + json + ')').setMimeType(ContentService.MimeType.JAVASCRIPT)` にて応答するアーキテクチャである。*
 
 ---
-市川学園 座席管理システム (NAZUNAP) v32.0.5
+市川学園 座席管理システム (Nチケ) v32.0.5
 
 Copyright (c) 2025 Junxiang Jin. All rights reserved.
 
