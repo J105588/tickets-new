@@ -304,7 +304,7 @@ function fetchJsonp(url, params, callback) {
     script.onerror = function () {
         delete window[callbackName];
         document.body.removeChild(script);
-        alert('APIへの接続に失敗しました (JSONP Error)');
+        callback({ success: false, error: 'APIへの接続に失敗しました (Network Error)' });
     };
 
     document.body.appendChild(script);

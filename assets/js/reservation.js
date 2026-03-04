@@ -315,6 +315,8 @@ function initStep1() {
         state.selectedSeats = []; // Clear selection
         updateSelectedSeatsUI();
 
+        checkStep1Validity(); // Re-validate step 1 since day and timeslot are reset
+
         await fetchPerformances(state.group);
     });
 
@@ -352,7 +354,17 @@ function initStep1() {
 }
 
 function checkStep1Validity() {
-    const isValid = state.group && state.day && state.timeslot;
+    // Check elements directly, making sure a valid option (not the first disabled placeholder) is selected.
+    const isGroupValid = inputs.group.value && inputs.group.value !== "";
+    const isDayValid = inputs.day.value && inputs.day.value !== "";
+    const isTimeslotValid = inputs.timeslot.value && inputs.timeslot.value !== "";
+
+    // Also update state just to be safe in case this is called directly
+    state.group = inputs.group.value;
+    state.day = inputs.day.value;
+    state.timeslot = inputs.timeslot.value;
+
+    const isValid = isGroupValid && isDayValid && isTimeslotValid;
     navigation.toStep2.disabled = !isValid;
 }
 
@@ -934,7 +946,7 @@ function fetchJsonp(url, params, callback) {
     script.onerror = function () {
         delete window[callbackName];
         document.body.removeChild(script);
-        alert('APIへの接続に失敗しました (JSONP Error)');
+        callback({ success: false, error: 'APIへの接続に失敗しました (Network Error)' });
     };
 
     document.body.appendChild(script);

@@ -10,12 +10,12 @@ function getAdminReservations(filters) {
   try {
     // 基本クエリ: bookingsテーブルとperformances, seatsを結合して取得
     // SupabaseのREST APIでフィルタリングを行う
-    
+
     // filters: { group, day, timeslot, year, class_num }
-    
+
     let query = 'select=*,performances!inner(group_name,day,timeslot),seats(seat_id)';
     let conditions = [];
-    
+
     // 1. 公演によるフィルタ (group, day, timeslot)
     if (filters.group) {
       conditions.push(`performances.group_name=eq.${encodeURIComponent(filters.group)}`);
@@ -26,7 +26,7 @@ function getAdminReservations(filters) {
     if (filters.timeslot) {
       conditions.push(`performances.timeslot=eq.${encodeURIComponent(filters.timeslot)}`);
     }
-    
+
     // 2. 学年・クラスによるフィルタ
     // grade_classは "1-1" のような文字列
     if (filters.year || filters.class_num) {
@@ -34,13 +34,13 @@ function getAdminReservations(filters) {
       // "年-組" という形式で部分一致検索をするか、year/classが独立しているかによるが、
       // 現状は grade_class varchar(50) なので、 "1-1" 等が入っている。
       // filters.year = 1, filters.class_num = 1 なら "1-1" を検索
-      
+
       if (filters.year && filters.class_num) {
         gradeStr = `${filters.year}-${filters.class_num}`;
         conditions.push(`grade_class=eq.${gradeStr}`);
       } else if (filters.year) {
-         // "1-*" のような検索はLIKE演算子が必要: grade_class=like.1-%
-         conditions.push(`grade_class=like.${filters.year}-%`);   
+        // "1-*" のような検索はLIKE演算子が必要: grade_class=like.1-%
+        conditions.push(`grade_class=like.${filters.year}-%`);
       }
       // クラスのみの検索はあまり意味がないのでスキップ
     }
@@ -55,7 +55,7 @@ function getAdminReservations(filters) {
     if (filters.search && filters.search.trim()) {
       const term = filters.search.trim();
       const isNumeric = /^\d+$/.test(term);
-      
+
       // Use ilike for case-insensitive partial match on name and email.
       // If term is numeric, also search exactly by ID.
       let searchCond = `or=(name.ilike.*${encodeURIComponent(term)}*,email.ilike.*${encodeURIComponent(term)}*`;
@@ -63,7 +63,7 @@ function getAdminReservations(filters) {
         searchCond += `,id.eq.${term}`;
       }
       searchCond += `)`;
-      
+
       endpoint += '&' + searchCond;
     }
 
@@ -77,11 +77,11 @@ function getAdminReservations(filters) {
 
     // Data Fetch
     const response = supabaseIntegration._request(endpoint, { useServiceRole: true });
-    
+
     if (!response.success) {
       return { success: false, error: response.error };
     }
-    
+
     // Direct return (Client-side filtering removed)
     return { success: true, data: response.data };
 
@@ -97,23 +97,23 @@ function adminResendEmail(bookingId) {
   try {
     const response = supabaseIntegration.getBooking(bookingId);
     if (!response.success) return { success: false, error: '予約が見つかりません' };
-    
+
     const booking = response.data;
-    
+
     // 公演情報を取得 (bookingにはperformance_idしかないため)
     // getBookingByCredentialsなら結合できるが、getBookingは単純取得になっている可能性があるため再取得
     // ここではgetBookingのselectを強化して結合済みのデータを期待するか、別途取得するか。
     // SupabaseIntegration.getBookingの実装を見ると、seatsは結合されているがperformancesは結合されていないかも？
     // 確認: getBookingは `bookings?id=eq.${bookingId}&select=*,seats(...)` となっている
-    
+
     // performancesを取得
     const perfRes = supabaseIntegration._request(`performances?id=eq.${booking.performance_id}`);
     if (!perfRes.success || perfRes.data.length === 0) return { success: false, error: '公演情報が見つかりません' };
     const performance = perfRes.data[0];
-    
+
     // シート文字列
     const seats = booking.seats ? booking.seats.map(s => s.seat_id).join(', ') : '未指定';
-    
+
     // メール送信
     sendReservationEmail(booking.email, {
       name: booking.name,
@@ -124,7 +124,7 @@ function adminResendEmail(bookingId) {
       bookingId: booking.id,
       passcode: booking.passcode
     });
-    
+
     return { success: true, message: 'メールを再送しました' };
 
   } catch (e) {
@@ -139,58 +139,59 @@ function adminChangeSeats(bookingId, newSeatIds) {
   try {
     // 現在の予約取得
     const bookingRes = supabaseIntegration.getBooking(bookingId);
-    if (!bookingRes.success) return {success: false, error: '予約なし'};
+    if (!bookingRes.success) return { success: false, error: '予約なし' };
     const booking = bookingRes.data;
     const performanceId = booking.performance_id;
 
-    // 1. Bulk Release: Release ALL seats associated with this booking ID
-    // This is more robust than iterating individually and avoids phantom seats
-    const releaseRes = supabaseIntegration._request(`seats?booking_id=eq.${bookingId}`, {
-        method: 'PATCH',
-        useServiceRole: true,
-        body: { 
-            status: 'available', 
-            booking_id: null, 
-            reserved_by: null, 
-            reserved_at: null 
-        }
-    });
-
-    if (!releaseRes.success) return { success: false, error: '旧座席の開放に失敗(Bulk): ' + releaseRes.error };
-    
-    // 2. 新しい座席の確保
-    // まず空きチェック
+    // 1. 新しい座席の確保（空きチェック）
     const checkRes = supabaseIntegration._request(`seats?performance_id=eq.${performanceId}&seat_id=in.(${newSeatIds.join(',')})`);
+    if (!checkRes.success) return { success: false, error: '座席の空き状況確認に失敗しました' };
     const targetSeats = checkRes.data;
-    
-    // 他人の予約が入っているかチェック (Bulk Release後なので、自分自身も既にnullになっているはず → 即ち埋まっててはいけない)
-    // ただし、既に開放済みなので、もし埋まっていたら「他人」確定。
-    const unavailable = targetSeats.filter(s => s.status !== 'available');
-    
+
+    // 自分自身の既存の予約と同じ座席が含まれている場合を考慮し、booking_id をチェック
+    const unavailable = targetSeats.filter(s => s.status !== 'available' && String(s.booking_id) !== String(bookingId));
+
     if (unavailable.length > 0) {
-      // 復旧困難（既に開放してしまった）
-      // FIXME: 本来はトランザクションにするべきだが、修正の緊急度優先
-      return { success: false, error: '選択された座席は既に埋まっています（旧座席は開放されました）' };
+      return { success: false, error: '選択された座席の少なくとも一部は既に埋まっています（旧座席は維持されました）' };
     }
-    
+
+    // 2. 旧座席の取得と開放 (ただし新しく選択された座席以外を開放する)
+    const currentSeatsRes = supabaseIntegration._request(`seats?booking_id=eq.${bookingId}&select=seat_id`);
+    if (currentSeatsRes.success && currentSeatsRes.data.length > 0) {
+      const seatsToRelease = currentSeatsRes.data.map(s => s.seat_id).filter(sid => !newSeatIds.includes(sid));
+      if (seatsToRelease.length > 0) {
+        const releaseUpdates = seatsToRelease.map(sid => ({
+          seatId: sid,
+          data: {
+            status: 'available',
+            booking_id: null,
+            reserved_by: null,
+            reserved_at: null
+          }
+        }));
+        supabaseIntegration.updateMultipleSeats(performanceId, releaseUpdates);
+      }
+    }
+
+    // 3. 新座席の確保
     const reserveUpdates = newSeatIds.map(sid => ({
-        seatId: sid,
-        data: {
-            status: 'reserved',
-            booking_id: bookingId,
-            reserved_by: booking.name,
-            reserved_at: new Date().toISOString()
-        }
+      seatId: sid,
+      data: {
+        status: 'reserved',
+        booking_id: bookingId,
+        reserved_by: booking.name,
+        reserved_at: new Date().toISOString()
+      }
     }));
-    
+
     const reserveRes = supabaseIntegration.updateMultipleSeats(performanceId, reserveUpdates);
     if (!reserveRes.success) return { success: false, error: '新座席の確保に失敗' };
-    
+
     // 3. メール再送（変更通知）
     adminResendEmail(bookingId);
-    
+
     return { success: true, message: '座席を変更しました' };
-    
+
   } catch (e) {
     return { success: false, error: e.message };
   }
@@ -201,37 +202,37 @@ function adminChangeSeats(bookingId, newSeatIds) {
 // ==========================================
 function adminCancelReservation(bookingId) {
   try {
-     // パスコードチェックなしでキャンセル処理を行う
-     // 既存のcancelReservationロジックを流用したいが、パスコード必須設計のため
-     // ここで再実装するか、ロジックを分離する必要がある。
-     // ここでは再実装（Admin権限）
-     
+    // パスコードチェックなしでキャンセル処理を行う
+    // 既存のcancelReservationロジックを流用したいが、パスコード必須設計のため
+    // ここで再実装するか、ロジックを分離する必要がある。
+    // ここでは再実装（Admin権限）
+
     const bookingRes = supabaseIntegration.getBooking(bookingId);
     if (!bookingRes.success) return { success: false, error: '予約が見つかりません' };
     const booking = bookingRes.data;
 
     if (booking.status === 'cancelled') return { success: true, message: '既にキャンセル済' };
-    
+
     // ステータス更新
     const updateRes = supabaseIntegration.updateBookingStatus(bookingId, 'cancelled');
     if (!updateRes.success) return { success: false, error: '更新失敗' };
-    
+
     // 座席開放
     const performanceId = booking.performance_id;
     // シート検索 (seatsテーブルのbooking_idで探す)
     const seatsRes = supabaseIntegration._request(`seats?booking_id=eq.${bookingId}`);
     if (seatsRes.success && seatsRes.data.length > 0) {
-        const updates = seatsRes.data.map(s => ({
-            seatId: s.seat_id,
-            data: { 
-                status: 'available', booking_id: null, reserved_by: null, reserved_at: null, checked_in_at: null 
-            }
-        }));
-        supabaseIntegration.updateMultipleSeats(performanceId, updates);
+      const updates = seatsRes.data.map(s => ({
+        seatId: s.seat_id,
+        data: {
+          status: 'available', booking_id: null, reserved_by: null, reserved_at: null, checked_in_at: null
+        }
+      }));
+      supabaseIntegration.updateMultipleSeats(performanceId, updates);
     }
-    
+
     return { success: true, message: '予約を強制キャンセルしました' };
-     
+
   } catch (e) {
     return { success: false, error: e.message };
   }
@@ -242,9 +243,9 @@ function adminCancelReservation(bookingId) {
 function adminUpdateReservation(bookingId, updates) {
   try {
     // updates: { name, email, grade_class, club_affiliation, notes, status? }
-    
+
     if (!bookingId) return { success: false, error: 'Booking ID is required' };
-    
+
     // updateBookingStatus is for status only. Use generic PATCH for other fields.
     // RPCを使用することで、座席ステータスの連動更新（キャンセル時の開放など）を確実に行う
     const rpcParams = {
@@ -262,13 +263,13 @@ function adminUpdateReservation(bookingId, updates) {
       body: rpcParams,
       useServiceRole: true // 管理者操作なのでService Roleを使用
     });
-    
+
     if (!result.success) {
       return { success: false, error: result.error };
     }
-    
+
     return { success: true, message: '予約情報を更新しました', debug_updates: updates };
-    
+
   } catch (e) {
     return { success: false, error: e.message };
   }
@@ -280,7 +281,7 @@ function adminUpdateReservation(bookingId, updates) {
 function adminSendSummaryEmails(jobs) {
   let count = 0;
   let errors = [];
-  
+
   if (!jobs || !Array.isArray(jobs)) return { success: false, error: 'Invalid jobs' };
 
   jobs.forEach(job => {
@@ -290,9 +291,9 @@ function adminSendSummaryEmails(jobs) {
       if (!emails || emails.length === 0) return;
 
       const bookings = job.bookings || [];
-      
+
       let body = `${name} 様\n\n平素より大変お世話になっております。\n市川学園座席管理システム運営でございます。\n\nお客様の現在のご予約状況を以下の通りまとめてご案内申し上げます。\n\n--------------------------------------------------\n`;
-      
+
       bookings.forEach((b, i) => {
         let statusText = b.status;
         if (b.status === 'confirmed') statusText = '予約済';
@@ -300,14 +301,14 @@ function adminSendSummaryEmails(jobs) {
         if (b.status === 'cancelled') statusText = 'キャンセル';
 
         const link = `https://j105588.github.io/tickets-new/pages/reservation-status.html?id=${b.id}&pass=${b.passcode}`;
-        
+
         let createdStr = '不明';
         if (b.created_at) {
           const d = new Date(b.created_at);
           createdStr = Utilities.formatDate(d, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm');
         }
 
-        body += `[${i+1}] ${b.group_name}\n`;
+        body += `[${i + 1}] ${b.group_name}\n`;
         body += `     日時: ${b.day} (${b.timeslot})\n`;
         body += `     座席: ${toDisplaySeatId(b.seat)}\n`;
         body += `     予約ID: ${b.id}\n`;
@@ -316,18 +317,18 @@ function adminSendSummaryEmails(jobs) {
         body += `     詳細確認: ${link}\n`;
         body += `--------------------------------------------------\n`;
       });
-      
+
       body += `\n当日はQRコードをご提示の上、受付までお越しください。\nご来場を心よりお待ち申し上げております。\n\n市川学園座席管理システム`;
-      
+
       const recipient = emails[0];
       const options = {};
       if (emails.length > 1) {
         options.cc = emails.slice(1).join(',');
       }
-      
+
       MailApp.sendEmail(recipient, '【市川学園座席管理システム】ご予約内容の確認', body, options);
       count++;
-      
+
     } catch (e) {
       errors.push(`${job.name}: ${e.message}`);
       console.error('Email send failed for ' + job.name, e);
@@ -384,9 +385,9 @@ function adminResetPerformance(performanceId) {
       return { success: false, error: '予約データの削除に失敗しました: ' + bookingDeleteRes.error };
     }
 
-    return { 
-      success: true, 
-      message: `公演「${performance.group_name} ${performance.day} ${performance.timeslot}」を初期化しました\n(座席開放・予約削除完了)` 
+    return {
+      success: true,
+      message: `公演「${performance.group_name} ${performance.day} ${performance.timeslot}」を初期化しました\n(座席開放・予約削除完了)`
     };
 
   } catch (e) {
@@ -408,19 +409,19 @@ function generateAdminInviteToken(validMinutes = 30) {
   try {
     const now = new Date().getTime();
     const expiry = now + (validMinutes * 60 * 1000);
-    
+
     // Payload: expiry_timestamp
     const payload = expiry.toString();
-    
+
     // Signature: MD5(payload + secret)
     const signature = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, payload + ADMIN_TOKEN_SECRET);
     const signatureHex = signature.map(b => ('0' + (b & 0xFF).toString(16)).slice(-2)).join('');
-    
+
     // Token: Base64(payload + "_" + signatureHex)
     const token = Utilities.base64EncodeWebSafe(`${payload}_${signatureHex}`);
-    
+
     return { success: true, token: token, expiry: expiry };
-    
+
   } catch (e) {
     return { success: false, error: e.message };
   }
@@ -433,29 +434,29 @@ function generateAdminInviteToken(validMinutes = 30) {
  */
 function validateAdminToken(token) {
   if (!token) return { success: false, error: 'Token missing' };
-  
+
   try {
     const decoded = Utilities.newBlob(Utilities.base64DecodeWebSafe(token)).getDataAsString();
     const parts = decoded.split('_');
     if (parts.length !== 2) return { success: false, error: 'Invalid token format' };
-    
+
     const expiryStr = parts[0];
     const signatureHex = parts[1];
-    
+
     // 1. Check Signature
     const expectedSig = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, expiryStr + ADMIN_TOKEN_SECRET);
     const expectedHex = expectedSig.map(b => ('0' + (b & 0xFF).toString(16)).slice(-2)).join('');
-    
+
     if (signatureHex !== expectedHex) return { success: false, error: 'Invalid signature' }; // Tampered
-    
+
     // 2. Check Expiry
     const expiry = parseInt(expiryStr);
     const now = new Date().getTime();
-    
+
     if (now > expiry) return { success: false, error: 'Token expired', expiry: expiry, now: now }; // Expired
-    
+
     return { success: true };
-    
+
   } catch (e) {
     console.warn('Token validation error', e);
     return { success: false, error: 'Validation exception: ' + e.message };
@@ -478,7 +479,7 @@ function getGlobalDeadline() {
   try {
     // Fetch from Supabase settings table
     const res = supabaseIntegration._request(`settings?key=eq.${PROP_GLOBAL_DEADLINE}&select=value`);
-    
+
     if (res.success && res.data && res.data.length > 0) {
       return { success: true, deadline: res.data[0].value };
     }
@@ -508,14 +509,14 @@ function saveGlobalDeadline(datetimeStr) {
         value: datetimeStr,
         updated_at: new Date().toISOString()
       };
-      
+
       const res = supabaseIntegration._request('settings', {
         method: 'POST',
         headers: { 'Prefer': 'resolution=merge-duplicates' },
         body: payload,
         useServiceRole: true
       });
-      
+
       return res.success ? { success: true } : { success: false, error: res.error };
     }
   } catch (e) {

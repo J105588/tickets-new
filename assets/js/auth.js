@@ -139,7 +139,7 @@ function mountLoginUI() {
   wrapper.style.cssText = 'position:fixed;inset:0;background:#fff;display:flex;align-items:center;justify-content:center;z-index:20000;';
   wrapper.innerHTML = `
     <div style="background:#fff;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,0.25);max-width:360px;width:92%;padding:24px 20px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;">
-      <div style="font-size:18px;font-weight:600;margin-bottom:14px;text-align:center;">Nチケ へようこそ</div>
+      <div style="font-size:18px;font-weight:600;margin-bottom:14px;text-align:center;">ログイン</div>
       <div style="display:flex;flex-direction:column;gap:10px;">
         <label style="font-size:13px;color:#555;">ユーザーID</label>
         <input id="auth-user-id" type="text" autocomplete="username" inputmode="text" style="padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;outline:none;" />
@@ -266,6 +266,7 @@ async function showOpeningCeremony() {
     try {
       const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+      // 1. 黒寄りの漆黒オーバーレイ
       const overlay = document.createElement('div');
       overlay.id = 'opening-ceremony-overlay';
       overlay.setAttribute('aria-hidden', 'true');
@@ -273,64 +274,90 @@ async function showOpeningCeremony() {
         'position:fixed',
         'inset:0',
         'z-index:30002',
-        'background:	#EEEEEE',
+        'background: radial-gradient(circle at center, #1b2a47 0%, #0c162c 100%)', // 深い紺色のグラデーション
         'display:flex',
         'align-items:center',
         'justify-content:center',
         'opacity:0',
+        'pointer-events:none',
+        'overflow:hidden'
+      ].join(';') + ';';
+
+      // 2. 背景の巨大な透かし紋章
+      const bgCrest = document.createElement('img');
+      bgCrest.src = 'https://lh3.googleusercontent.com/pw/AP1GczNF7LLZlv3RdKkFgScUndLX8l0OqrTUUu9gn3or7vRSYZz7n07r3Ds_Em5d3v6KtshefwP1yEuWJ6cVlYbU21ZcwKj31XqLZcJveEQ7IrDCHVYmZetqhDe_URyiwUxHw_8zRJljfgyQgxSRFwrD6qkp=w365-h366-s-no-gm';
+      bgCrest.alt = '';
+      bgCrest.decoding = 'async';
+      bgCrest.style.cssText = [
+        'position:absolute',
+        'width:clamp(400px, 90vw, 900px)',
+        'height:auto',
+        'opacity:0',
+        'filter: grayscale(100%) contrast(120%) brightness(1.2) drop-shadow(0 0 40px rgba(139, 0, 0, 0.2))',
+        'mix-blend-mode: color-dodge',
+        'transform: rotate(-15deg) scale(1.1)',
         'pointer-events:none'
       ].join(';') + ';';
 
-      const wrapper = document.createElement('div');
-      wrapper.style.cssText = [
+      // 3. コンテンツのラッパー
+      const content = document.createElement('div');
+      content.style.cssText = [
+        'position:relative',
+        'z-index:10',
         'display:flex',
         'flex-direction:column',
         'align-items:center',
         'justify-content:center',
-        'gap:20px',
-        'color:#333',
         'text-align:center'
       ].join(';') + ';';
 
-      const crest = document.createElement('img');
-      crest.src = 'https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg';
-      crest.alt = '';
-      crest.decoding = 'async';
-      crest.style.cssText = [
-        'width:clamp(160px, 32vw, 300px)',
-        'height:auto',
-        'opacity:0',
-        'transform: scale(0.98) translateY(4px)'
-      ].join(';') + ';';
-
+      // メインタイトル
       const title = document.createElement('div');
       title.textContent = 'Nチケ';
       title.style.cssText = [
-        'font-family:"Noe Display", "Playfair Display", "Times New Roman", serif',
-        'letter-spacing:0.05em',
-        'font-weight:700',
-        'font-size:clamp(28px, 5vw, 48px)', // サイズを縮小
+        'font-family: "Georgia", "YuMincho", "Hiragino Mincho ProN", serif',
+        'letter-spacing:0.4em',
+        'font-weight:600',
+        'font-size:clamp(42px, 8vw, 84px)',
         'opacity:0',
-        'color:#111',
-        'text-shadow: 0 4px 20px rgba(0,0,0,0.08)',
-        'margin-bottom:4px' // サブタイトルとの間隔
+        'color:transparent',
+        'background: linear-gradient(135deg, #f8f9fa 0%, #dcdcdc 50%, #ffffff 100%)', // 白系統にえんじ色の反射光
+        '-webkit-background-clip: text',
+        'background-clip: text',
+        'transform:translateY(30px)',
+        'margin-left:0.4em'
       ].join(';') + ';';
 
+      // 装飾ライン
+      const line = document.createElement('div');
+      line.style.cssText = [
+        'width:0px',
+        'height:1px',
+        'background: linear-gradient(90deg, transparent, rgba(139, 0, 0, 0.9), rgba(180, 20, 20, 1), rgba(139, 0, 0, 0.9), transparent)', // えんじ色のアクセントライン
+        'margin: 28px 0',
+        'opacity:0'
+      ].join(';') + ';';
+
+      // サブタイトル
       const subtitle = document.createElement('div');
       subtitle.textContent = '市川学園座席管理システム';
       subtitle.style.cssText = [
-        'font-family:"YuMincho", "Hiragino Mincho ProN", "Yu Mincho", "MS PMincho", serif',
-        'letter-spacing:0.4em',
-        'font-size:clamp(11px, 1.4vw, 14px)',
+        'font-family: "Shippori Mincho", "YuMincho", "Hiragino Mincho ProN", serif',
+        'letter-spacing:0.8em',
+        'font-size:clamp(12px, 1.8vw, 16px)',
+        'font-weight:400',
         'opacity:0',
-        'color:#666',
-        'transform:translateY(10px)'
+        'color:rgba(255, 255, 255, 0.75)',
+        'transform:translateY(-20px)',
+        'margin-left:0.8em'
       ].join(';') + ';';
 
-      wrapper.appendChild(crest);
-      wrapper.appendChild(title);
-      wrapper.appendChild(subtitle);
-      overlay.appendChild(wrapper);
+      content.appendChild(title);
+      content.appendChild(line);
+      content.appendChild(subtitle);
+
+      overlay.appendChild(bgCrest);
+      overlay.appendChild(content);
       document.body.appendChild(overlay);
 
       // 禁止: スクロール
@@ -341,19 +368,14 @@ async function showOpeningCeremony() {
         document.body.style.overflow = 'hidden';
       } catch (_) { }
 
-      const runNoMotion = () => {
-        overlay.style.opacity = '1';
-        crest.style.opacity = '1';
-        crest.style.transform = 'none';
-        title.style.opacity = '1';
-        subtitle.style.opacity = '1';
-        setTimeout(finish, 600);
-      };
-
       const finish = () => {
         try {
-          overlay.style.transition = 'opacity 800ms ease';
+          overlay.style.transition = 'opacity 1.8s cubic-bezier(0.4, 0, 0.2, 1)';
           overlay.style.opacity = '0';
+          content.style.transition = 'transform 1.8s cubic-bezier(0.4, 0, 0.2, 1)';
+          content.style.transform = 'scale(1.05)';
+          bgCrest.style.transition = 'transform 10s ease-out, opacity 1s ease'; // transformを維持してopacityだけ変える
+          bgCrest.style.opacity = '0';
           setTimeout(() => {
             try { overlay.remove(); } catch (_) { }
             try {
@@ -361,48 +383,62 @@ async function showOpeningCeremony() {
               document.body.style.overflow = prevBodyOverflow || '';
             } catch (_) { }
             resolve();
-          }, 820);
+          }, 1850);
         } catch (_) {
           resolve();
         }
       };
 
       if (reduced) {
-        // 低モーション: 簡易表示
-        requestAnimationFrame(runNoMotion);
+        overlay.style.opacity = '1';
+        title.style.opacity = '1';
+        title.style.transform = 'translateY(0)';
+        line.style.width = 'clamp(200px, 40vw, 400px)';
+        line.style.opacity = '1';
+        subtitle.style.opacity = '1';
+        subtitle.style.transform = 'translateY(0)';
+        setTimeout(finish, 800);
         return;
       }
 
-      // まず画面を即時覆う
       overlay.style.opacity = '1';
       overlay.style.pointerEvents = 'auto';
 
-      // 順次フェードイン
+      // アニメーションステップ
       setTimeout(() => {
         requestAnimationFrame(() => {
-          // 1. 紋章
-          crest.style.transition = 'transform 1200ms cubic-bezier(0.22, 1, 0.36, 1), opacity 1200ms ease';
-          crest.style.opacity = '1';
-          crest.style.transform = 'scale(1) translateY(0)';
+          // 1. 巨大な透かしエンブレムが極低速で回転しながら現れる
+          bgCrest.style.transition = 'transform 10s ease-out, opacity 4s ease';
+          bgCrest.style.opacity = '0.12'; // 暗い背景に上品に
+          bgCrest.style.transform = 'rotate(0deg) scale(1)';
 
-          // 2. メインタイトル (Nチケ)
+          // 2. 中央のラインが左右に伸びる
           setTimeout(() => {
-            title.style.transition = 'opacity 1000ms ease, transform 1000ms cubic-bezier(0.22, 1, 0.36, 1)';
-            title.style.opacity = '1';
-            title.style.transform = 'translateY(0)';
-          }, 300);
-
-          // 3. サブタイトル (システム名)
-          setTimeout(() => {
-            subtitle.style.transition = 'opacity 800ms ease, transform 800ms ease';
-            subtitle.style.opacity = '1';
-            subtitle.style.transform = 'translateY(0)';
+            line.style.transition = 'width 1.8s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 1.5s ease';
+            line.style.width = 'clamp(240px, 50vw, 500px)';
+            line.style.opacity = '1';
           }, 600);
 
-          // フェードアウト
-          setTimeout(finish, 3800);
+          // 3. タイトル 「Nチケ」 が浮かび上がる
+          setTimeout(() => {
+            title.style.transition = 'opacity 2.5s ease, transform 3s cubic-bezier(0.16, 1, 0.3, 1), filter 3s ease';
+            title.style.opacity = '1';
+            title.style.transform = 'translateY(0)';
+            title.style.filter = 'drop-shadow(0 0 24px rgba(255, 255, 255, 0.15)) drop-shadow(0 4px 12px rgba(139, 0, 0, 0.4))'; // 薄くえんじ色の後光
+          }, 1200);
+
+          // 4. サブタイトルが下りてくる
+          setTimeout(() => {
+            subtitle.style.transition = 'opacity 2s ease, transform 2s cubic-bezier(0.16, 1, 0.3, 1)';
+            subtitle.style.opacity = '1';
+            subtitle.style.transform = 'translateY(0)';
+          }, 2000);
+
+          // 全体が余韻をもってフェードアウト
+          setTimeout(finish, 5800);
         });
-      }, 350);
+      }, 200);
+
     } catch (_) {
       resolve();
     }
