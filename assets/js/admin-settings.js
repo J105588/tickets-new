@@ -4,6 +4,19 @@
  */
 
 import {
+
+
+// カスタムダイアログ用ヘルパー
+async function customAlert(msg) {
+  if (window.CustomDialog) await CustomDialog.alert(msg);
+  else window.alert(msg);
+}
+
+async function customConfirm(msg) {
+  if (window.CustomDialog) return await CustomDialog.confirm(msg);
+  return window.confirm(msg);
+}
+
     fetchMasterDataFromSupabase,
     adminFetchSchedules,
     adminManageSchedule,
@@ -36,7 +49,7 @@ async function loadAllData() {
         masterData.dates = mRes.data.dates || [];
         masterData.timeslots = mRes.data.timeslots || [];
     } else {
-        alert('マスタデータ取得エラー: ' + mRes.error);
+        await customAlert('マスタデータ取得エラー: ' + mRes.error);
     }
 
     if (sRes.success) {
@@ -162,15 +175,15 @@ window.saveGroup = async () => {
     };
     if (id) data.id = parseInt(id);
 
-    if (!data.name) return alert('名前は必須です');
+    if (!data.name) return await customAlert('名前は必須です');
 
     const res = await adminManageMaster('groups', 'save', data);
     if (res.success) {
-        alert('保存しました');
+        await customAlert('保存しました');
         closeModal('modal-group');
         loadAllData();
     } else {
-        alert('エラー: ' + res.error);
+        await customAlert('エラー: ' + res.error);
     }
 };
 
@@ -198,15 +211,15 @@ window.saveTimeslot = async () => {
     };
     if (id) data.id = parseInt(id);
 
-    if (!data.slot_code) return alert('コードは必須です');
+    if (!data.slot_code) return await customAlert('コードは必須です');
 
     const res = await adminManageMaster('time_slots', 'save', data);
     if (res.success) {
-        alert('保存しました');
+        await customAlert('保存しました');
         closeModal('modal-timeslot');
         loadAllData();
     } else {
-        alert('エラー: ' + res.error);
+        await customAlert('エラー: ' + res.error);
     }
 };
 
@@ -258,33 +271,33 @@ window.saveSchedule = async () => {
 
     const res = await adminManageSchedule(data);
     if (res.success) {
-        alert('保存しました');
+        await customAlert('保存しました');
         closeModal('modal-schedule');
         loadAllData();
     } else {
-        alert('エラー: ' + res.error);
+        await customAlert('エラー: ' + res.error);
     }
 };
 
 window.deleteScheduleEntry = async (id) => {
-    if (!confirm('本当に削除しますか？\n（関連する座席データも削除されます）')) return;
+    if (!await customConfirm('本当に削除しますか？\n（関連する座席データも削除されます）')) return;
     const res = await adminDeleteSchedule(id);
     if (res.success) {
-        alert('削除しました');
+        await customAlert('削除しました');
         loadAllData();
     } else {
-        alert('エラー: ' + res.error);
+        await customAlert('エラー: ' + res.error);
     }
 };
 
 // Generic Delete for Master
 window.deleteItem = async (table, id) => {
-    if (!confirm('本当に削除しますか？')) return;
+    if (!await customConfirm('本当に削除しますか？')) return;
     const res = await adminManageMaster(table, 'delete', { id: id });
     if (res.success) {
-        alert('削除しました');
+        await customAlert('削除しました');
         loadAllData();
     } else {
-        alert('エラー: ' + res.error);
+        await customAlert('エラー: ' + res.error);
     }
 };

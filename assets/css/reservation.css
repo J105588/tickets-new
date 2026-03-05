@@ -510,8 +510,6 @@ p {
     color: var(--text-muted);
     border: 2px solid #d1d5db;
     /* Gray outline */
-    margin-right: auto;
-    /* Push back buttons to the left */
 }
 
 .btn-secondary:hover {

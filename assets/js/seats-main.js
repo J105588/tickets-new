@@ -21,6 +21,16 @@ const MODES = {
   WALKIN: 'WALKIN'
 };
 
+async function customAlert(msg) {
+  if (window.CustomDialog) await CustomDialog.alert(msg);
+  else window.alert(msg);
+}
+
+async function customConfirm(msg) {
+  if (window.CustomDialog) return await CustomDialog.confirm(msg);
+  return window.confirm(msg);
+}
+
 function determineAppMode() {
   if (rebookId && IS_ADMIN) return MODES.REBOOK; // Rebook takes precedence (must have admin param)
   const current = localStorage.getItem('currentMode');
@@ -305,7 +315,7 @@ window.onload = async () => {
         errorContainer.style.display = 'flex';
       } else {
         // エラーコンテナがない場合はアラートで表示
-        alert(`座席データの読み込みに失敗しました: ${errorMsg} `);
+        await customAlert(`座席データの読み込みに失敗しました: ${errorMsg} `);
       }
 
       // エラー時でも基本的なUIは表示
@@ -341,7 +351,7 @@ window.onload = async () => {
       errorContainer.style.display = 'flex';
     } else {
       // エラーコンテナがない場合はアラートで表示
-      alert(`サーバー通信に失敗しました: ${error.message} `);
+      await customAlert(`サーバー通信に失敗しました: ${error.message} `);
     }
   } finally {
     showLoader(false);
@@ -1172,7 +1182,7 @@ function createSeatElement(seatData) {
 
 // 座席クリック時の処理
 // 座席クリック時の処理
-function handleSeatClick(seatData, event) {
+async function handleSeatClick(seatData, event) {
   // Use Global APP_MODE for routing
   if (APP_MODE === MODES.SUPER_ADMIN) {
     handleSuperAdminSeatClick(seatData, event);
@@ -1291,7 +1301,7 @@ function showBulkSeatEditModal(seatIds) {
     const columnC = document.getElementById('bulk-column-c').value;
     const columnD = document.getElementById('bulk-column-d').value;
     const columnE = document.getElementById('bulk-column-e').value;
-    if (!confirm(`以下の内容を${seatIds.length} 席に一括適用しますか？\n\nC列: ${columnC} \nD列: ${columnD} \nE列: ${columnE} `)) return;
+    if (!await customConfirm(`以下の内容を${seatIds.length} 席に一括適用しますか？\n\nC列: ${columnC} \nD列: ${columnD} \nE列: ${columnE} `)) return;
     closeBulkSeatEditModal();
     showLoader(true);
     try {
@@ -1393,7 +1403,7 @@ function handleAdminSeatClick(seatData) {
 }
 
 // 通常モードでの座席クリック処理
-function handleNormalSeatClick(seatData) {
+async function handleNormalSeatClick(seatData) {
   // 利用可能な座席のみ選択可能（通常時）
   // Rebook Mode with Admin: Allow selecting 'reserved' seats (to keep them or claim them)
   const isRebookAdmin = APP_MODE === MODES.REBOOK;
@@ -1410,7 +1420,7 @@ function handleNormalSeatClick(seatData) {
         'unavailable': 'この座席は利用できません'
       };
       const message = statusMessages[seatData.status] || 'この座席は選択できません';
-      alert(message);
+      await customAlert(message);
       return;
     }
   }
@@ -1564,7 +1574,7 @@ async function manualRefresh() {
         console.log('[Offline] 手動更新でキャッシュを使用');
         drawSeatMap(cached.seatMap);
         updateLastUpdateTime();
-        alert('オフラインのためキャッシュから表示しています');
+        await customAlert('オフラインのためキャッシュから表示しています');
         return;
       }
     }
@@ -1575,11 +1585,11 @@ async function manualRefresh() {
       try { if (window.writeCache) { window.writeCache(GROUP, DAY, TIMESLOT, seatData); } } catch (_) { }
       drawSeatMap(seatData.seatMap);
       updateLastUpdateTime();
-      alert('座席データを更新しました');
+      await customAlert('座席データを更新しました');
     }
   } catch (error) {
     console.error('手動更新エラー:', error);
-    alert('更新に失敗しました: ' + error.message);
+    await customAlert('更新に失敗しました: ' + error.message);
   } finally {
     showLoader(false);
     isRefreshing = false;
@@ -1634,7 +1644,7 @@ async function checkInSelected() {
   }
   const selectedSeatElements = document.querySelectorAll('.seat.selected-for-checkin');
   if (selectedSeatElements.length === 0) {
-    alert('チェックインする座席を選択してください。');
+    await customAlert('チェックインする座席を選択してください。');
     return;
   }
 
@@ -1647,7 +1657,7 @@ async function checkInSelected() {
   const seatList = selectedSeatInfos.map(seat => `${seat.id}：${seat.columnD || '（名前未設定）'} `).join('\n');
   const confirmMessage = `以下の座席をチェックインしますか？\n\n${seatList} `;
 
-  if (!confirm(confirmMessage)) {
+  if (!await customConfirm(confirmMessage)) {
     return;
   }
 
@@ -1781,7 +1791,7 @@ async function checkInSelected() {
 // 予約確認・実行関数（最適化版）
 async function confirmReservation() {
   if (selectedSeats.length === 0) {
-    alert('予約する座席を選択してください。\n\n利用可能な座席（緑色）をクリックして選択してから、予約ボタンを押してください。');
+    await customAlert('予約する座席を選択してください。\n\n利用可能な座席（緑色）をクリックして選択してから、予約ボタンを押してください。');
     return;
   }
 
@@ -1790,7 +1800,7 @@ async function confirmReservation() {
   if (urlParams.get('rebook') && urlParams.get('admin') === 'true') {
     const bookingId = urlParams.get('rebook');
 
-    if (!confirm(`予約変更(Rebooking for ID: ${bookingId}) \n\n選択した座席に変更します。\nよろしいですか？`)) return;
+    if (!await customConfirm(`予約変更(Rebooking for ID: ${bookingId}) \n\n選択した座席に変更します。\nよろしいですか？`)) return;
 
     showLoader(true);
     try {
@@ -1801,7 +1811,7 @@ async function confirmReservation() {
           window.parent.postMessage({ type: 'REBOOK_COMPLETE', success: true }, '*');
         } else {
           // Standalone Mode
-          alert('座席変更が完了しました。\n管理画面に戻ります。');
+          await customAlert('座席変更が完了しました。\n管理画面に戻ります。');
           if (window.opener) window.opener.location.reload();
           window.close();
         }
@@ -1809,14 +1819,14 @@ async function confirmReservation() {
         if (urlParams.get('embed') === 'true') {
           window.parent.postMessage({ type: 'REBOOK_COMPLETE', success: false, error: res.error }, '*');
         } else {
-          alert('変更失敗: ' + (res.error || 'Unknown Error'));
+          await customAlert('変更失敗: ' + (res.error || 'Unknown Error'));
         }
       }
     } catch (e) {
       if (urlParams.get('embed') === 'true') {
         window.parent.postMessage({ type: 'REBOOK_COMPLETE', success: false, error: e.message }, '*');
       } else {
-        alert('System Error: ' + e.message);
+        await customAlert('System Error: ' + e.message);
       }
     } finally {
       showLoader(false);
@@ -1830,11 +1840,11 @@ async function confirmReservation() {
     : `以下の座席で予約しますか？\n\n${selectedSeats.join(', ')} `;
 
   if (selectedSeats.length === 0) {
-    alert('予約する座席を選択してください。');
+    await customAlert('予約する座席を選択してください。');
     return;
   }
 
-  if (!confirm(confirmMessage)) {
+  if (!await customConfirm(confirmMessage)) {
     return;
   }
 
@@ -2108,7 +2118,7 @@ async function updateSeatData(seatId) {
   // 確認ダイアログを表示
   const confirmMessage = `座席 ${seatId} のデータを以下の内容で更新しますか？\n\nC列: ${columnC} \nD列: ${columnD} \nE列: ${columnE} `;
 
-  if (!confirm(confirmMessage)) {
+  if (!await customConfirm(confirmMessage)) {
     return;
   }
 
@@ -2185,7 +2195,7 @@ async function updateSeatData(seatId) {
           duration: 3000
         });
       } else {
-        alert('座席データを更新しました！');
+        await customAlert('座席データを更新しました！');
       }
 
       closeSeatEditModal();
@@ -2239,7 +2249,7 @@ async function updateSeatData(seatId) {
           duration: 8000
         });
       } else {
-        alert(`更新エラー：\n${errorMessage} `);
+        await customAlert(`更新エラー：\n${errorMessage} `);
       }
     }
   } catch (error) {
@@ -2272,7 +2282,7 @@ async function updateSeatData(seatId) {
         duration: 10000
       });
     } else {
-      alert(`更新中にエラーが発生しました：\n${errorMessage} `);
+      await customAlert(`更新中にエラーが発生しました：\n${errorMessage} `);
     }
   } finally {
     showLoader(false);
@@ -2294,11 +2304,11 @@ function endUserInteraction() {
 }
 
 // 当日券ページへのナビゲーション
-function navigateToWalkin() {
+async function navigateToWalkin() {
   const currentMode = localStorage.getItem('currentMode') || 'normal';
 
   if (currentMode !== 'walkin' && currentMode !== 'superadmin') {
-    alert('当日券発行には当日券モードまたは最高管理者モードでのログインが必要です。\nサイドバーからモードを変更してください。');
+    await customAlert('当日券発行には当日券モードまたは最高管理者モードでのログインが必要です。\nサイドバーからモードを変更してください。');
     return;
   }
 
@@ -2312,10 +2322,10 @@ function navigateToWalkin() {
 window.navigateToWalkin = navigateToWalkin;
 
 // 選択座席の一括編集を起動（ヘッダーボタンから）
-window.editSelectedSeats = function () {
+window.editSelectedSeats = async function () {
   const selected = Array.from(document.querySelectorAll('.seat.selected-for-edit')).map(el => el.dataset.id);
   if (selected.length < 1) {
-    alert('編集する座席を選択してください。\nCtrl/Shift キーを押しながらクリックで複数選択できます。');
+    await customAlert('編集する座席を選択してください。\nCtrl/Shift キーを押しながらクリックで複数選択できます。');
     return;
   }
   if (selected.length === 1) {

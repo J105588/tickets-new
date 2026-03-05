@@ -1,3 +1,15 @@
+
+// カスタムダイアログ用ヘルパー
+async function customAlert(msg) {
+  if (window.CustomDialog) await CustomDialog.alert(msg);
+  else window.alert(msg);
+}
+
+async function customConfirm(msg) {
+  if (window.CustomDialog) return await CustomDialog.confirm(msg);
+  return window.confirm(msg);
+}
+
 // ===============================================================
 // オフライン同期システム v2.0 - 完全再設計版
 // ===============================================================
@@ -63,16 +75,16 @@ class OfflineOperationManager {
     this.noticePollInterval = null;
     this.noticePollIntervalMs = 20000; // 20秒に延長（iOS負荷軽減）
     this.lastNoticeTs = 0;
-    
+
     // 当日券モード用の空席同期
     this.walkinSeatSyncInterval = null;
     this.walkinSeatSyncEnabled = false;
     this.walkinSeatSyncIntervalMs = 25000; // 25秒に延長（iOS負荷軽減）
-    
+
     // iOS対応: メモリクリーンアップ用
     this.memoryCleanupInterval = null;
     this.isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    
+
     this.setupCrossTabChannel();
     this.initializeEventListeners();
     this.startBackgroundSync();
@@ -86,20 +98,20 @@ class OfflineOperationManager {
     window.addEventListener('online', () => this.handleOnline());
     window.addEventListener('offline', () => this.handleOffline());
     window.addEventListener('beforeunload', (event) => this.handleBeforeUnload(event));
-    
+
     // iOS対応: 接続状態チェック間隔を調整
     const connectionCheckInterval = this.isIOS ? 15000 : 8000;
     setInterval(() => this.checkConnectionStatus(), connectionCheckInterval);
-    
+
     // ページ可視性の変更を監視
     document.addEventListener('visibilitychange', () => this.handleVisibilityChange());
-    
+
     // iOS対応: ページハイド時の処理
     if (this.isIOS) {
       document.addEventListener('pagehide', () => this.handlePageHide());
       window.addEventListener('pageshow', () => this.handlePageShow());
     }
-    
+
     // 当日券モードの監視
     this.startWalkinModeMonitoring();
 
@@ -115,7 +127,7 @@ class OfflineOperationManager {
             this.performSync();
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     });
   }
 
@@ -143,7 +155,7 @@ class OfflineOperationManager {
   }
 
   broadcast(message) {
-    try { if (this.bc) { this.bc.postMessage(message); } } catch (_) {}
+    try { if (this.bc) { this.bc.postMessage(message); } } catch (_) { }
   }
 
   // 競合回避のためのロック獲得
@@ -172,7 +184,7 @@ class OfflineOperationManager {
       const now = Date.now();
       const lock = { owner: this.instanceId, acquiredAt: now, expiresAt: now + this.lockTtlMs };
       localStorage.setItem(this.lockKey, JSON.stringify(lock));
-    } catch (_) {}
+    } catch (_) { }
   }
 
   releaseLock() {
@@ -181,7 +193,7 @@ class OfflineOperationManager {
       if (current.owner === this.instanceId) {
         localStorage.removeItem(this.lockKey);
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   /**
@@ -189,18 +201,18 @@ class OfflineOperationManager {
    */
   async handleOnline() {
     if (this.isOnline) return;
-    
+
     console.log('[OfflineSync] オンライン復帰を検知');
     this.isOnline = true;
     this.syncState.lastOnlineTime = Date.now();
     this.saveSyncState();
-    
+
     // オフライン状態インジケーターを更新
     this.updateOfflineIndicator();
-    
+
     // 即座に同期を開始
     await this.performSync();
-    
+
     // バックグラウンド同期を再開
     this.startBackgroundSync();
 
@@ -216,18 +228,18 @@ class OfflineOperationManager {
    */
   async handleOffline() {
     if (!this.isOnline) return;
-    
+
     console.log('[OfflineSync] オフライン状態を検知');
     this.isOnline = false;
     this.syncState.lastOfflineTime = Date.now();
     this.saveSyncState();
-    
+
     // オフライン状態インジケーターを更新
     this.updateOfflineIndicator();
-    
+
     // バックグラウンド同期を停止
     this.stopBackgroundSync();
-    
+
     // オフライン操作モードに切り替え
     await this.installOfflineOverrides();
 
@@ -299,14 +311,14 @@ class OfflineOperationManager {
   handleBeforeUnload(event) {
     // 同期状態を保存
     this.saveSyncState();
-    
+
     // 未同期の操作がある場合は警告
     const queue = this.readOperationQueue();
     if (queue.length > 0) {
       try {
         event.preventDefault();
         event.returnValue = '';
-      } catch (_) {}
+      } catch (_) { }
       return '';
     }
   }
@@ -316,13 +328,13 @@ class OfflineOperationManager {
    */
   addOperation(operation) {
     const queue = this.readOperationQueue();
-    
+
     // キューサイズの制限チェック
     if (queue.length >= OFFLINE_CONFIG.MAX_QUEUE_SIZE) {
       console.warn('[OfflineSync] キューが最大サイズに達しました。古い操作を削除します。');
       queue.splice(0, Math.floor(queue.length / 2)); // 古い操作を半分削除
     }
-    
+
     const operationWithMeta = {
       ...operation,
       id: this.generateOperationId(),
@@ -332,26 +344,26 @@ class OfflineOperationManager {
       status: 'pending',
       precondition: this.capturePrecondition(operation)
     };
-    
+
     queue.push(operationWithMeta);
-    
+
     // 優先度順にソート
     queue.sort((a, b) => a.priority - b.priority);
-    
+
     this.writeOperationQueue(queue);
     this.broadcast({ type: 'queue-updated' });
     this.logOperation(operationWithMeta);
 
     // コンテキストを学習して事前取得対象に追加
-    try { const ctx = this.extractContext(operation.args); this.trackKnownContext(ctx); } catch (_) {}
-    
+    try { const ctx = this.extractContext(operation.args); this.trackKnownContext(ctx); } catch (_) { }
+
     console.log(`[OfflineSync] オフライン操作を追加: ${operation.type} (ID: ${operationWithMeta.id})`);
-    
+
     // オンライン時は即座に同期を試行
     if (this.isOnline && !this.syncInProgress) {
       this.performSync();
     }
-    
+
     return operationWithMeta.id;
   }
 
@@ -394,12 +406,12 @@ class OfflineOperationManager {
       },
       queueLength: this.readOperationQueue().length
     });
-    
+
     // ログサイズを制限
     if (log.length > 1000) {
       log.splice(0, log.length - 1000);
     }
-    
+
     this.writeOperationLog(log);
   }
 
@@ -435,7 +447,7 @@ class OfflineOperationManager {
     this.syncInProgress = true;
     this.syncState.lastSyncAttempt = Date.now();
     this.saveSyncState();
-    
+
     this.showSyncModal();
 
     // GasAPI readiness guard: if not ready, back off and retry
@@ -452,7 +464,7 @@ class OfflineOperationManager {
     }
 
     // タイムアウト処理
-    const timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(async () => {
       if (this.syncInProgress) {
         console.error('[OfflineSync] 同期タイムアウト');
         this.syncInProgress = false;
@@ -465,7 +477,7 @@ class OfflineOperationManager {
         } catch (error) {
           console.error('[OfflineSync] エラー通知の表示に失敗:', error);
           // フォールバック: アラートで表示
-          alert('同期がタイムアウトしました。手動で再試行してください。');
+          await customAlert('同期がタイムアウトしました。手動で再試行してください。');
         }
       }
     }, OFFLINE_CONFIG.SYNC_TIMEOUT_MS);
@@ -474,44 +486,44 @@ class OfflineOperationManager {
       console.log('[OfflineSync] 操作キューの処理開始');
       const result = await this.processOperationQueue(queue);
       clearTimeout(timeoutId);
-      
+
       console.log('[OfflineSync] 同期完了:', result);
-      
+
       // 成功した操作をキューから削除
       this.writeOperationQueue(result.remaining);
       this.broadcast({ type: 'queue-updated' });
-      
+
       // 同期状態を更新
       this.syncState.lastSuccessfulSync = Date.now();
       this.syncState.syncErrors = [];
       this.saveSyncState();
-      
+
       // 成功通知を表示
       if (result.processed.length > 0) {
         this.showSuccessNotification(`${result.processed.length}件の操作を同期しました`);
       }
-      
+
       // 競合が残っている場合は自動解決を試行
       if (result.conflictCount > 0 && Array.isArray(result.conflicts) && result.conflicts.length > 0) {
         console.log('[OfflineSync] 競合の自動解決を試行します:', result.conflicts.length);
         await this.resolveConflicts(result.conflicts);
       }
-      
+
       // エラーが発生した操作がある場合の通知
       if (result.errorCount > 0) {
         this.showErrorNotification(`${result.errorCount}件の操作でエラーが発生しました`);
       }
-      
+
       // キャッシュを更新
       console.log('[OfflineSync] キャッシュ更新開始');
       await this.refreshCache();
       console.log('[OfflineSync] キャッシュ更新完了');
-      
+
     } catch (error) {
       clearTimeout(timeoutId);
       console.error('[OfflineSync] 同期エラー:', error);
       this.handleSyncError(error);
-      
+
       // エラーが発生した場合、キューをクリアして無限ループを防ぐ
       const currentQueue = this.readOperationQueue();
       if (currentQueue.length > 0) {
@@ -539,7 +551,7 @@ class OfflineOperationManager {
     for (const operation of queue) {
       try {
         console.log(`[OfflineSync] 処理中: ${operation.type} (ID: ${operation.id})`);
-        
+
         // 前提条件のチェック
         if (!this.validatePrecondition(operation)) {
           conflicts.push(operation);
@@ -548,9 +560,9 @@ class OfflineOperationManager {
           remaining.push(operation);
           continue;
         }
-        
+
         const result = await this.executeOperation(operation);
-        
+
         if (result.success) {
           processed.push({ ...operation, result, syncedAt: Date.now() });
           console.log(`[OfflineSync] 成功: ${operation.type} (ID: ${operation.id})`);
@@ -605,22 +617,22 @@ class OfflineOperationManager {
         console.log('[OfflineSync] 前提条件検証: コンテキスト情報が不完全');
         return true;
       }
-      
+
       const cache = this.readCache(group, day, timeslot);
       if (!cache) {
         console.log('[OfflineSync] 前提条件検証: キャッシュが存在しない');
         return true;
       }
-      
+
       if (!operation.precondition) {
         console.log('[OfflineSync] 前提条件検証: 操作の前提条件が存在しない');
         return true;
       }
-      
+
       // キャッシュのバージョンが前提条件と一致するかチェック
       const isValid = cache.version === operation.precondition.version;
       console.log(`[OfflineSync] 前提条件検証: ${isValid ? '有効' : '無効'} (cache: ${cache.version}, operation: ${operation.precondition.version})`);
-      
+
       // オフライン操作の場合は前提条件を緩和
       if (!isValid && operation.timestamp) {
         const timeDiff = Date.now() - operation.timestamp;
@@ -629,7 +641,7 @@ class OfflineOperationManager {
           return true;
         }
       }
-      
+
       return isValid;
     } catch (error) {
       console.warn('[OfflineSync] 前提条件の検証に失敗:', error);
@@ -644,7 +656,7 @@ class OfflineOperationManager {
     try {
       const { group, day, timeslot } = this.extractContext(operation.args);
       const cache = this.readCache(group, day, timeslot);
-      
+
       if (!cache || !cache.seatMap) {
         return { success: false, error: 'キャッシュデータが見つかりません' };
       }
@@ -694,7 +706,7 @@ class OfflineOperationManager {
       // GASのシート仕様に合わせてC/D/E列を直接更新
       const now = new Date();
       const pad = (n) => String(n).padStart(2, '0');
-      const ts = `${now.getFullYear()}/${pad(now.getMonth()+1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+      const ts = `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
       const walkinLabel = `当日券_${ts}`;
 
       const updatePromises = locallyReservedSeats.map(seatId => {
@@ -704,12 +716,12 @@ class OfflineOperationManager {
 
       const results = await Promise.all(updatePromises);
       const failedUpdates = results.filter(r => !r.success);
-      
+
       if (failedUpdates.length > 0) {
         // オフライン委譲はここでキュー投入して成功扱いにする
         const offlineDelegated = failedUpdates.filter(r => r && r.error === 'offline_delegate' && Array.isArray(r.params));
         const otherFailures = failedUpdates.filter(r => !(r && r.error === 'offline_delegate' && Array.isArray(r.params)));
-        
+
         if (offlineDelegated.length > 0) {
           try {
             offlineDelegated.forEach(item => {
@@ -719,7 +731,7 @@ class OfflineOperationManager {
                 if (Array.isArray(args)) {
                   this.addOperation({ type: OPERATION_TYPES.UPDATE_SEAT_DATA, args });
                 }
-              } catch (_) {}
+              } catch (_) { }
             });
             console.warn(`[OfflineSync] ${offlineDelegated.length}件の座席更新をオフラインキューに委譲`);
           } catch (e) {
@@ -729,8 +741,8 @@ class OfflineOperationManager {
 
         if (otherFailures.length > 0) {
           console.error('[OfflineSync] 一部の座席更新に失敗:', otherFailures);
-          return { 
-            success: false, 
+          return {
+            success: false,
             error: `${otherFailures.length}件の座席更新に失敗しました`,
             details: otherFailures
           };
@@ -751,7 +763,7 @@ class OfflineOperationManager {
           };
         }
       });
-      
+
       this.writeCache(group, day, timeslot, updatedCache);
 
       return {
@@ -772,14 +784,14 @@ class OfflineOperationManager {
    */
   async executeOperation(operation) {
     const { type, args } = operation;
-    
+
     try {
       console.log(`[OfflineSync] GasAPI待機開始: ${type}`);
       const gasAPI = await this.waitForGasAPI();
       console.log(`[OfflineSync] GasAPI取得完了: ${type}`);
-      
+
       console.log(`[OfflineSync] GAS API呼び出し: ${type}`, args);
-      
+
       let result;
       switch (type) {
         case OPERATION_TYPES.RESERVE_SEATS:
@@ -803,20 +815,20 @@ class OfflineOperationManager {
             : await gasAPI.updateSeatData(...args);
           console.log(`[OfflineSync] updateSeatData呼び出し完了(オリジナル)`);
           break;
-                 case OPERATION_TYPES.ASSIGN_WALKIN:
-           console.log(`[OfflineSync] ローカル予約済み座席を当日券として登録開始`);
-           result = await this.registerLocalReservationAsWalkin(operation);
-           console.log(`[OfflineSync] ローカル予約済み座席を当日券として登録完了`);
-           break;
-         case OPERATION_TYPES.ASSIGN_WALKIN_CONSECUTIVE:
-           console.log(`[OfflineSync] ローカル予約済み座席を当日券として登録開始`);
-           result = await this.registerLocalReservationAsWalkin(operation);
-           console.log(`[OfflineSync] ローカル予約済み座席を当日券として登録完了`);
-           break;
+        case OPERATION_TYPES.ASSIGN_WALKIN:
+          console.log(`[OfflineSync] ローカル予約済み座席を当日券として登録開始`);
+          result = await this.registerLocalReservationAsWalkin(operation);
+          console.log(`[OfflineSync] ローカル予約済み座席を当日券として登録完了`);
+          break;
+        case OPERATION_TYPES.ASSIGN_WALKIN_CONSECUTIVE:
+          console.log(`[OfflineSync] ローカル予約済み座席を当日券として登録開始`);
+          result = await this.registerLocalReservationAsWalkin(operation);
+          console.log(`[OfflineSync] ローカル予約済み座席を当日券として登録完了`);
+          break;
         default:
           result = { success: false, error: `未知の操作タイプ: ${type}` };
       }
-      
+
       console.log(`[OfflineSync] GAS API応答: ${type}`, result);
       return result;
     } catch (error) {
@@ -830,7 +842,7 @@ class OfflineOperationManager {
    */
   async resolveConflicts(conflicts) {
     console.log(`[OfflineSync] ${conflicts.length}件の競合を解決中...`);
-    
+
     for (const conflict of conflicts) {
       try {
         // 最新のデータを取得
@@ -838,11 +850,11 @@ class OfflineOperationManager {
         if (group && day && timeslot) {
           const gasAPI = await this.waitForGasAPI();
           const freshData = await gasAPI.getSeatDataMinimal(group, day, timeslot, false);
-          
+
           if (freshData && freshData.success) {
             // キャッシュを更新
             this.writeCache(group, day, timeslot, freshData);
-            
+
             // 操作を再試行
             const result = await this.executeOperation(conflict);
             if (result.success) {
@@ -855,7 +867,7 @@ class OfflineOperationManager {
       } catch (error) {
         console.error(`[OfflineSync] 競合解決エラー: ${conflict.type} (ID: ${conflict.id})`, error);
         // エラーも通知
-        try { await this.notifyConflict(conflict, null, error); } catch (_) {}
+        try { await this.notifyConflict(conflict, null, error); } catch (_) { }
       }
     }
   }
@@ -865,7 +877,7 @@ class OfflineOperationManager {
     try {
       // 現在モードの推定
       let mode = 'normal';
-      try { mode = localStorage.getItem('currentMode') || 'normal'; } catch (_) {}
+      try { mode = localStorage.getItem('currentMode') || 'normal'; } catch (_) { }
       const ctx = this.extractContext(operation.args) || {};
       const message = `競合が発生しました: type=${operation.type}, group=${ctx.group}, day=${ctx.day}, timeslot=${ctx.timeslot}`;
       const details = {
@@ -879,14 +891,14 @@ class OfflineOperationManager {
 
       // ローカル通知（画面）
       this.showErrorNotification(`${message}`);
-      try { console.warn('[OfflineSync] 競合詳細:', details); } catch (_) {}
+      try { console.warn('[OfflineSync] 競合詳細:', details); } catch (_) { }
 
       // 最高管理者モード端末向けにサーバー通知を試行
       try {
         if (window.GasAPI && window.GasAPI.broadcastAdminNotice) {
-          window.GasAPI.broadcastAdminNotice(message, details).catch(() => {});
+          window.GasAPI.broadcastAdminNotice(message, details).catch(() => { });
         }
-      } catch (_) {}
+      } catch (_) { }
 
       // タブ間にも通知
       this.broadcast({ type: 'conflict', payload: { message, details } });
@@ -905,7 +917,7 @@ class OfflineOperationManager {
         console.log('[OfflineSync] キャッシュを更新中...');
         const gasAPI = await this.waitForGasAPI();
         const freshData = await gasAPI.getSeatDataMinimal(group, day, timeslot, false);
-        
+
         if (freshData && freshData.success) {
           this.writeCache(group, day, timeslot, freshData);
           console.log('[OfflineSync] キャッシュ更新完了');
@@ -925,23 +937,23 @@ class OfflineOperationManager {
       error: error.message,
       retryCount: this.syncState.retryCount || 0
     });
-    
+
     // 連続エラーが多すぎる場合は同期を停止
     const recentErrors = this.syncState.syncErrors.filter(
       e => Date.now() - e.timestamp < 300000 // 5分以内のエラー
     );
-    
+
     if (recentErrors.length > 10) {
       console.error('[OfflineSync] 連続エラーが多すぎるため、同期を停止します');
       this.stopBackgroundSync();
       this.notifySyncFailure();
       return;
     }
-    
+
     if (this.syncState.retryCount < OFFLINE_CONFIG.MAX_RETRY_COUNT) {
       this.syncState.retryCount++;
       console.log(`[OfflineSync] リトライ ${this.syncState.retryCount}/${OFFLINE_CONFIG.MAX_RETRY_COUNT} を ${OFFLINE_CONFIG.RETRY_DELAY_MS}ms後に実行`);
-      
+
       this.retryTimeout = setTimeout(() => {
         this.performSync();
       }, OFFLINE_CONFIG.RETRY_DELAY_MS);
@@ -949,7 +961,7 @@ class OfflineOperationManager {
       console.error('[OfflineSync] 最大リトライ回数に達しました');
       this.notifySyncFailure();
     }
-    
+
     this.saveSyncState();
   }
 
@@ -968,7 +980,7 @@ class OfflineOperationManager {
         <button onclick="this.parentElement.parentElement.remove()">閉じる</button>
       </div>
     `;
-    
+
     document.body.appendChild(notification);
   }
 
@@ -979,10 +991,10 @@ class OfflineOperationManager {
     if (this.backgroundSyncInterval) {
       clearInterval(this.backgroundSyncInterval);
     }
-    
+
     let lastCacheRefreshAt = 0;
     this.backgroundSyncInterval = setInterval(() => {
-      try { if (document && document.visibilityState === 'hidden') { return; } } catch (_) {}
+      try { if (document && document.visibilityState === 'hidden') { return; } } catch (_) { }
       if (this.isOnline && !this.syncInProgress) {
         const hasQueue = this.readOperationQueue().length > 0;
         if (hasQueue) {
@@ -1014,45 +1026,45 @@ class OfflineOperationManager {
    */
   async installOfflineOverrides() {
     if (!OFFLINE_CONFIG.ENABLED) return;
-    
+
     try {
       // GasAPIの待機を短時間で試行
       const gasAPI = await Promise.race([
         this.waitForGasAPI(),
-        new Promise((_, reject) => 
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error('GasAPI待機タイムアウト')), 5000)
         )
       ]);
-      
+
       if (!gasAPI) {
         console.warn('[OfflineSync] GasAPIが利用できません。オフラインオーバーライドをスキップします。');
         return;
       }
-      
+
       console.log('[OfflineSync] オフライン操作モードに切り替え');
-      
-             // 元のメソッドを保存
-       const originalMethods = {
-         reserveSeats: gasAPI.reserveSeats.bind(gasAPI),
-         checkInMultipleSeats: gasAPI.checkInMultipleSeats.bind(gasAPI),
-         updateSeatData: gasAPI.updateSeatData.bind(gasAPI),
-         assignWalkInSeat: gasAPI.assignWalkInSeat.bind(gasAPI),
-         assignWalkInSeats: gasAPI.assignWalkInSeats.bind(gasAPI),
-         assignWalkInConsecutiveSeats: gasAPI.assignWalkInConsecutiveSeats.bind(gasAPI)
-       };
+
+      // 元のメソッドを保存
+      const originalMethods = {
+        reserveSeats: gasAPI.reserveSeats.bind(gasAPI),
+        checkInMultipleSeats: gasAPI.checkInMultipleSeats.bind(gasAPI),
+        updateSeatData: gasAPI.updateSeatData.bind(gasAPI),
+        assignWalkInSeat: gasAPI.assignWalkInSeat.bind(gasAPI),
+        assignWalkInSeats: gasAPI.assignWalkInSeats.bind(gasAPI),
+        assignWalkInConsecutiveSeats: gasAPI.assignWalkInConsecutiveSeats.bind(gasAPI)
+      };
       // インスタンスに保持（同期時にオリジナルを使用）
       this.originalMethods = originalMethods;
 
       // 予約のオフライン対応
       gasAPI.reserveSeats = async (...args) => {
         const [group, day, timeslot, seats] = args;
-        
+
         if (this.isOnline) {
           try {
             return await originalMethods.reserveSeats(...args);
           } catch (error) {
             console.log('[OfflineSync] オンライン予約失敗、オフライン処理を試行');
-            
+
             // キャッシュがある場合はローカル処理を試行
             if (this.shouldProcessLocally(group, day, timeslot)) {
               this.showOfflineProcessingNotification('座席予約をローカルで処理中...', true);
@@ -1066,14 +1078,14 @@ class OfflineOperationManager {
                 this.showErrorNotification(localResult.error);
               }
             }
-            
+
             // ローカル処理できない場合はキューに追加
             const operationId = this.addOperation({ type: OPERATION_TYPES.RESERVE_SEATS, args });
-            return { 
-              success: true, 
-              message: 'オフラインで予約を受け付けました', 
-              offline: true, 
-              operationId 
+            return {
+              success: true,
+              message: 'オフラインで予約を受け付けました',
+              offline: true,
+              operationId
             };
           }
         } else {
@@ -1094,11 +1106,11 @@ class OfflineOperationManager {
             // キャッシュがない場合は通常のオフライン処理
             this.showOfflineProcessingNotification('座席予約をオフラインで受け付けました');
             const operationId = this.addOperation({ type: OPERATION_TYPES.RESERVE_SEATS, args });
-            return { 
-              success: true, 
-              message: 'オフラインで予約を受け付けました', 
-              offline: true, 
-              operationId 
+            return {
+              success: true,
+              message: 'オフラインで予約を受け付けました',
+              offline: true,
+              operationId
             };
           }
         }
@@ -1107,13 +1119,13 @@ class OfflineOperationManager {
       // チェックインのオフライン対応
       gasAPI.checkInMultipleSeats = async (...args) => {
         const [group, day, timeslot, seats] = args;
-        
+
         if (this.isOnline) {
           try {
             return await originalMethods.checkInMultipleSeats(...args);
           } catch (error) {
             console.log('[OfflineSync] オンラインチェックイン失敗、オフライン処理を試行');
-            
+
             // キャッシュがある場合はローカル処理を試行
             if (this.shouldProcessLocally(group, day, timeslot)) {
               const localResult = this.processLocalCheckIn(group, day, timeslot, seats);
@@ -1123,14 +1135,14 @@ class OfflineOperationManager {
                 return { ...localResult, operationId };
               }
             }
-            
+
             // ローカル処理できない場合はキューに追加
             const operationId = this.addOperation({ type: OPERATION_TYPES.CHECK_IN_SEATS, args });
-            return { 
-              success: true, 
-              message: 'オフラインでチェックインを受け付けました', 
-              offline: true, 
-              operationId 
+            return {
+              success: true,
+              message: 'オフラインでチェックインを受け付けました',
+              offline: true,
+              operationId
             };
           }
         } else {
@@ -1147,11 +1159,11 @@ class OfflineOperationManager {
           } else {
             // キャッシュがない場合は通常のオフライン処理
             const operationId = this.addOperation({ type: OPERATION_TYPES.CHECK_IN_SEATS, args });
-            return { 
-              success: true, 
-              message: 'オフラインでチェックインを受け付けました', 
-              offline: true, 
-              operationId 
+            return {
+              success: true,
+              message: 'オフラインでチェックインを受け付けました',
+              offline: true,
+              operationId
             };
           }
         }
@@ -1165,191 +1177,191 @@ class OfflineOperationManager {
           } catch (error) {
             console.log('[OfflineSync] オンライン更新失敗、オフライン操作として処理');
             const operationId = this.addOperation({ type: OPERATION_TYPES.UPDATE_SEAT_DATA, args });
-            return { 
-              success: true, 
-              message: 'オフラインで更新を受け付けました', 
-              offline: true, 
-              operationId 
+            return {
+              success: true,
+              message: 'オフラインで更新を受け付けました',
+              offline: true,
+              operationId
             };
           }
         } else {
           const operationId = this.addOperation({ type: OPERATION_TYPES.UPDATE_SEAT_DATA, args });
-          return { 
-            success: true, 
-            message: 'オフラインで更新を受け付けました', 
-            offline: true, 
-            operationId 
+          return {
+            success: true,
+            message: 'オフラインで更新を受け付けました',
+            offline: true,
+            operationId
           };
         }
       };
 
-             // 当日券発行のオフライン対応（単発）
-       gasAPI.assignWalkInSeat = async (...args) => {
-         const [group, day, timeslot] = args;
-         
-         if (this.isOnline) {
-           try {
-             return await originalMethods.assignWalkInSeat(...args);
-           } catch (error) {
-             console.log('[OfflineSync] オンライン当日券発行失敗、オフライン処理を試行');
-             
-             // キャッシュがある場合はローカル処理を試行
-             if (this.shouldProcessLocally(group, day, timeslot)) {
-               this.showOfflineProcessingNotification('当日券発行をローカルで処理中...', true);
-               const localResult = this.processLocalWalkinAssignment(group, day, timeslot, 1, false);
-               if (localResult.success) {
-                 // ローカル処理成功時は同期キューにも追加
-                 const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
-                 this.showSuccessNotification(localResult.message);
-                 return { ...localResult, operationId };
-               } else {
-                 this.showErrorNotification(localResult.error);
-               }
-             }
-             
-             // ローカル処理できない場合はキューに追加
-             const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
-             return { 
-               success: true, 
-               message: 'オフラインで当日券発行を受け付けました', 
-               offline: true, 
-               operationId 
-             };
-           }
-         } else {
-           // オフライン時はキャッシュがあるかチェック
-           if (this.shouldProcessLocally(group, day, timeslot)) {
-             this.showOfflineProcessingNotification('当日券発行をローカルで処理中...', true);
-             const localResult = this.processLocalWalkinAssignment(group, day, timeslot, 1, false);
-             if (localResult.success) {
-               // ローカル処理成功時は同期キューにも追加
-               const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
-               this.showSuccessNotification(localResult.message);
-               return { ...localResult, operationId };
-             } else {
-               this.showErrorNotification(localResult.error);
-               return localResult; // ローカル処理失敗時はエラーを返す
-             }
-           } else {
-             // キャッシュがない場合は通常のオフライン処理
-             this.showOfflineProcessingNotification('当日券発行をオフラインで受け付けました');
-             const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
-             return { 
-               success: true, 
-               message: 'オフラインで当日券発行を受け付けました', 
-               offline: true, 
-               operationId 
-             };
-           }
-         }
-       };
+      // 当日券発行のオフライン対応（単発）
+      gasAPI.assignWalkInSeat = async (...args) => {
+        const [group, day, timeslot] = args;
 
-       // 当日券発行のオフライン対応（複数）
-       gasAPI.assignWalkInSeats = async (...args) => {
-         const [group, day, timeslot, numSeats] = args;
-         
-         if (this.isOnline) {
-           try {
-             return await originalMethods.assignWalkInSeats(...args);
-           } catch (error) {
-             console.log('[OfflineSync] オンライン当日券発行失敗、オフライン処理を試行');
-             
-             // キャッシュがある場合はローカル処理を試行
-             if (this.shouldProcessLocally(group, day, timeslot)) {
-               const localResult = this.processLocalWalkinAssignment(group, day, timeslot, numSeats, false);
-               if (localResult.success) {
-                 // ローカル処理成功時は同期キューにも追加
-                 const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
-                 return { ...localResult, operationId };
-               }
-             }
-             
-             // ローカル処理できない場合はキューに追加
-             const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
-             return { 
-               success: true, 
-               message: 'オフラインで当日券発行を受け付けました', 
-               offline: true, 
-               operationId 
-             };
-           }
-         } else {
-           // オフライン時はキャッシュがあるかチェック
-           if (this.shouldProcessLocally(group, day, timeslot)) {
-             const localResult = this.processLocalWalkinAssignment(group, day, timeslot, numSeats, false);
-             if (localResult.success) {
-               // ローカル処理成功時は同期キューにも追加
-               const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
-               return { ...localResult, operationId };
-             } else {
-               return localResult; // ローカル処理失敗時はエラーを返す
-             }
-           } else {
-             // キャッシュがない場合は通常のオフライン処理
-             const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
-             return { 
-               success: true, 
-               message: 'オフラインで当日券発行を受け付けました', 
-               offline: true, 
-               operationId 
-             };
-           }
-         }
-       };
+        if (this.isOnline) {
+          try {
+            return await originalMethods.assignWalkInSeat(...args);
+          } catch (error) {
+            console.log('[OfflineSync] オンライン当日券発行失敗、オフライン処理を試行');
 
-       // 連続席当日券発行のオフライン対応
-       gasAPI.assignWalkInConsecutiveSeats = async (...args) => {
-         const [group, day, timeslot, numSeats] = args;
-         
-         if (this.isOnline) {
-           try {
-             return await originalMethods.assignWalkInConsecutiveSeats(...args);
-           } catch (error) {
-             console.log('[OfflineSync] オンライン連続席発行失敗、オフライン処理を試行');
-             
-             // キャッシュがある場合はローカル処理を試行
-             if (this.shouldProcessLocally(group, day, timeslot)) {
-               const localResult = this.processLocalWalkinAssignment(group, day, timeslot, numSeats, true);
-               if (localResult.success) {
-                 // ローカル処理成功時は同期キューにも追加
-                 const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN_CONSECUTIVE, args });
-                 return { ...localResult, operationId };
-               }
-             }
-             
-             // ローカル処理できない場合はキューに追加
-             const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN_CONSECUTIVE, args });
-             return { 
-               success: true, 
-               message: 'オフラインで連続席発行を受け付けました', 
-               offline: true, 
-               operationId 
-             };
-           }
-         } else {
-           // オフライン時はキャッシュがあるかチェック
-           if (this.shouldProcessLocally(group, day, timeslot)) {
-             const localResult = this.processLocalWalkinAssignment(group, day, timeslot, numSeats, true);
-             if (localResult.success) {
-               // ローカル処理成功時は同期キューにも追加
-               const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN_CONSECUTIVE, args });
-               return { ...localResult, operationId };
-             } else {
-               return localResult; // ローカル処理失敗時はエラーを返す
-             }
-           } else {
-             // キャッシュがない場合は通常のオフライン処理
-             const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN_CONSECUTIVE, args });
-             return { 
-               success: true, 
-               message: 'オフラインで連続席発行を受け付けました', 
-               offline: true, 
-               operationId 
-             };
-           }
-         }
-       };
-      
+            // キャッシュがある場合はローカル処理を試行
+            if (this.shouldProcessLocally(group, day, timeslot)) {
+              this.showOfflineProcessingNotification('当日券発行をローカルで処理中...', true);
+              const localResult = this.processLocalWalkinAssignment(group, day, timeslot, 1, false);
+              if (localResult.success) {
+                // ローカル処理成功時は同期キューにも追加
+                const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
+                this.showSuccessNotification(localResult.message);
+                return { ...localResult, operationId };
+              } else {
+                this.showErrorNotification(localResult.error);
+              }
+            }
+
+            // ローカル処理できない場合はキューに追加
+            const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
+            return {
+              success: true,
+              message: 'オフラインで当日券発行を受け付けました',
+              offline: true,
+              operationId
+            };
+          }
+        } else {
+          // オフライン時はキャッシュがあるかチェック
+          if (this.shouldProcessLocally(group, day, timeslot)) {
+            this.showOfflineProcessingNotification('当日券発行をローカルで処理中...', true);
+            const localResult = this.processLocalWalkinAssignment(group, day, timeslot, 1, false);
+            if (localResult.success) {
+              // ローカル処理成功時は同期キューにも追加
+              const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
+              this.showSuccessNotification(localResult.message);
+              return { ...localResult, operationId };
+            } else {
+              this.showErrorNotification(localResult.error);
+              return localResult; // ローカル処理失敗時はエラーを返す
+            }
+          } else {
+            // キャッシュがない場合は通常のオフライン処理
+            this.showOfflineProcessingNotification('当日券発行をオフラインで受け付けました');
+            const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
+            return {
+              success: true,
+              message: 'オフラインで当日券発行を受け付けました',
+              offline: true,
+              operationId
+            };
+          }
+        }
+      };
+
+      // 当日券発行のオフライン対応（複数）
+      gasAPI.assignWalkInSeats = async (...args) => {
+        const [group, day, timeslot, numSeats] = args;
+
+        if (this.isOnline) {
+          try {
+            return await originalMethods.assignWalkInSeats(...args);
+          } catch (error) {
+            console.log('[OfflineSync] オンライン当日券発行失敗、オフライン処理を試行');
+
+            // キャッシュがある場合はローカル処理を試行
+            if (this.shouldProcessLocally(group, day, timeslot)) {
+              const localResult = this.processLocalWalkinAssignment(group, day, timeslot, numSeats, false);
+              if (localResult.success) {
+                // ローカル処理成功時は同期キューにも追加
+                const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
+                return { ...localResult, operationId };
+              }
+            }
+
+            // ローカル処理できない場合はキューに追加
+            const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
+            return {
+              success: true,
+              message: 'オフラインで当日券発行を受け付けました',
+              offline: true,
+              operationId
+            };
+          }
+        } else {
+          // オフライン時はキャッシュがあるかチェック
+          if (this.shouldProcessLocally(group, day, timeslot)) {
+            const localResult = this.processLocalWalkinAssignment(group, day, timeslot, numSeats, false);
+            if (localResult.success) {
+              // ローカル処理成功時は同期キューにも追加
+              const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
+              return { ...localResult, operationId };
+            } else {
+              return localResult; // ローカル処理失敗時はエラーを返す
+            }
+          } else {
+            // キャッシュがない場合は通常のオフライン処理
+            const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
+            return {
+              success: true,
+              message: 'オフラインで当日券発行を受け付けました',
+              offline: true,
+              operationId
+            };
+          }
+        }
+      };
+
+      // 連続席当日券発行のオフライン対応
+      gasAPI.assignWalkInConsecutiveSeats = async (...args) => {
+        const [group, day, timeslot, numSeats] = args;
+
+        if (this.isOnline) {
+          try {
+            return await originalMethods.assignWalkInConsecutiveSeats(...args);
+          } catch (error) {
+            console.log('[OfflineSync] オンライン連続席発行失敗、オフライン処理を試行');
+
+            // キャッシュがある場合はローカル処理を試行
+            if (this.shouldProcessLocally(group, day, timeslot)) {
+              const localResult = this.processLocalWalkinAssignment(group, day, timeslot, numSeats, true);
+              if (localResult.success) {
+                // ローカル処理成功時は同期キューにも追加
+                const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN_CONSECUTIVE, args });
+                return { ...localResult, operationId };
+              }
+            }
+
+            // ローカル処理できない場合はキューに追加
+            const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN_CONSECUTIVE, args });
+            return {
+              success: true,
+              message: 'オフラインで連続席発行を受け付けました',
+              offline: true,
+              operationId
+            };
+          }
+        } else {
+          // オフライン時はキャッシュがあるかチェック
+          if (this.shouldProcessLocally(group, day, timeslot)) {
+            const localResult = this.processLocalWalkinAssignment(group, day, timeslot, numSeats, true);
+            if (localResult.success) {
+              // ローカル処理成功時は同期キューにも追加
+              const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN_CONSECUTIVE, args });
+              return { ...localResult, operationId };
+            } else {
+              return localResult; // ローカル処理失敗時はエラーを返す
+            }
+          } else {
+            // キャッシュがない場合は通常のオフライン処理
+            const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN_CONSECUTIVE, args });
+            return {
+              success: true,
+              message: 'オフラインで連続席発行を受け付けました',
+              offline: true,
+              operationId
+            };
+          }
+        }
+      };
+
     } catch (error) {
       console.error('[OfflineSync] オフラインオーバーライドのインストールに失敗:', error);
     }
@@ -1380,10 +1392,10 @@ class OfflineOperationManager {
           </div>
         </div>
       `;
-      
+
       document.body.insertAdjacentHTML('beforeend', modalHTML);
       console.log('[OfflineSync] 同期モーダルを表示');
-      
+
     } catch (error) {
       console.error('[OfflineSync] モーダル表示エラー:', error);
     }
@@ -1414,16 +1426,16 @@ class OfflineOperationManager {
     try {
       const notification = document.createElement('div');
       notification.className = 'success-notification';
-      
+
       notification.innerHTML = `
         <div class="notification-content">
           <span class="notification-message">${message}</span>
           <button class="notification-close" onclick="this.parentElement.parentElement.remove()">閉じる</button>
         </div>
       `;
-      
+
       document.body.appendChild(notification);
-      
+
       setTimeout(() => {
         if (notification.parentElement) {
           notification.remove();
@@ -1432,20 +1444,20 @@ class OfflineOperationManager {
     } catch (error) {
       console.error('[OfflineSync] 成功通知の表示に失敗:', error);
       // フォールバック: アラートで表示
-      alert(message);
+      customAlert(message);
     }
   }
 
   /**
    * オフライン処理通知の表示
    */
-  showOfflineProcessingNotification(message, isLocal = false) {
+  async showOfflineProcessingNotification(message, isLocal = false) {
     try {
       const notification = document.createElement('div');
       notification.className = 'offline-processing-notification';
-      
+
       const type = isLocal ? 'ローカル処理' : 'オフライン処理';
-      
+
       notification.innerHTML = `
         <div class="notification-content">
           <span class="notification-message">
@@ -1454,9 +1466,9 @@ class OfflineOperationManager {
           <button class="notification-close" onclick="this.parentElement.parentElement.remove()">閉じる</button>
         </div>
       `;
-      
+
       document.body.appendChild(notification);
-      
+
       setTimeout(() => {
         if (notification.parentElement) {
           notification.remove();
@@ -1477,7 +1489,7 @@ class OfflineOperationManager {
 
       const isOnline = this.isOnline;
       const hasValidCache = this.hasValidCacheForContext(...Object.values(this.getCurrentContext()));
-      
+
       if (isOnline) {
         indicator.style.display = 'none';
         indicator.textContent = 'オンライン';
@@ -1497,19 +1509,19 @@ class OfflineOperationManager {
   /**
    * エラー通知の表示
    */
-  showErrorNotification(message) {
+  async showErrorNotification(message) {
     try {
       const notification = document.createElement('div');
       notification.className = 'sync-failure-notification';
-      
+
       notification.innerHTML = `
         <h4>エラー</h4>
         <p>${message}</p>
         <button onclick="this.parentElement.remove()">閉じる</button>
       `;
-      
+
       document.body.appendChild(notification);
-      
+
       setTimeout(() => {
         if (notification.parentElement) {
           notification.remove();
@@ -1518,7 +1530,7 @@ class OfflineOperationManager {
     } catch (error) {
       console.error('[OfflineSync] エラー通知の表示に失敗:', error);
       // フォールバック: アラートで表示
-      alert(message);
+      await customAlert(message);
     }
   }
 
@@ -1530,7 +1542,7 @@ class OfflineOperationManager {
       const timeout = setTimeout(() => {
         reject(new Error('GasAPIの待機がタイムアウトしました'));
       }, 10000); // 10秒でタイムアウト
-      
+
       const checkAPI = () => {
         if (window.GasAPI) {
           clearTimeout(timeout);
@@ -1634,13 +1646,13 @@ class OfflineOperationManager {
       const key = `${STORAGE_KEYS.CACHE_DATA}_${group}-${day}-${timeslot}`;
       const data = localStorage.getItem(key);
       if (!data) return null;
-      
+
       const cache = JSON.parse(data);
-      
+
       // オフライン時は有効期限を延長（通常の3倍）
       const isOffline = !navigator.onLine;
       const expiryMs = isOffline ? OFFLINE_CONFIG.CACHE_EXPIRY_MS * 3 : OFFLINE_CONFIG.CACHE_EXPIRY_MS;
-      
+
       // キャッシュの有効期限チェック
       if (cache.cachedAt && (Date.now() - cache.cachedAt) > expiryMs) {
         if (!isOffline) {
@@ -1649,7 +1661,7 @@ class OfflineOperationManager {
         }
         return null;
       }
-      
+
       // オフライン時の座席データ復元強化
       if (isOffline && cache.seatMap) {
         console.log('[OfflineSync] オフライン時の座席キャッシュ復元:', {
@@ -1657,7 +1669,7 @@ class OfflineOperationManager {
           seatCount: Object.keys(cache.seatMap).length,
           cacheAge: Math.round((Date.now() - cache.cachedAt) / 1000) + '秒前'
         });
-        
+
         // 座席データの整合性チェックと修復
         const repairedSeatMap = {};
         Object.entries(cache.seatMap).forEach(([seatId, seatData]) => {
@@ -1671,13 +1683,13 @@ class OfflineOperationManager {
             };
           }
         });
-        
+
         if (Object.keys(repairedSeatMap).length > 0) {
           cache.seatMap = repairedSeatMap;
           console.log('[OfflineSync] 座席データ修復完了:', Object.keys(repairedSeatMap).length + '席');
         }
       }
-      
+
       return cache;
     } catch (error) {
       console.error('[OfflineSync] キャッシュ読み取りエラー:', error);
@@ -1747,7 +1759,7 @@ class OfflineOperationManager {
   processLocalReservation(group, day, timeslot, seats) {
     try {
       console.log('[OfflineSync] ローカル座席予約処理開始:', { group, day, timeslot, seats });
-      
+
       const cache = this.readCache(group, day, timeslot);
       if (!cache || !cache.seatMap) {
         return { success: false, error: 'キャッシュデータが無効です' };
@@ -1766,7 +1778,7 @@ class OfflineOperationManager {
 
         const seatStatus = seatMap[seatId].status;
         const isReserved = seatStatus === 'reserved' || seatStatus === 'occupied' || seatStatus === 'taken';
-        
+
         if (isReserved) {
           errors.push(`座席 ${seatId} は既に予約済みです (状態: ${seatStatus})`);
           continue;
@@ -1796,7 +1808,7 @@ class OfflineOperationManager {
       this.writeCache(group, day, timeslot, updatedCache);
 
       console.log('[OfflineSync] ローカル座席予約処理完了:', { reservedSeats, errors });
-      
+
       return {
         success: true,
         message: `オフラインで ${reservedSeats.length} 席を予約しました`,
@@ -1817,7 +1829,7 @@ class OfflineOperationManager {
   processLocalCheckIn(group, day, timeslot, seats) {
     try {
       console.log('[OfflineSync] ローカルチェックイン処理開始:', { group, day, timeslot, seats });
-      
+
       const cache = this.readCache(group, day, timeslot);
       if (!cache || !cache.seatMap) {
         return { success: false, error: 'キャッシュデータが無効です' };
@@ -1836,8 +1848,8 @@ class OfflineOperationManager {
 
         const seatStatus = seatMap[seatId].status;
         const isOccupied = seatStatus === 'occupied' || seatStatus === 'taken';
-        const isAvailable = seatStatus === 'available' || seatStatus === 'free' || seatStatus === 'open' || 
-                           seatStatus === '' || seatStatus === null || seatStatus === undefined;
+        const isAvailable = seatStatus === 'available' || seatStatus === 'free' || seatStatus === 'open' ||
+          seatStatus === '' || seatStatus === null || seatStatus === undefined;
 
         if (isOccupied) {
           errors.push(`座席 ${seatId} は既にチェックイン済みです (状態: ${seatStatus})`);
@@ -1873,7 +1885,7 @@ class OfflineOperationManager {
       this.writeCache(group, day, timeslot, updatedCache);
 
       console.log('[OfflineSync] ローカルチェックイン処理完了:', { checkedInSeats, errors });
-      
+
       return {
         success: true,
         message: `オフラインで ${checkedInSeats.length} 席をチェックインしました`,
@@ -1894,10 +1906,10 @@ class OfflineOperationManager {
   processLocalWalkinAssignment(group, day, timeslot, numSeats = 1, consecutive = false) {
     try {
       console.log('[OfflineSync] ローカル当日券発行処理開始:', { group, day, timeslot, numSeats, consecutive });
-      
+
       let cache = this.readCache(group, day, timeslot);
       console.log('[OfflineSync] 読み込んだキャッシュデータ:', cache);
-      
+
       // ローカル座席キャッシュが空の場合、当日券用キャッシュで最低限の座席マップを補完
       if (!cache || !cache.seatMap || Object.keys(cache.seatMap).length === 0) {
         try {
@@ -1920,8 +1932,8 @@ class OfflineOperationManager {
           console.warn('[OfflineSync] 当日券用キャッシュ補完に失敗:', e);
         }
         if (!cache || !cache.seatMap || Object.keys(cache.seatMap).length === 0) {
-          return { 
-            success: false, 
+          return {
+            success: false,
             error: '座席データがキャッシュされていません。当日券キャッシュも空でした。',
             needsOnlineData: true
           };
@@ -1956,9 +1968,9 @@ class OfflineOperationManager {
       if (orderedAvailable.length < numSeats) {
         const errorMsg = `空席が不足しています (必要: ${numSeats}, 利用可能: ${availableSeats.length})`;
         console.error('[OfflineSync]', errorMsg);
-        return { 
-          success: false, 
-          error: errorMsg 
+        return {
+          success: false,
+          error: errorMsg
         };
       }
 
@@ -1986,9 +1998,9 @@ class OfflineOperationManager {
           if (found) break;
         }
         if (!found) {
-          return { 
-            success: false, 
-            error: `連続する空席が不足しています (必要: ${numSeats})` 
+          return {
+            success: false,
+            error: `連続する空席が不足しています (必要: ${numSeats})`
           };
         }
       } else {
@@ -2001,7 +2013,7 @@ class OfflineOperationManager {
       const ts = now.getTime();
       const fmt = this._formatYmdHms ? this._formatYmdHms(now) : (() => {
         const pad = (n) => (n < 10 ? '0' + n : '' + n);
-        return `${now.getFullYear()}/${pad(now.getMonth()+1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+        return `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
       })();
       const reservedBy = `当日券_${fmt}`;
 
@@ -2033,7 +2045,7 @@ class OfflineOperationManager {
 
       const seatIds = assignedSeats.map(s => s.seatId);
       console.log('[OfflineSync] ローカル当日券発行処理完了:', { seatIds });
-      
+
       return {
         success: true,
         message: `オフラインで ${numSeats} 席の当日券を発行しました`,
@@ -2055,7 +2067,7 @@ class OfflineOperationManager {
    */
   findConsecutiveSeats(availableSeats, numSeats) {
     console.log('[OfflineSync] 連続席検索開始:', { availableSeats: availableSeats.length, numSeats });
-    
+
     // 座席IDを数値としてソート
     const sortedSeats = availableSeats.sort((a, b) => {
       const aNum = parseInt(a.seatId.replace(/\D/g, '')) || 0;
@@ -2068,7 +2080,7 @@ class OfflineOperationManager {
     for (let i = 0; i <= sortedSeats.length - numSeats; i++) {
       const consecutive = sortedSeats.slice(i, i + numSeats);
       console.log(`[OfflineSync] 連続席候補 ${i}:`, consecutive.map(s => s.seatId));
-      
+
       if (consecutive.length === numSeats) {
         console.log('[OfflineSync] 連続席発見:', consecutive.map(s => s.seatId));
         return consecutive;
@@ -2086,7 +2098,7 @@ class OfflineOperationManager {
     try {
       const key = `${STORAGE_KEYS.CACHE_DATA}_${group}-${day}-${timeslot}`;
       const isOffline = !navigator.onLine;
-      
+
       // オフライン時の座席データ保存強化
       let enhancedData = { ...data };
       if (isOffline && data.seatMap) {
@@ -2094,7 +2106,7 @@ class OfflineOperationManager {
           group, day, timeslot,
           seatCount: Object.keys(data.seatMap).length
         });
-        
+
         // 座席データの完全性を保証
         const validatedSeatMap = {};
         Object.entries(data.seatMap).forEach(([seatId, seatData]) => {
@@ -2108,20 +2120,20 @@ class OfflineOperationManager {
             };
           }
         });
-        
+
         enhancedData.seatMap = validatedSeatMap;
         enhancedData.offlineCache = true; // オフラインキャッシュフラグ
       }
-      
+
       const cacheData = {
         ...enhancedData,
         cachedAt: Date.now(),
         version: Date.now().toString(), // バージョン管理
         offlineSaved: isOffline // オフライン保存フラグ
       };
-      
+
       localStorage.setItem(key, JSON.stringify(cacheData));
-      
+
       if (isOffline) {
         console.log('[OfflineSync] オフライン座席キャッシュ保存完了:', {
           group, day, timeslot,
@@ -2211,13 +2223,13 @@ class OfflineOperationManager {
    */
   async initialize() {
     console.log('[OfflineSync] オフライン同期システム v2.0 を初期化中...');
-    
+
     // 初回: 現在ページの座席が未キャッシュなら最低限の雛形を用意
     try {
       const { group, day, timeslot } = this.getCurrentContext();
       if (group && day && timeslot && !this.readCache(group, day, timeslot)) {
         console.log('[OfflineSync] 初期キャッシュを作成:', { group, day, timeslot });
-        this.writeCache(group, day, timeslot, { 
+        this.writeCache(group, day, timeslot, {
           seatMap: {},
           success: true,
           cachedAt: Date.now(),
@@ -2228,7 +2240,7 @@ class OfflineOperationManager {
       if (this.isOnline) {
         try {
           await this.prefetchSeatDataIfPossible();
-        } catch (_) {}
+        } catch (_) { }
       }
       // 現在のコンテキストを学習
       this.trackKnownContext({ group, day, timeslot });
@@ -2248,7 +2260,7 @@ class OfflineOperationManager {
     this.updateOfflineIndicator();
 
     // どのページでも設定から同期操作できるボタン/メニューを注入
-    try { this.injectGlobalSettingsEntry(); } catch (_) {}
+    try { this.injectGlobalSettingsEntry(); } catch (_) { }
 
     // 座席データのバックグラウンド事前取得
     if (this.isOnline) {
@@ -2276,20 +2288,20 @@ class OfflineOperationManager {
                 const ts = n.timestamp || Date.now();
                 this.lastNoticeTs = Math.max(this.lastNoticeTs || 0, ts);
                 this.showConflictAdminNotice(n);
-              } catch (_) {}
+              } catch (_) { }
             }
           }
-        } catch (_) {}
+        } catch (_) { }
       }, this.noticePollIntervalMs);
-    } catch (_) {}
+    } catch (_) { }
   }
 
   stopAdminNoticePolling() {
-    try { if (this.noticePollInterval) { clearInterval(this.noticePollInterval); this.noticePollInterval = null; } } catch (_) {}
+    try { if (this.noticePollInterval) { clearInterval(this.noticePollInterval); this.noticePollInterval = null; } } catch (_) { }
   }
 
   // 受信通知の表示（最高管理者）
-  showConflictAdminNotice(notice) {
+  async showConflictAdminNotice(notice) {
     try {
       const msg = notice && notice.message ? notice.message : '競合が発生しました';
       const detail = notice && notice.details ? notice.details : {};
@@ -2305,9 +2317,9 @@ class OfflineOperationManager {
           <button onclick="this.parentElement.parentElement.remove()">閉じる</button>
         </div>`;
       document.body.appendChild(div);
-      setTimeout(() => { try { if (div && div.parentElement) div.remove(); } catch (_) {} }, 10000);
+      setTimeout(() => { try { if (div && div.parentElement) div.remove(); } catch (_) { } }, 10000);
     } catch (e) {
-      try { alert('競合警告: ' + (notice && notice.message ? notice.message : '')); } catch (_) {}
+      try { customAlert('競合警告: ' + (notice && notice.message ? notice.message : '')); } catch (_) { }
     }
   }
 
@@ -2348,16 +2360,16 @@ class OfflineOperationManager {
         }
         this.saveSyncState();
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   // スプシID一覧（座席データ事前取得用）
   getSeatPrefetchSpreadsheetIds() {
     const ids = [];
-    try { if (window.SPREADSHEET_ID) ids.push(window.SPREADSHEET_ID); } catch (_) {}
-    try { if (window.OFFLINE_SPREADSHEET_ID) ids.push(window.OFFLINE_SPREADSHEET_ID); } catch (_) {}
-    try { if (window.SPREADSHEET_IDS && Array.isArray(window.SPREADSHEET_IDS)) ids.push(...window.SPREADSHEET_IDS); } catch (_) {}
-    try { if (window.SEAT_PREFETCH_IDS && Array.isArray(window.SEAT_PREFETCH_IDS)) ids.push(...window.SEAT_PREFETCH_IDS); } catch (_) {}
+    try { if (window.SPREADSHEET_ID) ids.push(window.SPREADSHEET_ID); } catch (_) { }
+    try { if (window.OFFLINE_SPREADSHEET_ID) ids.push(window.OFFLINE_SPREADSHEET_ID); } catch (_) { }
+    try { if (window.SPREADSHEET_IDS && Array.isArray(window.SPREADSHEET_IDS)) ids.push(...window.SPREADSHEET_IDS); } catch (_) { }
+    try { if (window.SEAT_PREFETCH_IDS && Array.isArray(window.SEAT_PREFETCH_IDS)) ids.push(...window.SEAT_PREFETCH_IDS); } catch (_) { }
     return [...new Set(ids)];
   }
 
@@ -2370,7 +2382,7 @@ class OfflineOperationManager {
         window[callbackName] = (response) => {
           try {
             document.head.removeChild(script);
-          } catch (_) {}
+          } catch (_) { }
           delete window[callbackName];
           if (response && response.success) {
             this.writeCache(group, day, timeslot, response);
@@ -2382,14 +2394,14 @@ class OfflineOperationManager {
         const params = [group, day, timeslot, false];
         script.src = `https://script.google.com/macros/s/${spreadsheetId}/exec?callback=${callbackName}&func=getSeatDataMinimal&params=${encodeURIComponent(JSON.stringify(params))}`;
         script.onerror = () => {
-          try { document.head.removeChild(script); } catch (_) {}
+          try { document.head.removeChild(script); } catch (_) { }
           delete window[callbackName];
           resolve(false);
         };
         document.head.appendChild(script);
         setTimeout(() => {
           if (window[callbackName]) {
-            try { document.head.removeChild(script); } catch (_) {}
+            try { document.head.removeChild(script); } catch (_) { }
             delete window[callbackName];
             resolve(false);
           }
@@ -2420,15 +2432,15 @@ class OfflineOperationManager {
         const limited = contexts.slice(0, 10);
         for (const spreadsheetId of ids) {
           for (const ctx of limited) {
-            try { await this.fetchSeatDataForSpreadsheet(spreadsheetId, ctx.group, ctx.day, ctx.timeslot); } catch (_) {}
+            try { await this.fetchSeatDataForSpreadsheet(spreadsheetId, ctx.group, ctx.day, ctx.timeslot); } catch (_) { }
           }
         }
       }, this.seatPrefetchIntervalMs);
-    } catch (_) {}
+    } catch (_) { }
   }
 
   stopSeatDataPrefetch() {
-    try { if (this.seatPrefetchInterval) { clearInterval(this.seatPrefetchInterval); this.seatPrefetchInterval = null; } } catch (_) {}
+    try { if (this.seatPrefetchInterval) { clearInterval(this.seatPrefetchInterval); this.seatPrefetchInterval = null; } } catch (_) { }
   }
 
   /**
@@ -2453,18 +2465,18 @@ class OfflineOperationManager {
     this.ensureOfflineSectionInSeatSettings();
 
     // seats.html では既存の歯車ボタンがあるため重複回避で非表示
-    try { const legacyBtn = document.getElementById('auto-refresh-settings-btn'); if (legacyBtn) legacyBtn.style.display = 'none'; } catch (_) {}
+    try { const legacyBtn = document.getElementById('auto-refresh-settings-btn'); if (legacyBtn) legacyBtn.style.display = 'none'; } catch (_) { }
   }
 
   openGlobalSettingsPanel() {
     console.log('[OfflineSync] openGlobalSettingsPanel called');
-    
+
     // seats.html の自動更新設定パネルがあればそこに統合
     if (document.getElementById('auto-refresh-settings-panel')) {
       console.log('[OfflineSync] Found auto-refresh-settings-panel, integrating with seats settings');
       try {
         // 既存のUIを開く（toggle関数があれば利用）
-        try { if (window.toggleAutoRefreshSettings) { window.toggleAutoRefreshSettings(); } } catch (_) {}
+        try { if (window.toggleAutoRefreshSettings) { window.toggleAutoRefreshSettings(); } } catch (_) { }
         this.ensureOfflineSectionInSeatSettings(true /*focus*/);
         return;
       } catch (error) {
@@ -2482,12 +2494,12 @@ class OfflineOperationManager {
       // 既存のモーダルがあれば削除
       const existing = document.getElementById('offline-sync-card-modal');
       if (existing) { existing.remove(); }
-      
+
       // カードモーダルを作成（オーバーレイなし）
       const modal = document.createElement('div');
       modal.id = 'offline-sync-card-modal';
       modal.className = 'offline-sync-card-modal';
-      
+
       try {
         modal.innerHTML = `
           <h4>オフライン同期</h4>
@@ -2511,9 +2523,9 @@ class OfflineOperationManager {
           <div class="offline-sync-card-status" id="offline-sync-status">同期状況: エラー</div>
         `;
       }
-      
+
       document.body.appendChild(modal);
-      
+
       // アニメーションで表示
       setTimeout(() => {
         try {
@@ -2522,10 +2534,10 @@ class OfflineOperationManager {
           console.error('[OfflineSync] Animation error:', error);
         }
       }, 10);
-      
+
       // カード外をクリックして閉じる機能を追加
       this.addOutsideClickHandler(modal);
-      
+
       this.hydrateOfflineControls();
     } catch (error) {
       console.error('[OfflineSync] showOfflineSyncPanel error:', error);
@@ -2535,10 +2547,10 @@ class OfflineOperationManager {
   closeOfflineSyncPanel() {
     try {
       const modal = document.getElementById('offline-sync-card-modal');
-      
+
       if (modal) {
         modal.classList.add('scale-out');
-        
+
         setTimeout(() => {
           try {
             modal.remove();
@@ -2584,7 +2596,7 @@ class OfflineOperationManager {
     panel.appendChild(section);
     this.hydrateOfflineControls();
     if (scrollIntoView) {
-      try { section.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_) {}
+      try { section.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (_) { }
     }
   }
 
@@ -2595,7 +2607,7 @@ class OfflineOperationManager {
       const inProgress = status?.syncInProgress ?? false;
       const queueLen = status?.queueLength ?? 0;
       const disabled = (!isOnline) || inProgress || queueLen === 0 ? 'disabled' : '';
-      
+
       // カードモーダル用のHTMLを返す
       return `
         <div class="offline-sync-controls-wrapper">
@@ -2621,36 +2633,36 @@ class OfflineOperationManager {
     }
   }
 
-    hydrateOfflineControls() {
+  hydrateOfflineControls() {
     try {
       const syncBtn = document.getElementById('sync-now-btn');
       const detailBtn = document.getElementById('sync-detail-btn');
-      
+
       if (syncBtn) {
-        syncBtn.onclick = () => { 
-          try { 
+        syncBtn.onclick = () => {
+          try {
             if (window.OfflineSyncV2 && window.OfflineSyncV2.sync) {
-              window.OfflineSyncV2.sync(); 
+              window.OfflineSyncV2.sync();
             } else {
               console.warn('[OfflineSync] OfflineSyncV2.sync not available');
             }
           } catch (error) {
             console.error('[OfflineSync] sync error:', error);
-          } 
+          }
         };
       }
-      
+
       if (detailBtn) {
-        detailBtn.onclick = () => { 
-          try { 
+        detailBtn.onclick = () => {
+          try {
             if (window.OfflineSyncV2 && window.OfflineSyncV2.showQueueStatus) {
-              window.OfflineSyncV2.showQueueStatus(); 
+              window.OfflineSyncV2.showQueueStatus();
             } else {
               console.warn('[OfflineSync] OfflineSyncV2.showQueueStatus not available');
             }
           } catch (error) {
             console.error('[OfflineSync] showQueueStatus error:', error);
-          } 
+          }
         };
       }
 
@@ -2663,7 +2675,7 @@ class OfflineOperationManager {
           const queueLen = status?.queueLength ?? 0;
           const statusPill = document.getElementById('sync-status-pill');
           const queuePill = document.getElementById('sync-queue-pill');
-          
+
           if (statusPill) {
             statusPill.textContent = inProgress ? '同期中' : (isOnline ? 'オンライン' : 'オフライン');
             statusPill.className = `sync-status-pill ${inProgress ? 'syncing' : (isOnline ? 'online' : 'offline')}`;
@@ -2679,7 +2691,7 @@ class OfflineOperationManager {
           console.error('[OfflineSync] update error:', error);
         }
       };
-      
+
       update();
       // 過剰更新を避けて2秒間隔
       const intervalId = setInterval(() => {
@@ -2711,7 +2723,7 @@ class OfflineOperationManager {
   checkWalkinMode() {
     const currentMode = localStorage.getItem('currentMode') || 'normal';
     const isWalkinMode = currentMode === 'walkin';
-    
+
     if (isWalkinMode && !this.walkinSeatSyncEnabled) {
       console.log('[OfflineSync] 当日券モードを検知、空席同期を開始');
       this.startWalkinSeatSync();
@@ -2726,13 +2738,13 @@ class OfflineOperationManager {
    */
   startWalkinSeatSync() {
     if (this.walkinSeatSyncEnabled) return;
-    
+
     this.walkinSeatSyncEnabled = true;
     console.log('[OfflineSync] 当日券用空席同期を開始');
-    
+
     // 即座に実行（現在の公演で取得）
     this.syncWalkinSeatData();
-    
+
     // 定期的に実行
     this.walkinSeatSyncInterval = setInterval(() => {
       this.syncWalkinSeatData();
@@ -2744,10 +2756,10 @@ class OfflineOperationManager {
    */
   stopWalkinSeatSync() {
     if (!this.walkinSeatSyncEnabled) return;
-    
+
     this.walkinSeatSyncEnabled = false;
     console.log('[OfflineSync] 当日券用空席同期を停止');
-    
+
     if (this.walkinSeatSyncInterval) {
       clearInterval(this.walkinSeatSyncInterval);
       this.walkinSeatSyncInterval = null;
@@ -2759,13 +2771,13 @@ class OfflineOperationManager {
    */
   async syncWalkinSeatData() {
     if (!this.isOnline || !this.walkinSeatSyncEnabled) return;
-    
+
     try {
       console.log('[OfflineSync] 当日券用空席データを同期中...');
-      
+
       // 各スプシの空席データを取得
       const spreadsheetIds = this.getWalkinSpreadsheetIds();
-      
+
       for (const spreadsheetId of spreadsheetIds) {
         try {
           await this.syncWalkinSpreadsheetSeats(spreadsheetId);
@@ -2773,7 +2785,7 @@ class OfflineOperationManager {
           console.error(`[OfflineSync] スプシ ${spreadsheetId} の空席同期エラー:`, error);
         }
       }
-      
+
       console.log('[OfflineSync] 当日券用空席データ同期完了');
     } catch (error) {
       console.error('[OfflineSync] 当日券用空席データ同期エラー:', error);
@@ -2786,17 +2798,17 @@ class OfflineOperationManager {
   getWalkinSpreadsheetIds() {
     // 設定からスプシID一覧を取得
     const spreadsheetIds = [];
-    
+
     // メインのスプシID
     if (window.SPREADSHEET_ID) {
       spreadsheetIds.push(window.SPREADSHEET_ID);
     }
-    
+
     // オフライン用のスプシID
     if (window.OFFLINE_SPREADSHEET_ID) {
       spreadsheetIds.push(window.OFFLINE_SPREADSHEET_ID);
     }
-    
+
     // その他のスプシID（設定ファイルから取得）
     try {
       if (window.SPREADSHEET_IDS && Array.isArray(window.SPREADSHEET_IDS)) {
@@ -2805,7 +2817,7 @@ class OfflineOperationManager {
     } catch (error) {
       console.warn('[OfflineSync] スプシID一覧の取得に失敗:', error);
     }
-    
+
     return [...new Set(spreadsheetIds)]; // 重複を除去
   }
 
@@ -2816,7 +2828,7 @@ class OfflineOperationManager {
     try {
       // 空席データを取得
       const seatData = await this.fetchWalkinSeatData(spreadsheetId);
-      
+
       if (seatData && seatData.success) {
         // ローカルストレージに保存
         const cacheKey = `walkin_seats_${spreadsheetId}`;
@@ -2825,7 +2837,7 @@ class OfflineOperationManager {
           timestamp: Date.now(),
           spreadsheetId: spreadsheetId
         };
-        
+
         localStorage.setItem(cacheKey, JSON.stringify(cacheData));
         console.log(`[OfflineSync] スプシ ${spreadsheetId} の空席データをキャッシュに保存`);
       }
@@ -2841,13 +2853,13 @@ class OfflineOperationManager {
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
       const callbackName = `walkinSeatCallback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
+
       window[callbackName] = (response) => {
         document.head.removeChild(script);
         delete window[callbackName];
         resolve(response);
       };
-      
+
       // 現在のコンテキストで取得
       const ctx = this.getCurrentContext();
       const params = [ctx.group || '見本演劇', ctx.day || '1', ctx.timeslot || 'A', false];
@@ -2857,9 +2869,9 @@ class OfflineOperationManager {
         delete window[callbackName];
         reject(new Error('空席データの取得に失敗しました'));
       };
-      
+
       document.head.appendChild(script);
-      
+
       // タイムアウト設定
       setTimeout(() => {
         if (window[callbackName]) {
@@ -2878,12 +2890,12 @@ class OfflineOperationManager {
     try {
       const cacheKey = `walkin_seats_${spreadsheetId}`;
       const cached = localStorage.getItem(cacheKey);
-      
+
       if (cached) {
         const cacheData = JSON.parse(cached);
         const now = Date.now();
         const cacheAge = now - cacheData.timestamp;
-        
+
         // キャッシュが1時間以内なら有効
         if (cacheAge < 3600000) {
           return cacheData.data;
@@ -2892,10 +2904,10 @@ class OfflineOperationManager {
     } catch (error) {
       console.error('[OfflineSync] キャッシュされた空席データの取得エラー:', error);
     }
-    
+
     return null;
   }
-  
+
   /**
    * キャッシュの有効性: ローカル座席キャッシュが空でも、当日券用キャッシュがあれば有効扱い
    */
@@ -2918,7 +2930,7 @@ class OfflineOperationManager {
   // メモリクリーンアップの開始
   startMemoryCleanup() {
     if (this.memoryCleanupInterval) return;
-    
+
     this.memoryCleanupInterval = setInterval(() => {
       this.performMemoryCleanup();
     }, OFFLINE_CONFIG.MEMORY_CLEANUP_INTERVAL);
@@ -2939,14 +2951,14 @@ class OfflineOperationManager {
       const cacheData = this.readCacheData();
       const now = Date.now();
       let cleaned = 0;
-      
+
       for (const key in cacheData) {
         if (cacheData[key].cachedAt && (now - cacheData[key].cachedAt) > OFFLINE_CONFIG.CACHE_EXPIRY_MS) {
           delete cacheData[key];
           cleaned++;
         }
       }
-      
+
       if (cleaned > 0) {
         this.writeCacheData(cacheData);
         console.log(`[OfflineSync] メモリクリーンアップ: ${cleaned}件の古いキャッシュを削除`);
@@ -2981,7 +2993,7 @@ class OfflineOperationManager {
             if (!raw) continue;
             const parsed = JSON.parse(raw);
             all[key] = parsed;
-          } catch (_) {}
+          } catch (_) { }
         }
       }
       return all;
@@ -2998,7 +3010,7 @@ class OfflineOperationManager {
         if (key && key.startsWith(STORAGE_KEYS.CACHE_DATA + '_')) {
           try {
             localStorage.setItem(key, JSON.stringify(cacheData[key]));
-          } catch (_) {}
+          } catch (_) { }
         }
       });
     } catch (e) {
@@ -3014,11 +3026,11 @@ const offlineOperationManager = new OfflineOperationManager();
 window.OfflineSyncV2 = {
   // 状態管理
   getStatus: () => offlineOperationManager.getSystemStatus(),
-  
+
   // 同期制御
   sync: () => offlineOperationManager.performSync(),
   retrySync: () => offlineOperationManager.performSync(),
-  
+
   // 強制同期（タイムアウトを無視）
   forceSync: async () => {
     console.log('[OfflineSyncV2] 強制同期を実行');
@@ -3027,21 +3039,21 @@ window.OfflineSyncV2 = {
       console.log('[OfflineSyncV2] 同期する操作がありません');
       return;
     }
-    
+
     // 同期状態をリセット
     offlineOperationManager.syncInProgress = false;
-    
+
     // 同期を実行
     await offlineOperationManager.performSync();
   },
-  
+
   // キュー管理
   getQueue: () => offlineOperationManager.readOperationQueue(),
-  clearQueue: () => {
+  clearQueue: async () => {
     try {
       offlineOperationManager.writeOperationQueue([]);
       console.log('[OfflineSyncV2] キューをクリアしました');
-      
+
       // 成功通知を表示
       const notification = document.createElement('div');
       notification.className = 'success-notification';
@@ -3052,27 +3064,27 @@ window.OfflineSyncV2 = {
           <button class="notification-close" onclick="this.parentElement.parentElement.remove()">×</button>
         </div>
       `;
-      
+
       document.body.appendChild(notification);
-      
+
       setTimeout(() => {
         if (notification.parentElement) {
           notification.remove();
         }
       }, 3000);
-      
+
       // 現在開いているキューステータスモーダルがあれば閉じる
       const modal = document.getElementById('queue-status-modal');
       if (modal) {
         modal.remove();
       }
-      
+
     } catch (error) {
       console.error('[OfflineSyncV2] キュークリアエラー:', error);
-      alert('キューのクリアに失敗しました');
+      await customAlert('キューのクリアに失敗しました');
     }
   },
-  
+
   // キャッシュ管理
   getCache: () => offlineOperationManager.getCacheInfo(),
   clearCache: () => {
@@ -3082,10 +3094,10 @@ window.OfflineSyncV2 = {
       console.log('[OfflineSyncV2] キャッシュをクリアしました');
     }
   },
-  
+
   // 操作管理
   addOperation: (operation) => offlineOperationManager.addOperation(operation),
-  
+
   // 競合解決
   resolveConflicts: () => offlineOperationManager.resolveConflicts([]),
 
@@ -3114,30 +3126,30 @@ window.OfflineSyncV2 = {
     localStorage.removeItem(key);
     console.log('[OfflineSync] キャッシュをクリアしました:', { group, day, timeslot });
   },
-  
-    // キューステータスの表示
-  showQueueStatus: () => {
+
+  // キューステータスの表示
+  showQueueStatus: async () => {
     try {
       const queue = offlineOperationManager.readOperationQueue();
       const status = offlineOperationManager.getSystemStatus();
-      
+
       console.log('[OfflineSyncV2] キューステータス:', {
         queueLength: queue.length,
         systemStatus: status,
         queue: queue
       });
-      
+
       // 既存のモーダルがあれば削除
       const existingModal = document.getElementById('queue-status-modal');
       if (existingModal) {
         existingModal.remove();
         console.log('[OfflineSyncV2] 既存のモーダルを削除');
       }
-      
+
       // モーダルを直接DOM要素として作成
       const modal = document.createElement('div');
       modal.id = 'queue-status-modal';
-      
+
       modal.innerHTML = `
         <div class="modal-content">
           <h3>オフライン操作キュー状況</h3>
@@ -3163,24 +3175,24 @@ window.OfflineSyncV2 = {
           </div>
         </div>
       `;
-      
+
       document.body.appendChild(modal);
-      
+
       console.log('[OfflineSyncV2] モーダルが正常に追加されました');
-      
+
       // モーダルクリックで閉じる機能を追加
       modal.onclick = (e) => {
         if (e.target === modal) {
           OfflineSyncV2.closeQueueStatusModal();
         }
       };
-      
+
     } catch (error) {
       console.error('[OfflineSyncV2] showQueueStatus error:', error);
       // フォールバック: アラートで情報を表示
       const queue = offlineOperationManager.readOperationQueue();
       const status = offlineOperationManager.getSystemStatus();
-      alert(`オフライン同期状況:\n\nキュー長: ${queue.length}\nオンライン状態: ${status.isOnline ? 'オンライン' : 'オフライン'}\n同期状況: ${status.syncInProgress ? '同期中' : '待機中'}`);
+      customAlert(`オフライン同期状況:\n\nキュー長: ${queue.length}\nオンライン状態: ${status.isOnline ? 'オンライン' : 'オフライン'}\n同期状況: ${status.syncInProgress ? '同期中' : '待機中'}`);
     }
   },
 
@@ -3194,17 +3206,17 @@ window.OfflineSyncV2 = {
         modalContent.classList.add('slide-down');
       }
       modal.classList.add('fade-out');
-      
+
       setTimeout(() => {
         modal.remove();
       }, 300);
     }
   },
-  
+
   // デバッグ機能
   debug: async () => {
     console.log('[OfflineSyncV2] システム状態:', offlineOperationManager.getSystemStatus());
-    
+
     // GAS接続テスト
     try {
       const gasAPI = await offlineOperationManager.waitForGasAPI();
@@ -3213,7 +3225,7 @@ window.OfflineSyncV2 = {
     } catch (error) {
       console.error('[OfflineSyncV2] GAS接続テスト失敗:', error);
     }
-    
+
     // 現在の座席データを取得
     try {
       const gasAPI = await offlineOperationManager.waitForGasAPI();

@@ -108,13 +108,21 @@ async function applyModeChange() {
 
     disableModal(true);
 
+    const showAlert = async (msg) => {
+        if (window.CustomDialog) {
+            await CustomDialog.alert(msg);
+        } else {
+            alert(msg);
+        }
+    };
+
     try {
         // 通常モードに戻る場合はパスワード検証をスキップ
         if (selectedMode === 'normal') {
             const beforeMode = localStorage.getItem('currentMode') || 'normal';
             localStorage.setItem('currentMode', selectedMode);
             updateModeDisplay();
-            alert('通常モードに切り替えました');
+            await showAlert('通常モードに切り替えました');
             try { audit.log('ui', 'mode_change', { from: beforeMode, to: selectedMode, success: true }); } catch (_) { }
             closeModeModal();
             // ページをリロードして権限を即時反映
@@ -124,7 +132,7 @@ async function applyModeChange() {
 
         // パスワードが入力されていない場合
         if (!password) {
-            alert('パスワードを入力してください');
+            await showAlert('パスワードを入力してください');
             return;
         }
 
@@ -151,17 +159,17 @@ async function applyModeChange() {
             if (selectedMode === 'walkin') modeText = '当日券モード';
             if (selectedMode === 'superadmin') modeText = '最高管理者モード';
 
-            alert(`${modeText}に切り替えました`);
+            await showAlert(`${modeText}に切り替えました`);
             closeModeModal(); // モーダルを閉じる
 
             // ページをリロードして権限を即時反映
             location.reload();
         } else {
-            alert('パスワードが間違っています。');
+            await showAlert('パスワードが間違っています。');
             try { audit.log('ui', 'mode_change', { from: beforeMode, to: selectedMode, success: false, error: 'auth_failed' }); } catch (_) { }
         }
     } catch (error) {
-        alert(`エラーが発生しました: ${error.message}`);
+        await showAlert(`エラーが発生しました: ${error.message}`);
         try { audit.log('ui', 'mode_change', { from: localStorage.getItem('currentMode') || 'normal', to: selectedMode, success: false, error: error.message }); } catch (_) { }
     } finally {
         disableModal(false);
@@ -244,11 +252,15 @@ function updateNavigationAccess() {
 }
 
 // 当日券ページへのナビゲーション
-function navigateToWalkin() {
+async function navigateToWalkin() {
     const currentMode = localStorage.getItem('currentMode') || 'normal';
 
     if (currentMode !== 'walkin' && currentMode !== 'superadmin') {
-        alert('当日券発行には当日券モードまたは最高管理者モードでのログインが必要です。\nサイドバーからモードを変更してください。');
+        if (window.CustomDialog) {
+            await CustomDialog.alert('当日券発行には当日券モードまたは最高管理者モードでのログインが必要です。\\nサイドバーからモードを変更してください。');
+        } else {
+            alert('当日券発行には当日券モードまたは最高管理者モードでのログインが必要です。\\nサイドバーからモードを変更してください。');
+        }
         return;
     }
 
@@ -337,17 +349,25 @@ async function applyModeFromUrl() {
 
 // GAS疎通テスト関数をグローバルに登録
 window.testGASConnection = async function () {
+    const showAlert = async (msg) => {
+        if (window.CustomDialog) {
+            await CustomDialog.alert(msg);
+        } else {
+            alert(msg);
+        }
+    };
+
     try {
         const result = await GasAPI.testGASConnection();
         if (result.success) {
-            alert('GAS疎通テスト成功！\n\nAPI応答: ' + JSON.stringify(result.data, null, 2));
+            await showAlert('GAS疎通テスト成功！\\n\\nAPI応答: ' + JSON.stringify(result.data, null, 2));
             try { audit.log('ui', 'gas_test', { success: true }); } catch (_) { }
         } else {
-            alert('GAS疎通テスト失敗！\n\nエラー: ' + result.error);
+            await showAlert('GAS疎通テスト失敗！\\n\\nエラー: ' + result.error);
             try { audit.log('ui', 'gas_test', { success: false, error: result.error || 'unknown' }); } catch (_) { }
         }
     } catch (error) {
-        alert('GAS疎通テストでエラーが発生しました！\n\nエラー: ' + error.message);
+        await showAlert('GAS疎通テストでエラーが発生しました！\\n\\nエラー: ' + error.message);
         try { audit.log('ui', 'gas_test', { success: false, error: error.message }); } catch (_) { }
     }
 };

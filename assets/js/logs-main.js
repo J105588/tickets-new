@@ -4,6 +4,19 @@ import GasAPI from './api.js';
 import { loadSidebar, toggleSidebar } from './sidebar.js';
 import fullCapacityMonitor from './full-capacity-monitor.js';
 
+
+// カスタムダイアログ用ヘルパー
+async function customAlert(msg) {
+  if (window.CustomDialog) await CustomDialog.alert(msg);
+  else window.alert(msg);
+}
+
+async function customConfirm(msg) {
+  if (window.CustomDialog) return await CustomDialog.confirm(msg);
+  return window.confirm(msg);
+}
+
+
 // グローバル変数
 let currentLogs = [];
 let autoRefreshInterval = null;
@@ -463,10 +476,10 @@ function clearFilters() {
 }
 
 // CSVエクスポート（最適化版）
-function exportLogsCSV() {
+async function exportLogsCSV() {
   const rows = getFilteredLogs();
   if (!rows || rows.length === 0) {
-    alert('エクスポート対象のログがありません');
+    await customAlert('エクスポート対象のログがありません');
     return;
   }
 
@@ -474,7 +487,7 @@ function exportLogsCSV() {
   showExportProgress();
 
   // 非同期でCSV生成（UIブロックを防ぐ）
-  setTimeout(() => {
+  setTimeout(async () => {
     try {
       const headers = ['timestamp', 'type', 'action', 'metadata', 'sessionId', 'ipAddress', 'userAgent'];
       const csvRows = [headers.join(',')];
@@ -536,7 +549,7 @@ function exportLogsCSV() {
 
     } catch (error) {
       console.error('CSVエクスポートエラー:', error);
-      alert('CSVエクスポート中にエラーが発生しました: ' + error.message);
+      await customAlert('CSVエクスポート中にエラーが発生しました: ' + error.message);
       hideExportProgress();
     }
   }, 100);
@@ -773,7 +786,7 @@ function showLoading(show) {
 }
 
 // エラー表示
-function showError(message) {
+async function showError(message) {
   const errorContainer = document.getElementById('error-container');
   const errorMessage = document.getElementById('error-message');
 
@@ -781,7 +794,7 @@ function showError(message) {
     errorMessage.textContent = message;
     errorContainer.style.display = 'flex';
   } else {
-    alert(message);
+    await customAlert(message);
   }
 }
 
@@ -851,7 +864,7 @@ async function saveFullCapacitySettings() {
       // 監視間隔を更新
       fullCapacityMonitor.setCheckInterval(interval);
 
-      alert('設定を保存しました。');
+      await customAlert('設定を保存しました。');
       closeFullCapacitySettings();
 
       // 設定に応じて監視を開始/停止
@@ -861,11 +874,11 @@ async function saveFullCapacitySettings() {
         fullCapacityMonitor.stop();
       }
     } else {
-      alert('設定の保存に失敗しました。');
+      await customAlert('設定の保存に失敗しました。');
     }
   } catch (error) {
     console.error('設定保存エラー:', error);
-    alert('設定の保存中にエラーが発生しました: ' + error.message);
+    await customAlert('設定の保存中にエラーが発生しました: ' + error.message);
   }
 }
 
@@ -897,13 +910,13 @@ async function testFullCapacityNotification() {
     }]);
 
     if (response && response.success) {
-      alert(`テスト通知を送信しました。\n成功: ${response.successCount}件\n失敗: ${response.failureCount}件`);
+      await customAlert(`テスト通知を送信しました。\n成功: ${response.successCount}件\n失敗: ${response.failureCount}件`);
     } else {
-      alert('テスト通知の送信に失敗しました: ' + (response?.message || 'Unknown error'));
+      await customAlert('テスト通知の送信に失敗しました: ' + (response?.message || 'Unknown error'));
     }
   } catch (error) {
     console.error('テスト通知エラー:', error);
-    alert('テスト通知中にエラーが発生しました: ' + error.message);
+    await customAlert('テスト通知中にエラーが発生しました: ' + error.message);
   }
 }
 
@@ -911,9 +924,9 @@ async function testFullCapacityNotification() {
 async function manualFullCapacityCheck() {
   try {
     await fullCapacityMonitor.manualCheck();
-    alert('手動チェックを実行しました。');
+    await customAlert('手動チェックを実行しました。');
   } catch (error) {
     console.error('手動チェックエラー:', error);
-    alert('手動チェック中にエラーが発生しました: ' + error.message);
+    await customAlert('手動チェック中にエラーが発生しました: ' + error.message);
   }
 }

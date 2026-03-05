@@ -181,7 +181,7 @@ function renderDaySection(container, dayId, dayLabel, schedules) {
   container.appendChild(section);
 }
 
-function selectTimeslot(day, timeslot) {
+async function selectTimeslot(day, timeslot) {
   const urlParams = new URLSearchParams(window.location.search);
   let group = urlParams.get('group');
   if (DemoMode.isActive()) group = DemoMode.enforceGroup(group);
@@ -191,7 +191,11 @@ function selectTimeslot(day, timeslot) {
   const currentMode = localStorage.getItem('currentMode') || 'normal';
 
   if (currentMode === 'normal') {
-    alert('権限がありません：通常モードでは時間帯を開けません。');
+    if (window.CustomDialog) {
+      await CustomDialog.alert('権限がありません：通常モードでは時間帯を開けません。');
+    } else {
+      alert('権限がありません：通常モードでは時間帯を開けません。');
+    }
     return;
   }
 

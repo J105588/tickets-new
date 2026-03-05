@@ -28,6 +28,22 @@ import {
     toDbSeatId
 } from './supabase-client.js';
 
+// カスタムダイアログ用ヘルパー
+async function customAlert(msg) {
+    if (window.CustomDialog) await CustomDialog.alert(msg);
+    else window.alert(msg);
+}
+
+async function customConfirm(msg) {
+    if (window.CustomDialog) return await CustomDialog.confirm(msg);
+    return window.confirm(msg);
+}
+
+async function customPrompt(msg, options = {}) {
+    if (window.CustomDialog) return await CustomDialog.prompt(msg, options);
+    return window.prompt(msg, options.defaultValue || '');
+}
+
 let currentReservations = [];
 let masterData = {
     groups: [],
@@ -67,7 +83,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const now = new Date().getTime();
     if (now - parseInt(lastActive) > SESSION_TIMEOUT_MS) {
-        alert('一定時間操作がなかったため、ログアウトしました。');
+        await customAlert('一定時間操作がなかったため、ログアウトしました。');
         sessionStorage.removeItem('admin_session');
         sessionStorage.removeItem('admin_verified_at');
         sessionStorage.removeItem('admin_last_active');
@@ -96,10 +112,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateActivity();
 
     // Inactivity Watcher Loop
-    setInterval(() => {
+    setInterval(async () => {
         const last = parseInt(sessionStorage.getItem('admin_last_active') || '0', 10);
         if (last && (new Date().getTime() - last) > SESSION_TIMEOUT_MS) {
-            alert('一定時間操作がなかったため、自動的にログアウトしました。');
+            await customAlert('一定時間操作がなかったため、自動的にログアウトしました。');
             sessionStorage.removeItem('admin_session');
             sessionStorage.removeItem('admin_verified_at');
             sessionStorage.removeItem('admin_last_active');
@@ -184,7 +200,7 @@ async function loadMasterData() {
         masterData.dates = mRes.data.dates || [];
         masterData.timeslots = mRes.data.timeslots || [];
     } else {
-        alert('マスタデータ取得失敗: ' + mRes.error);
+        await customAlert('マスタデータ取得失敗: ' + mRes.error);
     }
 
     if (sRes.success) {
@@ -557,7 +573,7 @@ window.saveChanges = async function () {
         notes: document.getElementById('edit-notes').value,
         status: document.getElementById('edit-status').value
     };
-    if (!updates.name) return alert('名前は必須です');
+    if (!updates.name) return await customAlert('名前は必須です');
 
     const btn = document.getElementById('btn-save-changes');
     btn.innerText = '保存中...';
@@ -568,34 +584,34 @@ window.saveChanges = async function () {
 
     hideOverlayLoader();
     if (res.success) {
-        alert('保存しました');
+        await customAlert('保存しました');
         closeModal('modal-edit');
         applyFilters();
     } else {
-        alert('保存失敗: ' + res.error);
+        await customAlert('保存失敗: ' + res.error);
     }
     btn.innerText = '変更を保存';
     btn.disabled = false;
 };
 
 async function handleCancel(id) {
-    if (!confirm('本当にキャンセルしますか？')) return;
+    if (!await customConfirm('本当にキャンセルしますか？')) return;
     showOverlayLoader();
     const res = await adminCancelBooking(id);
     hideOverlayLoader();
     if (res.success) {
-        alert('キャンセルしました');
+        await customAlert('キャンセルしました');
         closeModal('modal-edit');
         applyFilters();
     } else {
-        alert('エラー: ' + res.error);
+        await customAlert('エラー: ' + res.error);
     }
 }
 
 window.changeSeat = async function () {
     if (!selectedBooking) return;
     const dbSeatsStr = document.getElementById('edit-seat-db').value;
-    if (!dbSeatsStr) return alert('DB形式の座席IDが指定されていません');
+    if (!dbSeatsStr) return await customAlert('DB形式の座席IDが指定されていません');
 
     const btn = document.querySelector('button[onclick="changeSeat()"]');
     const originalText = btn.innerText;
@@ -610,23 +626,23 @@ window.changeSeat = async function () {
 
     hideOverlayLoader();
     if (res.success) {
-        alert('座席を変更しました');
+        await customAlert('座席を変更しました');
         closeModal('modal-edit'); // Close to refresh data cleanly via applyFilters
         applyFilters();
     } else {
-        alert('変更失敗: ' + res.error);
+        await customAlert('変更失敗: ' + res.error);
     }
 
     btn.innerText = originalText;
     btn.disabled = false;
 };
 
-window.selectFromMap = function () {
+window.selectFromMap = async function () {
     if (!selectedBooking) return;
     // booking details
     const p = selectedBooking.performances || selectedBooking.performance || {};
     if (!p.group_name || !p.day || !p.timeslot) {
-        alert('公演情報が不足しているため座席表を開けません');
+        await customAlert('公演情報が不足しているため座席表を開けません');
         return;
     }
 
@@ -649,75 +665,29 @@ window.selectFromMap = function () {
 };
 
 // Listen for messages from iframe
-window.addEventListener('message', (event) => {
+window.addEventListener('message', async (event) => {
     if (event.data && event.data.type === 'REBOOK_COMPLETE') {
         if (event.data.success) {
-            alert('座席変更が完了しました');
+            await customAlert('座席変更が完了しました');
             closeModal('modal-seat-map');
             closeModal('modal-edit'); // Close edit modal too
             applyFilters(); // Refresh list
         } else {
-            alert('座席変更エラー: ' + (event.data.error || 'Unknown'));
+            await customAlert('座席変更エラー: ' + (event.data.error || 'Unknown'));
         }
     }
 });
 
-window.resendEmail = function () {
+window.resendEmail = async function () {
     if (!selectedBooking) return;
-    if (!confirm('確認メールを再送しますか？')) return;
+    if (!await customConfirm('確認メールを再送しますか？')) return;
     const btn = document.getElementById('btn-resend-email');
     btn.innerText = '送信中...';
     showOverlayLoader();
-    // Use JSONP wrapper (assuming implemented in client or adminResendEmail wrapper uses it)
-    // adminResendEmail in supabase-client.js uses jsonpRequest
-    adminResendEmail(selectedBooking.id).then(res => {
-        hideOverlayLoader();
-        alert(res.success ? 'メールを再送しました' : '送信失敗: ' + res.error);
-        btn.innerText = 'メール再送';
-    });
-};
-
-// --- Modals (Settings) ---
-
-// Group
-window.openGroupModal = function (id = null) {
-    const item = id ? masterData.groups.find(g => g.id === id) : {};
-    document.getElementById('group-id').value = id || '';
-    document.getElementById('group-name').value = item.name || '';
-    document.getElementById('group-order').value = item.display_order || 10;
-    const activeSel = document.getElementById('group-status');
-    if (activeSel) activeSel.value = item.is_active === false ? 'inactive' : 'active';
-
-    // Delete Button visibility
-    const delBtn = document.getElementById('btn-delete-group');
-    if (delBtn) {
-        delBtn.style.display = id ? 'inline-block' : 'none';
-        delBtn.onclick = () => deleteItem('groups', id);
-    }
-
-    document.getElementById('modal-group').classList.add('active');
-};
-window.saveGroup = async function () {
-    const id = document.getElementById('group-id').value;
-    const data = {
-        name: document.getElementById('group-name').value,
-        display_order: parseInt(document.getElementById('group-order').value),
-        is_active: document.getElementById('group-status').value === 'active'
-    };
-    if (id) data.id = parseInt(id);
-    if (!data.name) return alert('名前は必須です');
-
-    showOverlayLoader();
-    // Check local duplicate for names if needed, or rely on DB
-    const res = await adminManageMaster('groups', 'save', data);
+    const res = await adminResendEmail(selectedBooking.id);
     hideOverlayLoader();
-    if (res.success) {
-        alert('保存しました');
-        closeModal('modal-group');
-        loadMasterData();
-    } else {
-        alert('エラー: ' + res.error);
-    }
+    await customAlert(res.success ? 'メールを再送しました' : '送信失敗: ' + res.error);
+    btn.innerText = 'メール再送';
 };
 
 // Date
@@ -747,17 +717,17 @@ window.saveDate = async function () {
         is_active: document.getElementById('date-status').value === 'active'
     };
     if (id) data.id = parseInt(id);
-    if (!data.date_label) return alert('ラベルは必須です');
+    if (!data.date_label) return await customAlert('ラベルは必須です');
 
     showOverlayLoader();
     const res = await adminManageMaster('event_dates', 'save', data);
     hideOverlayLoader();
     if (res.success) {
-        alert('保存しました');
+        await customAlert('保存しました');
         closeModal('modal-date');
         loadMasterData();
     } else {
-        alert('エラー: ' + res.error);
+        await customAlert('エラー: ' + res.error);
     }
 }
 
@@ -816,7 +786,7 @@ window.saveSchedule = async function () {
     const id = document.getElementById('schedule-id').value;
     const timeslotVal = document.getElementById('schedule-timeslot').value;
 
-    if (!timeslotVal) return alert('時間帯は必須です (例: 10:00)');
+    if (!timeslotVal) return await customAlert('時間帯は必須です (例: 10:00)');
 
     const data = {
         group_name: document.getElementById('schedule-group-id').value,
@@ -834,47 +804,47 @@ window.saveSchedule = async function () {
     const res = await adminManageSchedule(data);
     hideOverlayLoader();
     if (res.success) {
-        alert('保存しました');
+        await customAlert('保存しました');
         closeModal('modal-schedule');
         loadMasterData();
     } else {
-        alert('エラー: ' + res.error);
+        await customAlert('エラー: ' + res.error);
     }
 };
 
 window.deleteScheduleEntry = async function (id) {
-    if (!confirm('本当に削除しますか？')) return;
+    if (!await customConfirm('本当に削除しますか？')) return;
     showOverlayLoader();
     const res = await adminDeleteSchedule(id);
     hideOverlayLoader();
     if (res.success) {
-        alert('削除しました');
+        await customAlert('削除しました');
         loadMasterData();
     } else {
-        alert('エラー: ' + res.error);
+        await customAlert('エラー: ' + res.error);
     }
 };
 
 window.deleteItem = async function (type, id) {
-    if (!confirm('本当に削除しますか？\n(関連する予約データ等がある場合、整合性エラーになる可能性があります)')) return;
+    if (!await customConfirm('本当に削除しますか？\n(関連する予約データ等がある場合、整合性エラーになる可能性があります)')) return;
 
     showOverlayLoader();
     try {
         const res = await adminManageMaster(type, 'delete', { id: id });
         hideOverlayLoader();
         if (res.success) {
-            alert('削除しました');
+            await customAlert('削除しました');
             // Close generic modals if open
             if (type === 'groups') closeModal('modal-group');
             if (type === 'event_dates') closeModal('modal-date');
 
             loadMasterData();
         } else {
-            alert('削除エラー: ' + res.error);
+            await customAlert('削除エラー: ' + res.error);
         }
     } catch (e) {
         hideOverlayLoader();
-        alert('システムエラー: ' + e.message);
+        await customAlert('システムエラー: ' + e.message);
     }
 };
 
@@ -886,14 +856,14 @@ window.resetPerformance = async function (id) {
 
     const confirmMsg = `【重要】本当に初期化しますか？\n\n対象: ${item.group_name} ${item.day} ${item.timeslot}\n\n・全座席が「空席」に戻ります\n・全ての予約データが「完全に削除」されます\n・この操作は取り消せません\n\n実行するには、以下に「RESET」と入力してください。`;
 
-    const input = prompt(confirmMsg);
+    const input = await customPrompt(confirmMsg, { placeholder: 'RESET' });
     if (input !== 'RESET') {
-        if (input !== null) alert('入力内容が一致しないためキャンセルしました');
+        if (input !== null) await customAlert('入力内容が一致しないためキャンセルしました');
         return;
     }
 
     // Double check
-    if (!confirm('最終確認: 本当に初期化してよろしいですか？')) return;
+    if (!await customConfirm('最終確認: 本当に初期化してよろしいですか？')) return;
 
     // Execute
     // Use resetPerformance wrapper
@@ -910,14 +880,14 @@ window.resetPerformance = async function (id) {
         const res = await adminResetPerformance(id);
         hideOverlayLoader();
         if (res.success) {
-            alert(res.message || '初期化しました');
+            await customAlert(res.message || '初期化しました');
             loadMasterData(); // Refresh all
         } else {
-            alert('初期化エラー: ' + res.error);
+            await customAlert('初期化エラー: ' + res.error);
         }
     } catch (e) {
         hideOverlayLoader();
-        alert('エラーが発生しました: ' + e.message);
+        await customAlert('エラーが発生しました: ' + e.message);
     } finally {
         if (btn) {
             btn.innerText = originalText;
@@ -956,11 +926,11 @@ function switchTab(tabId) {
 
 window.sendSummaryEmails = async function () {
     if (!currentReservations || currentReservations.length === 0) {
-        alert('送信対象の予約がありません。フィルタを確認してください。');
+        await customAlert('送信対象の予約がありません。フィルタを確認してください。');
         return;
     }
 
-    if (!confirm(`現在表示されている ${currentReservations.length} 件の予約情報からまとめメールを作成して送信します。\n\n・名前が一致する予約を束ねます\n・重複するメールアドレスには1通のみ送信します\n\n実行しますか？`)) return;
+    if (!await customConfirm(`現在表示されている ${currentReservations.length} 件の予約情報からまとめメールを作成して送信します。\n\n・名前が一致する予約を束ねます\n・重複するメールアドレスには1通のみ送信します\n\n実行しますか？`)) return;
 
     // 1. Group by Name
     const groups = {}; // name -> { bookings: [], emails: Set() }
@@ -1026,10 +996,10 @@ window.sendSummaryEmails = async function () {
             }
         }
 
-        alert(`送信完了\n成功: ${results.success}件\n失敗: ${results.failure}件`);
+        await customAlert(`送信完了\n成功: ${results.success}件\n失敗: ${results.failure}件`);
 
     } catch (e) {
-        alert('送信中にエラーが発生しました: ' + e.message);
+        await customAlert('送信中にエラーが発生しました: ' + e.message);
     } finally {
         hideOverlayLoader();
         btn.innerHTML = originalText;
@@ -1100,10 +1070,10 @@ window.generateInviteLink = async function () {
             document.getElementById('invite-url').value = fullUrl;
             document.getElementById('invite-result').style.display = 'block';
         } else {
-            alert('発行失敗: ' + res.error);
+            await customAlert('発行失敗: ' + res.error);
         }
     } catch (e) {
-        alert('エラー: ' + e.message);
+        await customAlert('エラー: ' + e.message);
     } finally {
         hideOverlayLoader();
         btn.innerText = originalText;
@@ -1111,11 +1081,11 @@ window.generateInviteLink = async function () {
     }
 };
 
-window.copyInviteLink = function () {
+window.copyInviteLink = async function () {
     const el = document.getElementById('invite-url');
     el.select();
     document.execCommand('copy');
-    alert('コピーしました');
+    await customAlert('コピーしました');
 };
 
 // --- Global Deadline ---
@@ -1158,18 +1128,18 @@ window.loadDeadlineSettings = async function () {
 window.saveDeadlineSettings = async function () {
     const val = document.getElementById('global-deadline').value;
     if (!val) {
-        if (!confirm('期限をクリア（無期限）にしますか？')) return;
+        if (!await customConfirm('期限をクリア（無期限）にしますか？')) return;
     }
 
     try {
         const res = await GasAPI.adminDeadlineSettings(val);
         if (res.success) {
-            alert('保存しました');
+            await customAlert('保存しました');
         } else {
-            alert('保存失敗: ' + res.error);
+            await customAlert('保存失敗: ' + res.error);
         }
     } catch (e) {
-        alert('エラー: ' + e.message);
+        await customAlert('エラー: ' + e.message);
     }
 };
 
@@ -1208,7 +1178,7 @@ async function loadBackupsForUI() {
 }
 
 async function createBackupForUI() {
-    if (!confirm('現在のデータベースのバックアップを作成しますか？\n（数秒〜数十秒かかる場合があります）')) return;
+    if (!await customConfirm('現在のデータベースのバックアップを作成しますか？\n（数秒〜数十秒かかる場合があります）')) return;
 
     const btn = document.querySelector('button[onclick="createBackupForUI()"]');
     const originalText = btn.innerHTML;
@@ -1221,25 +1191,25 @@ async function createBackupForUI() {
     btn.innerHTML = originalText;
 
     if (res.success) {
-        alert(`バックアップが完了しました。\n保存先: ${res.name}`);
+        await customAlert(`バックアップが完了しました。\n保存先: ${res.name}`);
         loadBackupsForUI();
     } else {
-        alert(`バックアップに失敗しました: ${res.error}`);
+        await customAlert(`バックアップに失敗しました: ${res.error}`);
     }
 }
 
 async function restoreBackupForUI(backupId) {
-    if (!confirm('【警告】\n選択したバックアップからデータベースを復元します。\n\n・現在のデータは全て上書き（削除）されます。\n・この操作は取り消せません。\n\n本当に実行しますか？')) return;
+    if (!await customConfirm('【警告】\n選択したバックアップからデータベースを復元します。\n\n・現在のデータは全て上書き（削除）されます。\n・この操作は取り消せません。\n\n本当に実行しますか？')) return;
 
-    const userInput = prompt('確認のため "RESTORE" と入力してください:');
+    const userInput = await customPrompt('確認のため "RESTORE" と入力してください:', { placeholder: 'RESTORE' });
     if (userInput !== 'RESTORE') {
-        alert('入力が一致しないためキャンセルしました。');
+        await customAlert('入力が一致しないためキャンセルしました。');
         return;
     }
 
-    const restoreKey = prompt('セキュリティのため、復元用キー(RESTORE_KEY)を入力してください:');
+    const restoreKey = await customPrompt('セキュリティのため、復元用キー(RESTORE_KEY)を入力してください:', { isPassword: true });
     if (!restoreKey) {
-        alert('キーが入力されなかったためキャンセルしました。');
+        await customAlert('キーが入力されなかったためキャンセルしました。');
         return;
     }
 
@@ -1257,10 +1227,10 @@ async function restoreBackupForUI(backupId) {
     if (btn) btn.disabled = false;
 
     if (res.success) {
-        alert('復元が完了しました。ページをリロードします。');
+        await customAlert('復元が完了しました。ページをリロードします。');
         location.reload();
     } else {
-        alert(`復元に失敗しました: ${res.error}`);
+        await customAlert(`復元に失敗しました: ${res.error}`);
     }
 }
 
@@ -1336,7 +1306,7 @@ async function saveMaintenanceSchedule() {
     const endVal = document.getElementById('maint-end').value;
 
     if (!startVal) {
-        alert('開始日時を設定してください。\n（即時開始したい場合は現在時刻を指定）');
+        await customAlert('開始日時を設定してください。\n（即時開始したい場合は現在時刻を指定）');
         return;
     }
 
@@ -1344,13 +1314,13 @@ async function saveMaintenanceSchedule() {
     const end = endVal ? new Date(endVal) : null;
 
     if (end && start >= end) {
-        alert('終了日時は開始日時より後に設定してください。');
+        await customAlert('終了日時は開始日時より後に設定してください。');
         return;
     }
 
-    if (!confirm('メンテナンススケジュールを設定しますか？\n設定された時間帯は全ての利用者がアクセスできなくなります。')) return;
+    if (!await customConfirm('メンテナンススケジュールを設定しますか？\n設定された時間帯は全ての利用者がアクセスできなくなります。')) return;
 
-    const password = prompt('設定のため、最高管理者パスワードを入力してください:');
+    const password = await customPrompt('設定のため、最高管理者パスワードを入力してください:', { isPassword: true });
     if (!password) return;
 
     // Convert to ISO string for storage
@@ -1360,32 +1330,32 @@ async function saveMaintenanceSchedule() {
     try {
         const res = await adminSetMaintenanceSchedule(true, startIso, endIso, password);
         if (res.success) {
-            alert('設定しました。');
+            await customAlert('設定しました。');
             loadMaintenanceStatus();
         } else {
-            alert(`失敗しました: ${res.error || res.message}`);
+            await customAlert(`失敗しました: ${res.error || res.message}`);
         }
     } catch (e) {
-        alert(`エラー: ${e.message}`);
+        await customAlert(`エラー: ${e.message}`);
     }
 }
 
 async function clearMaintenanceSchedule() {
-    if (!confirm('メンテナンス設定を解除しますか？\nシステムは即座に通常稼働に戻ります。')) return;
+    if (!await customConfirm('メンテナンス設定を解除しますか？\nシステムは即座に通常稼働に戻ります。')) return;
 
-    const password = prompt('解除のため、最高管理者パスワードを入力してください:');
+    const password = await customPrompt('解除のため、最高管理者パスワードを入力してください:', { isPassword: true });
     if (!password) return;
 
     try {
         const res = await adminSetMaintenanceSchedule(false, null, null, password);
         if (res.success) {
-            alert('解除しました。');
+            await customAlert('解除しました。');
             loadMaintenanceStatus();
         } else {
-            alert(`失敗しました: ${res.error || res.message}`);
+            await customAlert(`失敗しました: ${res.error || res.message}`);
         }
     } catch (e) {
-        alert(`エラー: ${e.message}`);
+        await customAlert(`エラー: ${e.message}`);
     }
 }
 

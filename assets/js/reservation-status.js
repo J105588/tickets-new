@@ -7,6 +7,19 @@ import { apiUrlManager } from './config.js';
 import { subscribeToSeatUpdates, subscribeToBookingEvents, getBookingForScan, toDisplaySeatId } from './supabase-client.js';
 
 
+// カスタムダイアログ用ヘルパー
+async function customAlert(msg) {
+  if (window.CustomDialog) await CustomDialog.alert(msg);
+  else window.alert(msg);
+}
+
+async function customConfirm(msg) {
+  if (window.CustomDialog) return await CustomDialog.confirm(msg);
+  return window.confirm(msg);
+}
+
+
+
 function initReservationStatus() {
     // 1. Check URL parameters for auto-login
     const params = new URLSearchParams(window.location.search);
@@ -58,11 +71,11 @@ async function fetchBookingDetails(id, passcode) {
             passcode: passcode
         };
 
-        fetchJsonp(apiUrl, params, (json) => {
+        fetchJsonp(apiUrl, params, async (json) => {
             if (json.success) {
                 showDetails(json.data);
             } else {
-                alert('確認失敗: ' + (json.error || '情報が見つかりません'));
+                await customAlert('確認失敗: ' + (json.error || '情報が見つかりません'));
                 btn.disabled = false;
                 btn.innerText = '確認する';
             }
@@ -70,7 +83,7 @@ async function fetchBookingDetails(id, passcode) {
 
     } catch (e) {
         console.error(e);
-        alert('通信エラーが発生しました');
+        await customAlert('通信エラーが発生しました');
         btn.disabled = false;
         btn.innerText = '確認する';
     }
@@ -233,7 +246,7 @@ function updateUIAsCheckedIn() {
 
 
 async function cancelBooking(id, passcode) {
-    if (!confirm('本当に予約をキャンセルしますか？\nこの操作は取り消せません。')) return;
+    if (!await customConfirm('本当に予約をキャンセルしますか？\nこの操作は取り消せません。')) return;
 
     const btn = document.getElementById('btn-cancel');
     const originalText = btn.innerText;
@@ -264,19 +277,19 @@ async function cancelBooking(id, passcode) {
 
     try {
         const apiUrl = apiUrlManager.getCurrentUrl();
-        fetchJsonp(apiUrl, params, (json) => {
+        fetchJsonp(apiUrl, params, async (json) => {
             if (json.success) {
-                alert('予約をキャンセルしました。');
+                await customAlert('予約をキャンセルしました。');
                 location.reload();
             } else {
-                alert('キャンセル失敗: ' + (json.error || '不明なエラー'));
+                await customAlert('キャンセル失敗: ' + (json.error || '不明なエラー'));
                 btn.disabled = false;
                 btn.innerText = originalText;
             }
         });
     } catch (e) {
         console.error('API Error:', e);
-        alert('通信エラーが発生しました。もう一度お試しください。');
+        await customAlert('通信エラーが発生しました。もう一度お試しください。');
         btn.disabled = false;
         btn.innerText = originalText;
     }

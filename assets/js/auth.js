@@ -1,3 +1,15 @@
+
+// カスタムダイアログ用ヘルパー
+async function customAlert(msg) {
+  if (window.CustomDialog) await CustomDialog.alert(msg);
+  else window.alert(msg);
+}
+
+async function customConfirm(msg) {
+  if (window.CustomDialog) return await CustomDialog.confirm(msg);
+  return window.confirm(msg);
+}
+
 // auth.js
 
 const AUTH_STORAGE_KEY = 'app_auth_session_v1';
@@ -111,7 +123,7 @@ function startInactivityWatcher() {
       if (hasAdmin) {
         const lastAdminActive = parseInt(sessionStorage.getItem('admin_last_active') || '0', 10);
         if (lastAdminActive && (Date.now() - lastAdminActive) > AUTH_TIMEOUT_MS) {
-          alert('一定時間操作がなかったため、自動的にログアウトしました。');
+          await customAlert('一定時間操作がなかったため、自動的にログアウトしました。');
           sessionStorage.removeItem('admin_session');
           sessionStorage.removeItem('superadmin_session');
           sessionStorage.removeItem('admin_verified_at');

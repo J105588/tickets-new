@@ -1,3 +1,15 @@
+
+// カスタムダイアログ用ヘルパー
+async function customAlert(msg) {
+  if (window.CustomDialog) await CustomDialog.alert(msg);
+  else window.alert(msg);
+}
+
+async function customConfirm(msg) {
+  if (window.CustomDialog) return await CustomDialog.confirm(msg);
+  return window.confirm(msg);
+}
+
 // config.js
 // 複数のAPI URL（使用数上限回避のため分散）
 const GAS_API_URLS = [
@@ -283,12 +295,16 @@ class DemoModeManager {
   }
 
   // DEMOモード時に許可外のグループアクセスをブロック（ゲネプロは制限なし）
-  guardGroupAccessOrRedirect(currentGroup, redirectTo = null) {
+  async guardGroupAccessOrRedirect(currentGroup, redirectTo = null) {
     if (!this.isActive()) return true;
     if (currentGroup === this.demoGroup) return true;
 
     const modeName = 'DEMOモード';
-    alert(`権限がありません：${modeName}では「見本演劇」のみアクセス可能です`);
+    if (window.CustomDialog) {
+      await CustomDialog.alert(`権限がありません：${modeName}では「見本演劇」のみアクセス可能です`);
+    } else {
+      await customAlert(`権限がありません：${modeName}では「見本演劇」のみアクセス可能です`);
+    }
     if (redirectTo) {
       window.location.href = redirectTo;
     }
@@ -368,7 +384,7 @@ class DemoModeManager {
       // フォールバック
       const modeName = this.isGeneproActive() ? 'ゲネプロモード' : 'DEMOモード';
       const groupName = this.isGeneproActive() ? this.geneproGroup : this.demoGroup;
-      try { alert(`${modeName}：現在「${groupName}」のみ操作可能です`); } catch (__) { }
+      try { customAlert(`${modeName}：現在「${groupName}」のみ操作可能です`); } catch (__) { }
     }
   }
 }

@@ -69,6 +69,7 @@
             border-radius: 8px;
         }
     </style>
+    <script src="../assets/js/custom-dialog.js"></script>
 </head>
 
 <body>
@@ -136,7 +137,7 @@
             }, timeout);
         }
 
-        document.getElementById('login-form').addEventListener('submit', (e) => {
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const passwordInput = document.getElementById('password');
             const password = passwordInput.value.trim();
@@ -144,7 +145,11 @@
             const errorMsg = document.getElementById('error-msg');
 
             if (!password) {
-                alert('パスワードを入力してください');
+                if (window.CustomDialog) {
+                    await CustomDialog.alert('パスワードを入力してください');
+                } else {
+                    alert('パスワードを入力してください');
+                }
                 return;
             }
 

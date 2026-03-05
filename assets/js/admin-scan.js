@@ -6,6 +6,17 @@
 import { apiUrlManager } from './config.js';
 import { fetchMasterDataFromSupabase, checkInReservation, getBookingForScan, toDisplaySeatId } from './supabase-client.js';
 
+// カスタムダイアログ用ヘルパー
+async function customAlert(msg) {
+    if (window.CustomDialog) await CustomDialog.alert(msg);
+    else window.alert(msg);
+}
+
+async function customConfirm(msg) {
+    if (window.CustomDialog) return await CustomDialog.confirm(msg);
+    return window.confirm(msg);
+}
+
 const state = {
     group: '',
     day: '',
@@ -118,7 +129,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
         const now = new Date().getTime();
         if (now - parseInt(lastActive) > SESSION_TIMEOUT_MS) {
-            alert('一定時間操作がなかったため、ログアウトしました。');
+            await customAlert('一定時間操作がなかったため、ログアウトしました。');
             sessionStorage.removeItem('admin_session');
             sessionStorage.removeItem('admin_verified_at');
             sessionStorage.removeItem('admin_last_active');
@@ -127,10 +138,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             updateActivityAndInit();
 
             // Inactivity Watcher Loop
-            setInterval(() => {
+            setInterval(async () => {
                 const last = parseInt(sessionStorage.getItem('admin_last_active') || '0', 10);
                 if (last && (new Date().getTime() - last) > SESSION_TIMEOUT_MS) {
-                    alert('一定時間操作がなかったため、自動的にログアウトしました。');
+                    await customAlert('一定時間操作がなかったため、自動的にログアウトしました。');
                     sessionStorage.removeItem('admin_session');
                     sessionStorage.removeItem('admin_verified_at');
                     sessionStorage.removeItem('admin_last_active');
@@ -143,7 +154,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Login Form Handler
     const loginForm = document.getElementById('login-form');
     if (loginForm) {
-        loginForm.addEventListener('submit', (e) => {
+        loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const passwordInput = document.getElementById('admin-password');
             const password = passwordInput.value.trim();
@@ -151,7 +162,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const errorMsg = document.getElementById('login-error-msg');
 
             if (!password) {
-                alert('パスワードを入力してください');
+                await customAlert('パスワードを入力してください');
                 return;
             }
 
@@ -574,7 +585,7 @@ async function fetchScannablePerformances(group, inputs) {
     try {
         const apiUrl = apiUrlManager.getCurrentUrl();
         showLoader();
-        fetchJsonp(apiUrl, { action: 'get_performances', group }, (json) => {
+        fetchJsonp(apiUrl, { action: 'get_performances', group }, async (json) => {
             hideLoader();
             if (json.success) {
                 performanceScanData = json.data;
@@ -589,7 +600,7 @@ async function fetchScannablePerformances(group, inputs) {
                 });
                 inputs.day.disabled = false;
             } else {
-                alert('データ取得失敗');
+                await customAlert('データ取得失敗');
             }
         });
     } catch (e) { hideLoader(); console.error(e); }

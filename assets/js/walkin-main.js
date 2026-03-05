@@ -106,7 +106,7 @@ window.onload = async () => {
   `;
 
   // 当日券モードのアクセス制限をチェック
-  const hasAccess = checkWalkinModeAccess();
+  const hasAccess = await checkWalkinModeAccess();
 
   // アクセス権限がない場合は、以降の処理をスキップ
   if (!hasAccess) {
@@ -114,9 +114,9 @@ window.onload = async () => {
   }
 
   // モード変更時のイベントリスナーを追加
-  window.addEventListener('storage', (e) => {
+  window.addEventListener('storage', async (e) => {
     if (e.key === 'currentMode') {
-      const newHasAccess = checkWalkinModeAccess();
+      const newHasAccess = await checkWalkinModeAccess();
       if (!newHasAccess) {
         return; // アクセス権限がなくなった場合は自動的にリダイレクトされる
       }
@@ -162,7 +162,7 @@ window.onload = async () => {
 };
 
 // 当日券モードのアクセス制限をチェックする関数
-function checkWalkinModeAccess() {
+async function checkWalkinModeAccess() {
   const currentMode = localStorage.getItem('currentMode');
 
   if (currentMode !== 'walkin' && currentMode !== 'superadmin') {
@@ -172,16 +172,20 @@ function checkWalkinModeAccess() {
     const day = urlParams.get('day');
     const timeslot = urlParams.get('timeslot');
 
+    let redirectUrl = '../index.html';
     if (group && day && timeslot) {
       // 座席選択ページにリダイレクト
-      window.location.href = `seats.html?group=${group}&day=${day}&timeslot=${timeslot}`;
-    } else {
-      // パラメータがない場合は組選択ページにリダイレクト
-      window.location.href = '../index.html';
+      redirectUrl = `seats.html?group=${group}&day=${day}&timeslot=${timeslot}`;
     }
 
     // リダイレクト前にメッセージを表示
-    alert('当日券発行には当日券モードまたは最高管理者モードでのログインが必要です。\n座席選択ページに移動します。');
+    if (window.CustomDialog) {
+      await CustomDialog.alert('当日券発行には当日券モードまたは最高管理者モードでのログインが必要です。\\n座席選択ページに移動します。');
+    } else {
+      alert('当日券発行には当日券モードまたは最高管理者モードでのログインが必要です。\\n座席選択ページに移動します。');
+    }
+
+    window.location.href = redirectUrl;
     return false;
   }
 

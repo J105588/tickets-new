@@ -10,6 +10,17 @@ import { fetchMasterDataFromSupabase, fetchPerformancesFromSupabase, fetchSeatsF
 
 
 
+// カスタムダイアログ用ヘルパー
+async function customAlert(msg) {
+    if (window.CustomDialog) await CustomDialog.alert(msg);
+    else window.alert(msg);
+}
+
+async function customConfirm(msg) {
+    if (window.CustomDialog) return await CustomDialog.confirm(msg);
+    return window.confirm(msg);
+}
+
 // 状態管理
 const state = {
     group: '',
@@ -379,11 +390,11 @@ async function fetchPerformances(group) {
             performanceData = result.data;
             updateDayOptions();
         } else {
-            alert('公演データの取得に失敗しました: ' + result.error);
+            await customAlert('公演データの取得に失敗しました: ' + result.error);
         }
     } catch (e) {
         console.error(e);
-        alert('通信エラーが発生しました');
+        await customAlert('通信エラーが発生しました');
     }
 }
 
@@ -463,8 +474,11 @@ function initStep2() {
     // Close Modal
     const btnClose = document.getElementById('btn-close-modal');
     if (btnClose) {
-        btnClose.addEventListener('click', () => {
-            if (confirm('選択内容は保存されません。閉じますか？')) {
+        btnClose.addEventListener('click', async () => {
+            if (await customConfirm('選択内容は保存されません。閉じますか？')) {
+                // 選択をリセット
+                state.selectedSeats = [];
+                updateSelectedSeatsUI();
                 closeSeatModal();
             }
         });
@@ -510,9 +524,41 @@ function initStep2() {
 }
 
 function updateZoom() {
-    // seatMapContainer.style.transform = `scale(${currentZoom})`; // Old way
+    currentZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, currentZoom));
     seatMapContainer.style.setProperty('--seat-scale', currentZoom);
 }
+
+// ピンチズーム対応
+(function initPinchZoom() {
+    let initialDistance = 0;
+    let initialZoom = 1.0;
+
+    function getTouchDistance(touches) {
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    const wrapper = document.getElementById('seat-map-wrapper');
+    if (!wrapper) return;
+
+    wrapper.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 2) {
+            initialDistance = getTouchDistance(e.touches);
+            initialZoom = currentZoom;
+        }
+    }, { passive: true });
+
+    wrapper.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 2) {
+            e.preventDefault(); // ブラウザのデフォルトズームを防止
+            const dist = getTouchDistance(e.touches);
+            const scale = dist / initialDistance;
+            currentZoom = initialZoom * scale;
+            updateZoom();
+        }
+    }, { passive: false });
+})();
 
 function openSeatModal() {
     seatModal.classList.add('active');
@@ -563,10 +609,24 @@ async function loadSeatMap() {
 
     } catch (e) {
         console.error(e);
-        alert('座席データの読み込みに失敗しました: ' + e.message);
+        await customAlert('座席データの読み込みに失敗しました: ' + e.message);
     } finally {
         loadingSpinner.style.display = 'none';
         updateZoom(); // Ensure zoom is applied to new content
+
+        // 座席マップの中心にスクロール
+        setTimeout(() => {
+            const container = document.getElementById('seat-map-container');
+            if (container) {
+                const scrollLeft = (container.scrollWidth - container.clientWidth) / 2;
+                const scrollTop = (container.scrollHeight - container.clientHeight) / 2;
+                container.scrollTo({
+                    left: Math.max(0, scrollLeft),
+                    top: Math.max(0, scrollTop),
+                    behavior: 'smooth'
+                });
+            }
+        }, 300);
     }
 }
 
@@ -750,7 +810,7 @@ function createSeatElement(seat) {
     return seatEl;
 }
 
-function handleSeatClick(seat) {
+async function handleSeatClick(seat) {
     if (seat.status !== 'available') {
         return; // 空席以外は選択不可
     }
@@ -764,7 +824,7 @@ function handleSeatClick(seat) {
     } else {
         // 新規選択 (最大数制限)
         if (state.selectedSeats.length >= state.maxSeats) {
-            alert(`一度に予約できるのは${state.maxSeats}席までです。`);
+            await customAlert(`一度に予約できるのは${state.maxSeats}席までです。`);
             return;
         }
         state.selectedSeats.push(id);
@@ -772,17 +832,22 @@ function handleSeatClick(seat) {
 
     updateSelectedSeatsUI();
 
-    // UI更新 (非効率だが確実)
+    // UI更新
     const el = document.querySelector(`.seat[data-id="${id}"]`);
     if (el) {
-        el.classList.toggle('selected');
-        // selectedクラスがつくとCSSで緑になるはず
-        // ただし .status クラス (available) があるので、CSSの詳細度に注意
-        // .seat.selected { ... } が .seat.available より優先される必要がある
+        if (index > -1) {
+            // 選択解除: selectedを外しavailableを戻す
+            el.classList.remove('selected');
+            el.classList.add('available');
+        } else {
+            // 選択: availableを外しselectedを付ける
+            el.classList.remove('available');
+            el.classList.add('selected');
+        }
     }
 }
 
-function handleRealtimeSeatUpdate(newSeatInfo) {
+async function handleRealtimeSeatUpdate(newSeatInfo) {
     const seatId = newSeatInfo.seat_id;
     const newStatus = newSeatInfo.status;
 
@@ -805,11 +870,11 @@ function handleRealtimeSeatUpdate(newSeatInfo) {
         updateSelectedSeatsUI();
 
         // ユーザーに簡易通知
-        alert(`選択中の座席 ${toDisplaySeatId(seatId)} は他の方に予約されました。別の座席を選択してください。`);
+        await customAlert(`選択中の座席 ${toDisplaySeatId(seatId)} は他の方に予約されました。別の座席を選択してください。`);
     }
 }
 
-function toggleSeat(seatId, el) {
+async function toggleSeat(seatId, el) {
     const idx = state.selectedSeats.indexOf(seatId);
     if (idx >= 0) {
         // 選択解除
@@ -818,7 +883,7 @@ function toggleSeat(seatId, el) {
     } else {
         // 選択追加
         if (state.selectedSeats.length >= state.maxSeats) {
-            alert(`一度に予約できるのは最大${state.maxSeats}席までです。`);
+            await customAlert(`一度に予約できるのは最大${state.maxSeats}席までです。`);
             return;
         }
         state.selectedSeats.push(seatId);
@@ -862,7 +927,7 @@ navigation.toStep3.addEventListener('click', () => {
 // ==========================================
 document.getElementById('reservation-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!confirm('この内容で予約を確定しますか？')) return;
+    if (!await customConfirm('この内容で予約を確定しますか？')) return;
 
     // Validation
     const name = document.getElementById('res-name').value.trim();
@@ -871,7 +936,7 @@ document.getElementById('reservation-form').addEventListener('submit', async (e)
     const club = document.getElementById('res-club-select').value;
 
     if (!name || !email || !gradeClass || !club) {
-        alert('必須項目が入力されていません。\n(お名前、メールアドレス、所属年組、所属部活)');
+        await customAlert('必須項目が入力されていません。\n(お名前、メールアドレス、所属年組、所属部活)');
         return;
     }
 
@@ -897,13 +962,13 @@ document.getElementById('reservation-form').addEventListener('submit', async (e)
         const apiUrl = apiUrlManager.getCurrentUrl();
         console.log("Submitting via JSONP to:", apiUrl);
 
-        fetchJsonp(apiUrl, params, (json) => {
+        fetchJsonp(apiUrl, params, async (json) => {
             if (json.success) {
                 // 完了画面へ
                 document.getElementById('result-booking-id').innerText = json.data.bookingId;
                 showStep(4);
             } else {
-                alert('予約に失敗しました: ' + json.error);
+                await customAlert('予約に失敗しました: ' + json.error);
                 btn.disabled = false;
                 btn.innerText = originalText;
 
@@ -918,7 +983,7 @@ document.getElementById('reservation-form').addEventListener('submit', async (e)
 
     } catch (err) {
         console.error(err);
-        alert('通信エラーが発生しました。');
+        await customAlert('通信エラーが発生しました。');
         btn.disabled = false;
         btn.innerText = originalText;
     }
