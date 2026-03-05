@@ -13,7 +13,7 @@ async function customConfirm(msg) {
 // config.js
 // 複数のAPI URL（使用数上限回避のため分散）
 const GAS_API_URLS = [
-  "https://script.google.com/macros/s/AKfycbxVtVLXA3_CSACT-y2LQon6UwjNrN-n4-FhW0a_lYOZFLfnqxVuW__HgVBxj_oCeM83Zw/exec"
+  "https://script.google.com/macros/s/AKfycbzFyBFuxTfeGlsfAydhTnKhSKa73PKeUonabzCna2ZwyCaMFUAzTVYULZQriqU_Vtt0Og/exec"
   //jxjin.ig.school@gmail.com
   //"https://script.google.com/macros/s/AKfycbxGBy7NvMzEdENKL_SYA9Bvk6oq_Fx7_VW2iey0bGFlDfQmGb_-zVP3Gt2pZzJ20m9B/exec",
   //nzn.engeki5@gmail.com
