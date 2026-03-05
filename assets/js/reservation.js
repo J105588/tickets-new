@@ -461,6 +461,7 @@ const MIN_ZOOM = 0.4;
 
 let currentSeatSubscription = null;
 let currentPerformanceId = null;
+let seatsBackup = []; // モーダルを開いた時点の選択状態バックアップ
 
 function initStep2() {
     // Open Modal
@@ -475,9 +476,12 @@ function initStep2() {
     const btnClose = document.getElementById('btn-close-modal');
     if (btnClose) {
         btnClose.addEventListener('click', async () => {
-            if (await customConfirm('選択内容は保存されません。閉じますか？')) {
-                // 選択をリセット
-                state.selectedSeats = [];
+            const msg = seatsBackup.length > 0
+                ? '変更内容は保存されません。閉じますか？'
+                : '選択内容は保存されません。閉じますか？';
+            if (await customConfirm(msg)) {
+                // 開いた時点の状態に戻す
+                state.selectedSeats = [...seatsBackup];
                 updateSelectedSeatsUI();
                 closeSeatModal();
             }
@@ -561,6 +565,9 @@ function updateZoom() {
 })();
 
 function openSeatModal() {
+    // 現在の選択状態をバックアップ（キャンセル時に復元用）
+    seatsBackup = [...state.selectedSeats];
+
     seatModal.classList.add('active');
     document.body.style.overflow = 'hidden'; // Prevent bg scroll
 
