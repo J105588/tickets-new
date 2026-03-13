@@ -4,7 +4,12 @@
  */
 
 import {
-
+    fetchMasterDataFromSupabase,
+    adminFetchSchedules,
+    adminManageSchedule,
+    adminDeleteSchedule,
+    adminManageMaster
+} from './supabase-client.js';
 
 // カスタムダイアログ用ヘルパー
 async function customAlert(msg) {
@@ -16,13 +21,6 @@ async function customConfirm(msg) {
   if (window.CustomDialog) return await CustomDialog.confirm(msg);
   return window.confirm(msg);
 }
-
-    fetchMasterDataFromSupabase,
-    adminFetchSchedules,
-    adminManageSchedule,
-    adminDeleteSchedule,
-    adminManageMaster
-} from './supabase-client.js';
 
 let masterData = {
     groups: [],
