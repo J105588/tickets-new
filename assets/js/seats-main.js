@@ -451,7 +451,35 @@ flex - shrink: 0;
     // 座席番号でソート
     const sortedSeats = seatData.rows[rowLabel].sort((a, b) => a.seatNumber - b.seatNumber);
 
+    // 歯抜け座席の自動補完ロジック (Missing seat gap filling)
+    let prevSeatNumber = null;
+    if (sortedSeats.length > 0) {
+        prevSeatNumber = sortedSeats[0].seatNumber - 1;
+    }
+
     sortedSeats.forEach(seat => {
+      // もし座席番号が飛んでいた場合、ダミー要素を挿入してレイアウトの崩れを防ぐ
+      if (prevSeatNumber !== null && seat.seatNumber > prevSeatNumber + 1) {
+          for (let missingNum = prevSeatNumber + 1; missingNum < seat.seatNumber; missingNum++) {
+              const dummyEl = createDummySeatElement(rowLabel, missingNum);
+              rowEl.appendChild(dummyEl);
+              
+              // 通路の保持
+              if (missingNum === 13) {
+                  const passage = document.createElement('div');
+                  passage.className = 'passage vertical-passage';
+                  passage.textContent = '通路';
+                  rowEl.appendChild(passage);
+              } else if (missingNum === 25) {
+                  const passage = document.createElement('div');
+                  passage.className = 'passage vertical-passage';
+                  passage.textContent = '通路';
+                  rowEl.appendChild(passage);
+              }
+          }
+      }
+      prevSeatNumber = seat.seatNumber;
+
       // 座席要素を作成
       const seatElement = createSeatElement(seat);
       rowEl.appendChild(seatElement);
@@ -1059,6 +1087,24 @@ function toggleAutoRefresh() {
   }
 }
 
+// ダミー座席要素を作成するユーティリティ関数
+function createDummySeatElement(rowLabel, seatNum) {
+    const seatEl = document.createElement('div');
+    seatEl.className = 'seat blocked';
+    seatEl.dataset.id = `${rowLabel}${seatNum}`;
+    
+    // UI上で完全に隠す
+    seatEl.style.opacity = '0';
+    seatEl.style.pointerEvents = 'none';
+    seatEl.style.cursor = 'default';
+    seatEl.style.backgroundColor = 'transparent';
+    seatEl.style.boxShadow = 'none';
+    seatEl.style.border = 'none';
+    seatEl.innerText = '';
+    
+    return seatEl;
+}
+
 // 座席要素を作成する関数
 function createSeatElement(seatData) {
   const seat = document.createElement('div');
@@ -1097,6 +1143,7 @@ function createSeatElement(seatData) {
       seat.style.cursor = 'default';
       seat.style.backgroundColor = 'transparent';
       seat.style.boxShadow = 'none';
+      seat.style.border = 'none';
       // 余分にクリック反応などが飛ばないためのお守り
       seat.dataset.status = 'blocked';
     }
@@ -1654,8 +1701,8 @@ async function checkInSelected() {
   }));
 
   // 選択された座席の一覧を表示
-  const seatList = selectedSeatInfos.map(seat => `${seat.id}：${seat.columnD || '（名前未設定）'} `).join('\n');
-  const confirmMessage = `以下の座席をチェックインしますか？\n\n${seatList} `;
+  const seatList = selectedSeatInfos.map(seat => `${toDisplaySeatId(seat.id)}：${seat.columnD || '（名前未設定）'}`).join('\n');
+  const confirmMessage = `以下の座席をチェックインしますか？\n\n${seatList}`;
 
   if (!await customConfirm(confirmMessage)) {
     return;
@@ -1701,9 +1748,9 @@ async function checkInSelected() {
       showLoader(false);
 
       // 成功通知を表示（非ブロッキング）: 座席ID：名前 の形式で複数表示し、スコープを明示
-      const scopeLabel = `${GROUP} ${DAY}日目 ${DISPLAY_TIMESLOT} `;
-      const lines = selectedSeatInfos.map(s => `${s.id}：${s.columnD || '（名前未設定）'} `);
-      const message = `チェックインが完了しました（${scopeLabel}）\n\n${lines.join('\n')} `;
+      const scopeLabel = `${GROUP} ${DAY}日目 ${DISPLAY_TIMESLOT}`;
+      const lines = selectedSeatInfos.map(s => `${toDisplaySeatId(s.id)}：${s.columnD || '（名前未設定）'}`);
+      const message = `チェックインが完了しました（${scopeLabel}）\n\n${lines.join('\n')}`;
       showSuccessNotification(message);
 
       // バックグラウンドで座席データを再取得（サイレント更新）
@@ -2027,7 +2074,7 @@ function showSeatEditModal(seatData) {
     <div id="seat-edit-overlay" class="seat-edit-overlay" onclick="closeSeatEditModal()"></div>
     <div id="seat-edit-drawer" class="seat-edit-drawer">
       <div class="drawer-header">
-        <h3>座席編集 - ${seatData.id}</h3>
+        <h3>座席編集 - ${toDisplaySeatId(seatData.id)}</h3>
         <button class="btn-close-drawer" onclick="closeSeatEditModal()">&times;</button>
       </div>
       <div class="drawer-content">
@@ -2116,7 +2163,7 @@ async function updateSeatData(seatId) {
   const columnE = document.getElementById('column-e').value; // 備考として取得
 
   // 確認ダイアログを表示
-  const confirmMessage = `座席 ${seatId} のデータを以下の内容で更新しますか？\n\nC列: ${columnC} \nD列: ${columnD} \nE列: ${columnE} `;
+  const confirmMessage = `座席 ${toDisplaySeatId(seatId)} のデータを以下の内容で更新しますか？\n\nC列: ${columnC} \nD列: ${columnD} \nE列: ${columnE} `;
 
   if (!await customConfirm(confirmMessage)) {
     return;

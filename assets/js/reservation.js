@@ -40,7 +40,8 @@ const pages = {
     1: document.getElementById('step-1'),
     2: document.getElementById('step-2'),
     3: document.getElementById('step-3'),
-    4: document.getElementById('step-4')
+    4: document.getElementById('step-4'),
+    5: document.getElementById('step-5')
 };
 
 const inputs = {
@@ -52,6 +53,7 @@ const inputs = {
 const navigation = {
     toStep2: document.getElementById('btn-to-step-2'),
     toStep3: document.getElementById('btn-to-step-3'),
+    toStep4: document.getElementById('btn-to-step-4'),
     submit: document.getElementById('btn-submit')
 };
 
@@ -65,6 +67,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     populateFormDropdowns();
     initStep1();
     initStep2();
+    initStep3();
     startDeadlineMonitoring(); // Start loop
 });
 
@@ -343,9 +346,6 @@ function initStep1() {
     });
 
     navigation.toStep2.addEventListener('click', () => {
-        // loadSeatMap(); // Moved to Modal Open
-        // Reset selection if going fresh? 
-        // Better to clear selection when changing Group/Day/Time in initStep1 listeners.
         showStep(2);
     });
 
@@ -360,6 +360,13 @@ function initStep1() {
     if (btnBack2) {
         btnBack2.addEventListener('click', () => {
             showStep(2);
+        });
+    }
+
+    const btnBack3 = document.getElementById('btn-back-to-step-3');
+    if (btnBack3) {
+        btnBack3.addEventListener('click', () => {
+            showStep(3);
         });
     }
 }
@@ -464,6 +471,34 @@ let currentPerformanceId = null;
 let seatsBackup = []; // モーダルを開いた時点の選択状態バックアップ
 
 function initStep2() {
+    // Step 2 (Information Input) validation
+    const checkStep2Validity = () => {
+        const name = document.getElementById('res-name').value.trim();
+        const email = document.getElementById('res-email').value.trim();
+        const gradeYear = document.getElementById('res-grade-year').value;
+        const gradeClass = document.getElementById('res-grade-class').value;
+        const club = document.getElementById('res-club-select').value;
+        
+        const isValid = name && email && gradeYear && gradeClass && club;
+        navigation.toStep3.disabled = !isValid;
+    };
+
+    ['res-name', 'res-email', 'res-grade-year', 'res-grade-class', 'res-club-select'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', checkStep2Validity);
+        if (el && el.tagName === 'INPUT') el.addEventListener('input', checkStep2Validity);
+    });
+
+    navigation.toStep3.addEventListener('click', (e) => {
+        e.preventDefault();
+        showStep(3);
+    });
+    
+    // Initial check
+    checkStep2Validity();
+}
+
+function initStep3() {
     // Open Modal
     const btnOpen = document.getElementById('btn-open-seat-modal');
     if (btnOpen) {
@@ -755,7 +790,31 @@ function renderSeatMap(seatList) {
         // 座席番号順にソート
         const sortedSeats = rows[rowLabel].sort((a, b) => a.seatNumber - b.seatNumber);
 
+        // 歯抜け座席の自動補完ロジック (Missing seat gap filling)
+        let prevSeatNumber = null;
+        if (sortedSeats.length > 0) {
+            prevSeatNumber = sortedSeats[0].seatNumber - 1;
+        }
+
         sortedSeats.forEach(seat => {
+            // もし座席番号が飛んでいた場合、ダミー要素を挿入してレイアウトの崩れを防ぐ
+            if (prevSeatNumber !== null && seat.seatNumber > prevSeatNumber + 1) {
+                for (let missingNum = prevSeatNumber + 1; missingNum < seat.seatNumber; missingNum++) {
+                    const dummyEl = createDummySeatElement(rowLabel, missingNum);
+                    rowDiv.appendChild(dummyEl);
+                    
+                    // 通路の保持
+                    if (missingNum === 13 || missingNum === 25) {
+                        const passage = document.createElement('div');
+                        passage.className = 'passage-vertical';
+                        passage.style.flexShrink = '0';
+                        passage.style.width = '20px';
+                        rowDiv.appendChild(passage);
+                    }
+                }
+            }
+            prevSeatNumber = seat.seatNumber;
+
             const seatEl = createSeatElement(seat);
             rowDiv.appendChild(seatEl);
 
@@ -764,6 +823,7 @@ function renderSeatMap(seatList) {
                 const passage = document.createElement('div');
                 passage.className = 'passage-vertical';
                 passage.style.flexShrink = '0';
+                passage.style.width = '20px';
                 rowDiv.appendChild(passage);
             }
         });
@@ -783,6 +843,24 @@ function renderSeatMap(seatList) {
     // If not, we should have done it. 
     // Assuming container.appendChild(wrapperRow) happened before the loop.
     // Let's verify and just close.
+}
+
+// ダミー座席要素を作成するユーティリティ関数
+function createDummySeatElement(rowLabel, seatNum) {
+    const seatEl = document.createElement('div');
+    seatEl.className = `seat blocked`;
+    seatEl.dataset.id = `${rowLabel}${seatNum}`;
+    
+    // UI上で完全に隠す
+    seatEl.style.opacity = '0';
+    seatEl.style.pointerEvents = 'none';
+    seatEl.style.cursor = 'default';
+    seatEl.style.backgroundColor = 'transparent';
+    seatEl.style.boxShadow = 'none';
+    seatEl.style.border = 'none';
+    seatEl.innerText = '';
+    
+    return seatEl;
 }
 
 function createSeatElement(seat) {
@@ -903,10 +981,10 @@ function updateSelectedSeatsUI() {
     const display = document.getElementById('selected-seats-display');
     if (state.selectedSeats.length === 0) {
         display.innerText = 'なし';
-        navigation.toStep3.disabled = true;
+        navigation.toStep4.disabled = true;
     } else {
         display.innerText = toDisplaySeatId(state.selectedSeats.join(', '));
-        navigation.toStep3.disabled = false;
+        navigation.toStep4.disabled = false;
     }
     updateModalCount();
 }
@@ -916,7 +994,7 @@ function updateModalCount() {
     if (el) el.innerText = state.selectedSeats.length;
 }
 
-navigation.toStep3.addEventListener('click', () => {
+navigation.toStep4.addEventListener('click', () => {
     // Determine which modal is active and close it
     // But explicitly closing seat modal is safest
     closeSeatModal(); // Close modal first!
@@ -925,15 +1003,24 @@ navigation.toStep3.addEventListener('click', () => {
     document.getElementById('conf-group').innerText = state.group;
     document.getElementById('conf-time').innerText = `${state.day}日目 ${state.timeslot}`;
     document.getElementById('conf-seats').innerText = toDisplaySeatId(state.selectedSeats.join(', '));
-    showStep(3);
+    
+    // ユーザー情報の確認
+    document.getElementById('conf-name').innerText = document.getElementById('res-name').value;
+    document.getElementById('conf-email').innerText = document.getElementById('res-email').value;
+    
+    const gradeYear = document.getElementById('res-grade-year').value;
+    const gradeClass = document.getElementById('res-grade-class').value;
+    const club = document.getElementById('res-club-select').value;
+    document.getElementById('conf-affiliation').innerText = `${gradeYear} ${gradeClass} / ${club}`;
+    
+    showStep(4);
 });
 
 
 // ==========================================
 // Step 3: 情報入力 & 送信
 // ==========================================
-document.getElementById('reservation-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
+document.getElementById('btn-submit').addEventListener('click', async (e) => {
     if (!await customConfirm('この内容で予約を確定しますか？')) return;
 
     // Validation
@@ -973,17 +1060,15 @@ document.getElementById('reservation-form').addEventListener('submit', async (e)
             if (json.success) {
                 // 完了画面へ
                 document.getElementById('result-booking-id').innerText = json.data.bookingId;
-                showStep(4);
+                showStep(5);
             } else {
                 await customAlert('予約に失敗しました: ' + json.error);
                 btn.disabled = false;
                 btn.innerText = originalText;
 
-                // 重複予約などのエラーだった場合、座席を選び直せるようにStep2(座席選択)へ戻す
+                // 重複予約などのエラーだった場合、座席を選び直せるようにStep3(座席選択)へ戻す
                 if (json.error && (json.error.includes('既') || json.error.includes('重複') || json.error.includes('エラー'))) {
-                    // ただし今回は状態をそのままにしてStep2を見せるだけ（座席を選びなおさせる）
-                    // 念のため選んでいた一部の既に予約されている座席はその時点でUI更新されているはず
-                    showStep(2);
+                    showStep(3);
                 }
             }
         });

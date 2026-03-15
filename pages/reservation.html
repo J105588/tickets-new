@@ -56,9 +56,10 @@
         <!-- プログレスバー -->
         <div class="progress-bar">
             <div class="step active" data-step="1">1. 公演選択</div>
-            <div class="step" data-step="2">2. 座席選択</div>
-            <div class="step" data-step="3">3. 情報入力</div>
-            <div class="step" data-step="4">4. 完了</div>
+            <div class="step" data-step="2">2. 情報入力</div>
+            <div class="step" data-step="3">3. 座席選択</div>
+            <div class="step" data-step="4">4. 予約確認</div>
+            <div class="step" data-step="5">5. 完了</div>
         </div>
 
         <!-- Step 1: 公演選択 -->
@@ -88,37 +89,11 @@
             </div>
         </section>
 
-        <!-- Step 2: 座席選択 -->
+        <!-- Step 2: 情報入力 -->
         <section id="step-2" class="step-content">
             <div class="header-with-action">
-                <h2>座席を選択してください</h2>
-                <button id="btn-back-to-step-1" class="btn btn-secondary btn-sm">戻る</button>
-            </div>
-
-            <div class="seat-selection-ui">
-                <p class="instruction">ご希望の座席を選択してください。</p>
-
-                <div class="selected-seats-info">
-                    選択中の座席: <span id="selected-seats-display">なし</span>
-                </div>
-
-                <button id="btn-open-seat-modal" class="btn btn-primary btn-lg btn-block btn-seat-map"
-                    style="margin: 20px 0; padding: 20px;">
-                    <i class="fas fa-map-marked-alt" style="margin-right:8px;"></i> 座席表から選択する
-                </button>
-            </div>
-
-            <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem;">
-                <button id="btn-to-step-3" class="btn btn-primary" disabled>次へ進む <i class="fas fa-chevron-right"
-                        style="margin-left: 8px;"></i></button>
-            </div>
-        </section>
-
-        <!-- Step 3: 情報入力 -->
-        <section id="step-3" class="step-content">
-            <div class="header-with-action">
                 <h2>予約者情報を入力してください</h2>
-                <button id="btn-back-to-step-2" class="btn btn-secondary btn-sm">戻る</button>
+                <button id="btn-back-to-step-1" class="btn btn-secondary btn-sm">戻る</button>
             </div>
 
             <form id="reservation-form">
@@ -152,19 +127,68 @@
                     </select>
                 </div>
 
-                <div class="confirmation-box">
-                    <h4>予約内容確認</h4>
+                <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem;">
+                    <button id="btn-to-step-3" class="btn btn-primary">次へ進む <i class="fas fa-chevron-right"
+                            style="margin-left: 8px;"></i></button>
+                </div>
+            </form>
+        </section>
+
+        <!-- Step 3: 座席選択 -->
+        <section id="step-3" class="step-content">
+            <div class="header-with-action">
+                <h2>座席を選択してください</h2>
+                <button id="btn-back-to-step-2" class="btn btn-secondary btn-sm">戻る</button>
+            </div>
+
+            <div class="seat-selection-ui">
+                <p class="instruction">ご希望の座席を選択してください。</p>
+
+                <div class="selected-seats-info">
+                    選択中の座席: <span id="selected-seats-display">なし</span>
+                </div>
+
+                <button id="btn-open-seat-modal" class="btn btn-primary btn-lg btn-block btn-seat-map"
+                    style="margin: 20px 0; padding: 20px;">
+                    <i class="fas fa-map-marked-alt" style="margin-right:8px;"></i> 座席表から選択する
+                </button>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem;">
+                <button id="btn-to-step-4" class="btn btn-primary" disabled>次へ進む <i class="fas fa-chevron-right"
+                        style="margin-left: 8px;"></i></button>
+            </div>
+        </section>
+
+        <!-- Step 4: 予約確認 -->
+        <section id="step-4" class="step-content">
+            <div class="header-with-action">
+                <h2>入力内容を確認してください</h2>
+                <button id="btn-back-to-step-3" class="btn btn-secondary btn-sm">戻る</button>
+            </div>
+
+            <div class="confirmation-box">
+                <h4>予約内容確認</h4>
+                <div class="conf-group-item">
                     <p><strong>公演:</strong> <span id="conf-group"></span></p>
                     <p><strong>日時:</strong> <span id="conf-time"></span></p>
                     <p><strong>座席:</strong> <span id="conf-seats"></span></p>
                 </div>
+                <hr>
+                <div class="conf-user-item">
+                    <p><strong>お名前:</strong> <span id="conf-name"></span></p>
+                    <p><strong>メール:</strong> <span id="conf-email"></span></p>
+                    <p><strong>所属:</strong> <span id="conf-affiliation"></span></p>
+                </div>
+            </div>
 
-                <button type="submit" id="btn-submit" class="btn btn-success btn-lg btn-block">予約を確定する</button>
-            </form>
+            <button type="button" id="btn-submit" class="btn btn-success btn-lg btn-block" style="margin-top: 20px;">
+                <i class="fas fa-check-circle" style="margin-right: 8px;"></i> 予約を確定する
+            </button>
         </section>
 
-        <!-- Step 4: 完了 -->
-        <section id="step-4" class="step-content">
+        <!-- Step 5: 完了 -->
+        <section id="step-5" class="step-content">
             <div class="success-message">
                 <i class="fas fa-check-circle"></i>
                 <h2>予約が完了しました！</h2>
