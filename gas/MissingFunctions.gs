@@ -8,26 +8,23 @@
 /**
  * システムロック状態を取得する
  */
-/**
- * システムロック状態を取得する
- */
 function getSystemLock() {
   try {
     // Supabaseから取得
-    // setting_key=eq.SYSTEM_LOCK
-    // settings: { setting_key, setting_value, updated_at }
-    const endpoint = 'settings?setting_key=eq.SYSTEM_LOCK&select=setting_value,updated_at';
+    // key=eq.SYSTEM_LOCK
+    // settings: { key, value, updated_at }
+    const endpoint = 'settings?key=eq.SYSTEM_LOCK&select=value,updated_at';
     const response = supabaseIntegration._request(endpoint);
-    
+
     // データがない、またはエラーの場合はデフォルトロック解除
     if (!response.success || !response.data || response.data.length === 0) {
       return { success: true, locked: false, lockedAt: null };
     }
-    
+
     const record = response.data[0];
-    const locked = record.setting_value === 'true';
+    const locked = record.value === 'true';
     const lockedAt = locked ? record.updated_at : null;
-    
+
     return { success: true, locked, lockedAt };
 
   } catch (e) {
@@ -53,19 +50,19 @@ function verifyModePassword(mode, password) {
     else if (mode === 'walkin') result = { success: walkinPassword && password === walkinPassword };
     else if (mode === 'superadmin') result = { success: superAdminPassword && password === superAdminPassword };
     else result = { success: false };
-    
+
     // ログ記録（パスワードは記録しない）
     safeLogOperation('verifyModePassword', { mode }, result);
-    
+
     return result;
 
   } catch (e) {
     Logger.log("verifyModePassword Error: " + e.message);
     const result = { success: false };
-    
+
     // エラーログ記録
     safeLogOperation('verifyModePassword', { mode }, result);
-    
+
     return result;
   }
 }
@@ -82,28 +79,28 @@ function setSystemLock(shouldLock, password) {
     }
 
     // Upsert (Insert or Update)
-    // settings table UNIQUE(setting_key)
+    // settings table UNIQUE(key)
     const payload = {
-      setting_key: 'SYSTEM_LOCK',
-      setting_value: shouldLock ? 'true' : 'false',
+      key: 'SYSTEM_LOCK',
+      value: shouldLock ? 'true' : 'false',
       updated_at: new Date().toISOString()
     };
-    
-    // on_conflict=setting_key
-    const endpoint = 'settings?on_conflict=setting_key';
+
+    // on_conflict=key
+    const endpoint = 'settings?on_conflict=key';
     const options = {
       method: 'POST',
       body: payload,
       headers: { 'Prefer': 'resolution=merge-duplicates' }, // Upsert
       useServiceRole: true // RLS might restrict write
     };
-    
+
     const response = supabaseIntegration._request(endpoint, options);
 
     if (response.success) {
-        return { success: true, locked: shouldLock === true };
+      return { success: true, locked: shouldLock === true };
     } else {
-        throw new Error(response.error || 'Supabase update failed');
+      throw new Error(response.error || 'Supabase update failed');
     }
 
   } catch (e) {
@@ -137,16 +134,16 @@ function performDangerAction(action, payload) {
     const group = payload && payload.group;
     const day = payload && payload.day;
     const timeslot = payload && payload.timeslot;
-    
+
     // Supabase版の実装
     try {
       const performanceResult = getOrCreatePerformance(group, day, timeslot);
       if (!performanceResult.success) {
         return { success: false, message: '公演が見つかりません' };
       }
-      
+
       const performanceId = performanceResult.data.id;
-      
+
       // 全座席を初期化
       const updateResult = supabaseIntegration._request(`seats?performance_id=eq.${performanceId}`, {
         method: 'PATCH',
@@ -159,7 +156,7 @@ function performDangerAction(action, payload) {
           updated_at: new Date().toISOString()
         }
       });
-      
+
       if (updateResult.success) {
         return { success: true, message: '該当公演の予約・チェックイン情報を初期化しました' };
       } else {
@@ -191,10 +188,10 @@ function logOperation(operation, params, result, userAgent, ipAddress, skipDupli
       status: result.success ? 'SUCCESS' : 'ERROR',
       timestamp: new Date().toISOString()
     };
-    
+
     // ログをSupabaseに記録（実装は簡易版）
     console.log('Operation Log:', logData);
-    
+
   } catch (e) {
     Logger.log('Log recording failed: ' + e.message);
   }
@@ -208,7 +205,7 @@ function recordClientAudit(entries) {
     if (!Array.isArray(entries) || entries.length === 0) {
       return { success: false, message: 'No entries' };
     }
-    
+
     // Supabase版の監査ログ記録（簡易実装）
     entries.forEach(entry => {
       const auditData = {
@@ -221,10 +218,10 @@ function recordClientAudit(entries) {
         user_agent: entry.ua || 'Unknown',
         ip_address: entry.ip || 'Unknown'
       };
-      
+
       console.log('Client Audit Log:', auditData);
     });
-    
+
     return { success: true, saved: entries.length };
   } catch (e) {
     Logger.log('recordClientAudit failed: ' + e.message);
@@ -250,8 +247,8 @@ function getClientAuditLogs(limit = 200, type = null, action = null) {
  */
 function getClientAuditStatistics() {
   try {
-    return { 
-      success: true, 
+    return {
+      success: true,
       statistics: {
         totalOperations: 0,
         successCount: 0,
@@ -329,7 +326,7 @@ function getFullTimeslotsSupabase() {
     var perfs = _spRequest('performances?select=id,group_name,day,timeslot');
     if (!Array.isArray(perfs)) perfs = [];
     // 除外: 見本演劇
-    perfs = perfs.filter(function(p){ return String(p.group_name) !== '見本演劇'; });
+    perfs = perfs.filter(function (p) { return String(p.group_name) !== '見本演劇'; });
     if (perfs.length === 0) return { success: true, full: [] };
 
     // 2 全座席の status を取得し、公演別に集計
@@ -337,7 +334,7 @@ function getFullTimeslotsSupabase() {
     if (!Array.isArray(seats)) seats = [];
 
     var byPerf = {};
-    seats.forEach(function(s) {
+    seats.forEach(function (s) {
       var pid = s.performance_id;
       if (!byPerf[pid]) byPerf[pid] = { total: 0, available: 0 };
       byPerf[pid].total++;
@@ -345,7 +342,7 @@ function getFullTimeslotsSupabase() {
     });
 
     var full = [];
-    perfs.forEach(function(p) {
+    perfs.forEach(function (p) {
       var agg = byPerf[p.id] || { total: 0, available: 0 };
       if (agg.total > 0 && agg.available === 0) {
         full.push({ group: p.group_name, day: String(p.day), timeslot: p.timeslot });
@@ -367,7 +364,7 @@ function getFullCapacityTimeslotsSupabase() {
     var perfs = _spRequest('performances?select=id,group_name,day,timeslot');
     if (!Array.isArray(perfs)) perfs = [];
     // 除外: 見本演劇
-    perfs = perfs.filter(function(p){ return String(p.group_name) !== '見本演劇'; });
+    perfs = perfs.filter(function (p) { return String(p.group_name) !== '見本演劇'; });
 
     // 2) 全座席の status を取得
     var seats = _spRequest('seats?select=performance_id,status');
@@ -375,7 +372,7 @@ function getFullCapacityTimeslotsSupabase() {
 
     // 3) 公演別に集計
     var byPerf = {};
-    seats.forEach(function(s) {
+    seats.forEach(function (s) {
       var pid = s.performance_id;
       if (!byPerf[pid]) byPerf[pid] = { total: 0, available: 0 };
       byPerf[pid].total++;
@@ -384,7 +381,7 @@ function getFullCapacityTimeslotsSupabase() {
 
     var fullTimeslots = [];
     var allTimeslots = [];
-    perfs.forEach(function(p) {
+    perfs.forEach(function (p) {
       var agg = byPerf[p.id] || { total: 0, available: 0 };
       var total = agg.total;
       var empty = agg.available;
@@ -406,9 +403,9 @@ function getFullCapacityTimeslotsSupabase() {
     var summary = {
       totalChecked: allTimeslots.length,
       fullCapacity: fullTimeslots.length,
-      totalSeats: allTimeslots.reduce(function(s, t){ return s + (t.totalSeats||0); }, 0),
-      totalOccupied: allTimeslots.reduce(function(s, t){ return s + (t.occupiedSeats||0); }, 0),
-      totalEmpty: allTimeslots.reduce(function(s, t){ return s + (t.emptySeats||0); }, 0)
+      totalSeats: allTimeslots.reduce(function (s, t) { return s + (t.totalSeats || 0); }, 0),
+      totalOccupied: allTimeslots.reduce(function (s, t) { return s + (t.occupiedSeats || 0); }, 0),
+      totalEmpty: allTimeslots.reduce(function (s, t) { return s + (t.emptySeats || 0); }, 0)
     };
 
     return { success: true, fullTimeslots: fullTimeslots, allTimeslots: allTimeslots, summary: summary };
@@ -426,7 +423,7 @@ function setFullCapacityNotification(enabled) {
     const props = PropertiesService.getScriptProperties();
     props.setProperty('FULL_CAPACITY_NOTIFICATION_ENABLED', enabled.toString());
     props.setProperty('FULL_CAPACITY_NOTIFICATION_UPDATED', new Date().toISOString());
-    
+
     Logger.log(`満席通知設定更新: enabled=${enabled}`);
     return { success: true, message: '設定を保存しました' };
   } catch (e) {
@@ -443,9 +440,9 @@ function getFullCapacityNotificationSettings() {
     const props = PropertiesService.getScriptProperties();
     const enabled = props.getProperty('FULL_CAPACITY_NOTIFICATION_ENABLED') === 'true';
     const updated = props.getProperty('FULL_CAPACITY_NOTIFICATION_UPDATED') || null;
-    
-    return { 
-      success: true, 
+
+    return {
+      success: true,
       emails: ['admin@example.com'],
       enabled: enabled,
       updated: updated
@@ -642,7 +639,7 @@ function getDetailedCapacityAnalysisSupabase(group = null, day = null, timeslot 
     var perfs = _spRequest(perfQuery);
     if (!Array.isArray(perfs)) perfs = [];
     // 除外: 見本演劇
-    perfs = perfs.filter(function(p){ return String(p.group_name) !== '見本演劇'; });
+    perfs = perfs.filter(function (p) { return String(p.group_name) !== '見本演劇'; });
 
     if (perfs.length === 0) {
       return {
@@ -658,7 +655,7 @@ function getDetailedCapacityAnalysisSupabase(group = null, day = null, timeslot 
     }
 
     // 2) 対象公演の座席をまとめて取得（in クエリを使用）
-    var idList = perfs.map(function(p){ return p.id; }).filter(function(x){ return x !== null && x !== undefined; });
+    var idList = perfs.map(function (p) { return p.id; }).filter(function (x) { return x !== null && x !== undefined; });
     if (idList.length === 0) {
       return {
         success: true,
@@ -676,7 +673,7 @@ function getDetailedCapacityAnalysisSupabase(group = null, day = null, timeslot 
 
     // 3) 公演別に集計
     var byPerf = {};
-    seats.forEach(function(s){
+    seats.forEach(function (s) {
       var pid = s.performance_id;
       if (!byPerf[pid]) byPerf[pid] = { total: 0, available: 0 };
       byPerf[pid].total++;
@@ -686,7 +683,7 @@ function getDetailedCapacityAnalysisSupabase(group = null, day = null, timeslot 
     var timeslotsArr = [];
     var summary = { totalTimeslots: 0, fullCapacity: 0, warningCapacity: 0, criticalCapacity: 0, normalCapacity: 0, totalSeats: 0, totalOccupied: 0, totalEmpty: 0 };
 
-    perfs.forEach(function(p){
+    perfs.forEach(function (p) {
       var agg = byPerf[p.id] || { total: 0, available: 0 };
       var total = agg.total;
       var empty = agg.available;
@@ -747,7 +744,7 @@ function getCapacityStatisticsSupabase() {
     if (!Array.isArray(seats)) seats = [];
     var total = seats.length;
     var available = 0, reserved = 0, checked_in = 0, walkin = 0, blocked = 0;
-    seats.forEach(function(s){
+    seats.forEach(function (s) {
       var st = String(s.status);
       if (st === 'available') available++;
       else if (st === 'reserved') reserved++;
@@ -760,7 +757,7 @@ function getCapacityStatisticsSupabase() {
     var statistics = {
       totalChecks: parseInt(props.getProperty('CAPACITY_TOTAL_CHECKS') || '0', 10),
       totalNotifications: parseInt(props.getProperty('CAPACITY_TOTAL_NOTIFICATIONS') || '0', 10),
-      lastCheckTime: (function(){ var v = props.getProperty('CAPACITY_LAST_CHECK_TIME'); return v ? new Date(v) : null; })(),
+      lastCheckTime: (function () { var v = props.getProperty('CAPACITY_LAST_CHECK_TIME'); return v ? new Date(v) : null; })(),
       averageEmptySeats: parseFloat(props.getProperty('CAPACITY_AVERAGE_EMPTY') || '0'),
       currentSummary: {
         totalSeats: total,
@@ -793,28 +790,28 @@ function getCapacityStatisticsSupabase() {
  */
 function toDisplaySeatId(dbId) {
   if (!dbId) return '';
-  
-  var translateOne = function(id) {
+
+  var translateOne = function (id) {
     var match = id.match(/^([A-Z]+)(\d+)$/);
     if (!match) return id;
     var row = match[1];
     var num = parseInt(match[2], 10);
-    
+
     var offset = 0;
-    switch(row) {
+    switch (row) {
       case 'A': offset = 5; break; // A6 -> A1
       case 'B': offset = 4; break; // B5 -> B1
       case 'C': offset = 3; break; // C4 -> B1
       case 'D': offset = 2; break; // D3 -> D1
       case 'E': offset = 1; break; // E2 -> E1
     }
-    
+
     var newNum = num - offset;
     return (newNum > 0) ? row + newNum : id; // Fallback if invalid
   };
 
   if (dbId.indexOf(',') !== -1) {
-    return dbId.split(',').map(function(s) { return translateOne(s.trim()); }).join(', ');
+    return dbId.split(',').map(function (s) { return translateOne(s.trim()); }).join(', ');
   }
   return translateOne(dbId);
 }
@@ -938,14 +935,14 @@ function listDangerPending() {
         try {
           const rec = JSON.parse(all[k]);
           if (rec && now <= rec.expiresAt) {
-            items.push({ 
-              token: rec.token, 
-              action: rec.action, 
-              confirmations: (rec.confirmations||[]).length, 
-              expiresAt: new Date(rec.expiresAt).toISOString() 
+            items.push({
+              token: rec.token,
+              action: rec.action,
+              confirmations: (rec.confirmations || []).length,
+              expiresAt: new Date(rec.expiresAt).toISOString()
             });
           }
-        } catch (_) {}
+        } catch (_) { }
       }
     });
     return { success: true, items: items };
@@ -971,7 +968,7 @@ function debugSpreadsheetStructure(group, day, timeslot) {
 
     const performanceId = performanceResult.data.id;
     const seatsResult = supabaseIntegration.getSeats(performanceId);
-    
+
     if (!seatsResult.success) {
       return { success: false, error: "座席データの取得に失敗しました" };
     }
@@ -979,7 +976,7 @@ function debugSpreadsheetStructure(group, day, timeslot) {
     const seats = seatsResult.data;
     const seatCount = seats.length;
     const statusCounts = {};
-    
+
     seats.forEach(seat => {
       const status = seat.status || 'unknown';
       statusCounts[status] = (statusCounts[status] || 0) + 1;
@@ -1029,7 +1026,7 @@ function getOrCreateLogSheet() {
       },
       getRange: (row, col, numRows, numCols) => ({
         getValues: () => [],
-        setValues: (values) => {}
+        setValues: (values) => { }
       })
     };
   } catch (e) {
@@ -1049,7 +1046,7 @@ function getOrCreateClientAuditSheet() {
       getLastRow: () => 1,
       getRange: (row, col, numRows, numCols) => ({
         getValues: () => [],
-        setValues: (values) => {}
+        setValues: (values) => { }
       })
     };
   } catch (e) {
@@ -1063,7 +1060,7 @@ function getOrCreateClientAuditSheet() {
  */
 function appendClientAuditEntries(entries) {
   if (!Array.isArray(entries) || entries.length === 0) return;
-  
+
   try {
     // Supabase版では、監査ログはSupabaseに記録されるため、簡易実装
     entries.forEach(entry => {
@@ -1095,7 +1092,7 @@ function getGroupsSupabase() {
     var list = _spRequest('performances?select=group_name');
     if (!Array.isArray(list)) list = [];
     var set = {};
-    list.forEach(function(r){
+    list.forEach(function (r) {
       var g = r && r.group_name;
       if (g && String(g) !== '見本演劇') set[String(g)] = true;
     });
@@ -1114,44 +1111,44 @@ function getAllTimeslotsForGroup(group) {
     // 1. 公演データ取得
     const perfRes = supabaseIntegration._request(`performances?group_name=eq.${encodeURIComponent(group)}&select=day,timeslot&order=day.asc`);
     if (!perfRes.success) return [];
-    
+
     // 2. 時間帯マスタ取得
     const slotRes = supabaseIntegration._request(`time_slots?select=slot_code,start_time,end_time`);
     const slotMap = {};
     if (slotRes.success && Array.isArray(slotRes.data)) {
-        slotRes.data.forEach(s => {
-            slotMap[s.slot_code] = `${s.start_time}-${s.end_time}`;
-        });
+      slotRes.data.forEach(s => {
+        slotMap[s.slot_code] = `${s.start_time}-${s.end_time}`;
+      });
     }
 
     // 3. マッピング
     const uniqueMap = new Map(); // 重複排除用
-    
+
     perfRes.data.forEach(perf => {
-        const key = `${perf.day}-${perf.timeslot}`;
-        if (!uniqueMap.has(key)) {
-            const timeRange = slotMap[perf.timeslot] || '';
-            // 表示名: "10:00 (10:00-11:00)" または "10:00-11:00"
-            // フロントエンドの仕様に合わせて変更
-            let displayName = perf.timeslot; // Default
-            if (timeRange) {
-                 // コード自体が「10:00」等の場合、重複して表示されるのを防ぐか、親切に表示するか
-                 // ユーザー要望「何時からを設定できる」→ "10:00 (10:00-11:00)" がわかりやすい
-                 displayName = `${perf.timeslot} (${timeRange})`;
-                 // もしコードが"A"とかなら "A (10:00-11:00)"
-            }
-            
-            uniqueMap.set(key, {
-                day: perf.day,
-                timeslot: perf.timeslot,
-                displayName: displayName
-            });
+      const key = `${perf.day}-${perf.timeslot}`;
+      if (!uniqueMap.has(key)) {
+        const timeRange = slotMap[perf.timeslot] || '';
+        // 表示名: "10:00 (10:00-11:00)" または "10:00-11:00"
+        // フロントエンドの仕様に合わせて変更
+        let displayName = perf.timeslot; // Default
+        if (timeRange) {
+          // コード自体が「10:00」等の場合、重複して表示されるのを防ぐか、親切に表示するか
+          // ユーザー要望「何時からを設定できる」→ "10:00 (10:00-11:00)" がわかりやすい
+          displayName = `${perf.timeslot} (${timeRange})`;
+          // もしコードが"A"とかなら "A (10:00-11:00)"
         }
+
+        uniqueMap.set(key, {
+          day: perf.day,
+          timeslot: perf.timeslot,
+          displayName: displayName
+        });
+      }
     });
-    
+
     return Array.from(uniqueMap.values());
-    
-    
+
+
   } catch (e) {
     Logger.log('getAllTimeslotsForGroup Error: ' + e.message);
     return [];
@@ -1169,23 +1166,23 @@ function getMaintenanceSchedule() {
   try {
     const endpoint = 'settings?key=eq.MAINTENANCE_SCHEDULE&select=value,updated_at';
     const response = supabaseIntegration._request(endpoint);
-    
+
     if (!response.success || !response.data || response.data.length === 0) {
       // Default: disabled
       return { success: true, enabled: false, start: null, end: null };
     }
-    
+
     const record = response.data[0];
     let schedule = { enabled: false, start: null, end: null };
-    
+
     try {
-        if (record.value) {
-            schedule = JSON.parse(record.value);
-        }
+      if (record.value) {
+        schedule = JSON.parse(record.value);
+      }
     } catch (e) {
-        console.warn('Failed to parse maintenance schedule:', e);
+      console.warn('Failed to parse maintenance schedule:', e);
     }
-    
+
     return { success: true, ...schedule };
 
   } catch (e) {
@@ -1201,16 +1198,16 @@ function setMaintenanceSchedule(enabled, start, end, password) {
   try {
     const props = PropertiesService.getScriptProperties();
     const superAdminPassword = props.getProperty('SUPERADMIN_PASSWORD');
-    
+
     // Validate password (requires Super Admin)
     if (!superAdminPassword || password !== superAdminPassword) {
       return { success: false, message: '認証に失敗しました' };
     }
 
     const payloadVal = JSON.stringify({
-        enabled: enabled === true || enabled === 'true',
-        start: start || null,
-        end: (end && end !== 'null') ? end : null
+      enabled: enabled === true || enabled === 'true',
+      start: start || null,
+      end: (end && end !== 'null') ? end : null
     });
 
     const payload = {
@@ -1218,7 +1215,7 @@ function setMaintenanceSchedule(enabled, start, end, password) {
       value: payloadVal,
       updated_at: new Date().toISOString()
     };
-    
+
     const endpoint = 'settings?on_conflict=key';
     const options = {
       method: 'POST',
@@ -1226,13 +1223,13 @@ function setMaintenanceSchedule(enabled, start, end, password) {
       headers: { 'Prefer': 'resolution=merge-duplicates' },
       useServiceRole: true
     };
-    
+
     const response = supabaseIntegration._request(endpoint, options);
 
     if (response.success) {
-        return { success: true };
+      return { success: true };
     } else {
-        throw new Error(response.error || 'Supabase update failed');
+      throw new Error(response.error || 'Supabase update failed');
     }
 
   } catch (e) {

@@ -13,7 +13,7 @@ async function customConfirm(msg) {
 // config.js
 // 複数のAPI URL（使用数上限回避のため分散）
 const GAS_API_URLS = [
-  "https://script.google.com/macros/s/AKfycbwlTr5q7NSKdiM96RM1WL1KjjZJ7l--izwWbHhrgMZ8U7F7mH5VdqYwFwvZm8_9lPXRjA/exec"
+  "https://script.google.com/macros/s/AKfycbzBD3eK9bxj3Xm4OMc9rqu5P97XDBZPSxdhYfSxQRUmzUNdnvMqgZZh2ZChpOf1nrCumg/exec"
   //jxjin.ig.school@gmail.com
   //"https://script.google.com/macros/s/AKfycbxGBy7NvMzEdENKL_SYA9Bvk6oq_Fx7_VW2iey0bGFlDfQmGb_-zVP3Gt2pZzJ20m9B/exec",
   //nzn.engeki5@gmail.com
@@ -159,7 +159,18 @@ class APIUrlManager {
 const apiUrlManager = new APIUrlManager();
 // バックグラウンド同期用URL（独立GASプロジェクトのURL）
 const BACKGROUND_SYNC_URL = "https://script.google.com/macros/s/AKfycbzOVVyo8K5-bCZkzD_N2EXFLC7AHQSgKljJo1UXzVB99vacoOsHDme4NIn_emoes-t3/exec"; // 例: "https://script.google.com/macros/s/OFFLINE_PROJECT_ID/exec"
-const DEBUG_MODE = true;
+const DEBUG_MODE = false;
+
+// 本番環境（DEBUG_MODE=false）ではコンソール出力を無効化（セキュリティ対策）
+if (!DEBUG_MODE && typeof window !== 'undefined' && window.console) {
+  const noop = () => {};
+  window.console.log = noop;
+  window.console.info = noop;
+  window.console.warn = noop;
+  window.console.debug = noop;
+  window.console.error = noop;
+  window.console.trace = noop;
+}
 // エラーハンドリング機能フラグ（既存機能に影響しないよう全てデフォルトOFF）
 const FEATURE_FLAGS = {
   apiRetryEnabled: false, // API自動リトライ（指数バックオフ）

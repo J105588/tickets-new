@@ -1138,7 +1138,7 @@ class SupabaseAPI {
 
   // システム設定関連のAPI
   async getSystemSettings() {
-    const result = await this._request('system_settings?select=*');
+    const result = await this._request('settings?select=*');
     if (!result.success) {
       return { success: false, error: 'システム設定の取得に失敗しました' };
     }
@@ -1146,7 +1146,7 @@ class SupabaseAPI {
     // 設定をオブジェクト形式に変換
     const settings = {};
     result.data.forEach(setting => {
-      settings[setting.setting_key] = setting.setting_value;
+      settings[setting.key] = setting.value;
     });
 
     return { success: true, data: settings };
@@ -1154,12 +1154,12 @@ class SupabaseAPI {
 
   async updateSystemSetting(key, value) {
     const data = {
-      setting_key: key,
-      setting_value: value,
+      key: key,
+      value: value,
       updated_at: new Date().toISOString()
     };
 
-    return await this._request('system_settings', {
+    return await this._request('settings', {
       method: 'POST',
       body: JSON.stringify(data)
     });
