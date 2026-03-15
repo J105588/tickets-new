@@ -22,26 +22,26 @@ function checkReservationDeadline(performanceId) {
     // Global Deadline Check (Supabase Settings)
     const res = supabaseIntegration._request(`settings?key=eq.RESERVATION_DEADLINE&select=value`);
     let deadlineStr = null;
-    
+
     if (res.success && res.data && res.data.length > 0) {
-        deadlineStr = res.data[0].value;
+      deadlineStr = res.data[0].value;
     }
 
     if (!deadlineStr) {
-        // Not set = Open
-        return { success: true, isExpired: false };
+      // Not set = Open
+      return { success: true, isExpired: false };
     }
 
     const deadline = new Date(deadlineStr);
     const now = new Date();
 
     if (now > deadline) {
-        return { success: true, isExpired: true, deadline: deadline };
+      return { success: true, isExpired: true, deadline: deadline };
     } else {
-        return { success: true, isExpired: false, deadline: deadline };
+      return { success: true, isExpired: false, deadline: deadline };
     }
 
-  } catch(e) {
+  } catch (e) {
     console.warn('Deadline check error', e);
     // Fail safe: if setting is broken, treat as Open or Closed?
     // Treating as Open to avoid blocking if config error
@@ -65,11 +65,11 @@ function createReservation(data) {
     // --- Deadline Check ---
     const deadlineCheck = checkReservationDeadline(performanceId);
     if (deadlineCheck.success && deadlineCheck.isExpired) {
-        // 期限切れ。トークンチェックを行う。
-        const token = data.token;
-        if (!validateAdminToken(token)) {
-             return { success: false, error: '予約受付期間を終了しました。' };
-        }
+      // 期限切れ。トークンチェックを行う。
+      const token = data.token;
+      if (!validateAdminToken(token)) {
+        return { success: false, error: '予約受付期間を終了しました。' };
+      }
     }
     // ----------------------
 
@@ -78,26 +78,26 @@ function createReservation(data) {
     if (!seatIds || seatIds.length === 0) {
       return { success: false, error: '座席が選択されていません' };
     }
-    
+
     // 現在の座席状態を取得
     const currentSeatsResult = supabaseIntegration.getSeats(performanceId);
     if (!currentSeatsResult.success) return { success: false, error: '座席情報の確認に失敗しました' };
-    
-    const unavailable = currentSeatsResult.data.filter(s => 
+
+    const unavailable = currentSeatsResult.data.filter(s =>
       seatIds.includes(s.seat_id) && s.status !== 'available'
     );
-    
+
     if (unavailable.length > 0) {
-      return { success: false, error: `以下の座席は既に予約されています: ${unavailable.map(s=>s.seat_id).join(', ')}` };
+      return { success: false, error: `以下の座席は既に予約されています: ${unavailable.map(s => s.seat_id).join(', ')}` };
     }
 
     // 3. 予約データの作成と座席確保を1つのトランザクションで実行 (RPC呼び出し)
     // ランダムな予約ID (6桁) を生成 (既存互換維持のため数値ID生成)
     let rpcResult;
     let retries = 0;
-    while(retries < 3) {
-      const randomId = Math.floor(100000 + Math.random() * 900000); 
-      
+    while (retries < 3) {
+      const randomId = Math.floor(100000 + Math.random() * 900000);
+
       const payload = {
         p_id: randomId,
         p_group: data.group,
@@ -110,31 +110,31 @@ function createReservation(data) {
         p_seats: seatIds,
         p_reserved_by: data.name
       };
-      
+
       rpcResult = supabaseIntegration.rpc('create_reservation', payload);
-      
+
       // 成功したらループ抜ける
       if (rpcResult.success && rpcResult.data && rpcResult.data.success) {
         break;
       }
-      
+
       // エラーチェック（重複エラーならリトライ、それ以外は失敗）
       if (rpcResult.data && rpcResult.data.error && rpcResult.data.error.includes('duplicate key')) {
-         retries++;
-         console.log('Booking ID collision in RPC, retrying...', randomId);
-         continue;
+        retries++;
+        console.log('Booking ID collision in RPC, retrying...', randomId);
+        continue;
       } else if (rpcResult.data && !rpcResult.data.success) {
-          // RPC内部のエラー (座席重複など)
-          return { success: false, error: rpcResult.data.error };
+        // RPC内部のエラー (座席重複など)
+        return { success: false, error: rpcResult.data.error };
       } else {
-         return { success: false, error: '予約処理中にエラーが発生しました: ' + (rpcResult.error || '不明なエラー') };
+        return { success: false, error: '予約処理中にエラーが発生しました: ' + (rpcResult.error || '不明なエラー') };
       }
     }
 
     if (!rpcResult || !rpcResult.success || !rpcResult.data || !rpcResult.data.success) {
-       return { success: false, error: '予約処理中にエラーが発生しました。もう一度お試しください。' };
+      return { success: false, error: '予約処理中にエラーが発生しました。もう一度お試しください。' };
     }
-    
+
     // RPCの結果を確認
     const responseData = rpcResult.data;
     const bookingId = responseData.data.booking_id;
@@ -151,12 +151,12 @@ function createReservation(data) {
       passcode: passcode
     });
 
-    return { 
-      success: true, 
-      data: { 
-        bookingId: bookingId, 
-        passcode: passcode 
-      } 
+    return {
+      success: true,
+      data: {
+        bookingId: bookingId,
+        passcode: passcode
+      }
     };
 
   } catch (e) {
@@ -190,23 +190,23 @@ function getBookingDetails(bookingId, passcode) {
 // ==========================================
 
 /**
- * 予約IDとパスコードでチェックインする（ユーザーまたは管理者による手動入力）
- * 管理者がQRスキャンした場合はパスコードチェックをスキップするロジックも検討可能だが、
- * QRコードにパスコードを含めることでセキュリティを維持する。
+ * 予約IDと確認コードでチェックインする（ユーザーまたは管理者による手動入力）
+ * 管理者がQRスキャンした場合は確認コードチェックをスキップするロジックも検討可能だが、
+ * QRコードに確認コードを含めることでセキュリティを維持する。
  */
 function checkInReservation(bookingId, passcode) {
   try {
-    // 1. 存在確認とパスコード照合
+    // 1. 存在確認と確認コード照合
     const getRes = supabaseIntegration.getBookingByCredentials(bookingId, passcode);
     if (!getRes.success) {
-      return { success: false, error: '予約が見つからないか、パスコードが間違っています' };
+      return { success: false, error: '予約が見つからないか、確認コードが間違っています' };
     }
-    
+
     const booking = getRes.data;
     if (booking.status === 'checked_in') {
       return { success: true, message: '既にチェックイン済みです', data: booking };
     }
-    
+
     if (booking.status === 'cancelled') {
       return { success: false, error: 'この予約はキャンセルされています' };
     }
@@ -216,7 +216,7 @@ function checkInReservation(bookingId, passcode) {
     if (!updateRes.success) {
       return { success: false, error: 'チェックイン処理に失敗しました' };
     }
-    
+
     return { success: true, data: updateRes.data };
 
   } catch (e) {
@@ -238,57 +238,57 @@ function cancelReservation(bookingId, passcode, ip, userAgent) {
     // 1. 予約の検証
     const getRes = supabaseIntegration.getBookingByCredentials(bookingId, passcode);
     if (!getRes.success) {
-      return { success: false, error: '予約が見つからないか、パスコードが間違っています' };
+      return { success: false, error: '予約が見つからないか、確認コードが間違っています' };
     }
-    
+
     const booking = getRes.data;
     if (booking.status === 'cancelled') {
-        return { success: false, error: 'この予約は既にキャンセルされています' };
+      return { success: false, error: 'この予約は既にキャンセルされています' };
     }
     if (booking.status === 'checked_in') {
-        return { success: false, error: 'チェックイン済みの予約はキャンセルできません' };
+      return { success: false, error: 'チェックイン済みの予約はキャンセルできません' };
     }
 
     // 2. 予約ステータスを cancelled に更新
     const updateRes = supabaseIntegration.updateBookingStatus(bookingId, 'cancelled');
     if (!updateRes.success) {
-        return { success: false, error: '予約ステータスの更新に失敗しました' };
+      return { success: false, error: '予約ステータスの更新に失敗しました' };
     }
 
     // 3. 座席を開放 (status='available', reserved_by=null, booking_id=null)
     const performanceId = booking.performance_id;
-    
+
     // bookingsテーブルに関連づいている座席を取得するのは難しい（bookingには座席ID配列がない場合がある）
     // しかし、seatsテーブルには booking_id があるはず
     const seatsRes = supabaseIntegration._request(`seats?performance_id=eq.${performanceId}&booking_id=eq.${bookingId}`);
     if (seatsRes.success && seatsRes.data.length > 0) {
-        const seatIds = seatsRes.data.map(s => s.seat_id);
-        
-        // 一括更新用データ作成
-        const updates = seatIds.map(sid => ({
-            seatId: sid,
-            data: {
-                status: 'available',
-                reserved_by: null,
-                booking_id: null,
-                reserved_at: null,
-                checked_in_at: null
-            }
-        }));
-        
-        const releaseRes = supabaseIntegration.updateMultipleSeats(performanceId, updates);
-        if (!releaseRes.success) {
-             console.error(`Warning: Booking ${bookingId} cancelled but seats ${seatIds.join(',')} failed to release.`);
-             // ユーザーにはキャンセル成功として伝えるが、裏でログ残す
+      const seatIds = seatsRes.data.map(s => s.seat_id);
+
+      // 一括更新用データ作成
+      const updates = seatIds.map(sid => ({
+        seatId: sid,
+        data: {
+          status: 'available',
+          reserved_by: null,
+          booking_id: null,
+          reserved_at: null,
+          checked_in_at: null
         }
+      }));
+
+      const releaseRes = supabaseIntegration.updateMultipleSeats(performanceId, updates);
+      if (!releaseRes.success) {
+        console.error(`Warning: Booking ${bookingId} cancelled but seats ${seatIds.join(',')} failed to release.`);
+        // ユーザーにはキャンセル成功として伝えるが、裏でログ残す
+      }
     }
 
     // 4. キャンセル通知メール送信
     sendCancellationEmail(booking.email, {
-        name: booking.name,
-        bookingId: bookingId,
-        ip: ip || 'unknown',
-        userAgent: userAgent || 'unknown'
+      name: booking.name,
+      bookingId: bookingId,
+      ip: ip || 'unknown',
+      userAgent: userAgent || 'unknown'
     });
 
     return { success: true, message: '予約をキャンセルしました' };
@@ -301,13 +301,13 @@ function cancelReservation(bookingId, passcode, ip, userAgent) {
 
 // キャンセル通知メール
 function sendCancellationEmail(to, info) {
-    // JST Time
-    const timestamp = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
-    
-    // User Agent Parsing
-    const friendlyDevice = parseUserAgent(info.userAgent);
+  // JST Time
+  const timestamp = Utilities.formatDate(new Date(), 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
 
-    const body = `
+  // User Agent Parsing
+  const friendlyDevice = parseUserAgent(info.userAgent);
+
+  const body = `
 ${info.name} 様
 
 以下の予約がキャンセルされました。
@@ -327,31 +327,31 @@ IPアドレス: ${info.ip}
 お心当たりがない場合は、速やかに運営までご連絡ください。
 `;
 
-    MailApp.sendEmail({
-        to: to,
-        subject: '【市川学園座席管理システム】予約キャンセルのお知らせ',
-        body: body
-    });
+  MailApp.sendEmail({
+    to: to,
+    subject: '【市川学園座席管理システム】予約キャンセルのお知らせ',
+    body: body
+  });
 }
 
 function parseUserAgent(ua) {
-    if (!ua || ua === 'unknown') return '不明';
+  if (!ua || ua === 'unknown') return '不明';
 
-    let os = '不明なOS';
-    if (ua.includes('iPhone')) os = 'iPhone';
-    else if (ua.includes('iPad')) os = 'iPad';
-    else if (ua.includes('Android')) os = 'Android';
-    else if (ua.includes('Windows')) os = 'Windows PC';
-    else if (ua.includes('Macintosh')) os = 'Mac';
-    else if (ua.includes('Linux')) os = 'Linux PC';
+  let os = '不明なOS';
+  if (ua.includes('iPhone')) os = 'iPhone';
+  else if (ua.includes('iPad')) os = 'iPad';
+  else if (ua.includes('Android')) os = 'Android';
+  else if (ua.includes('Windows')) os = 'Windows PC';
+  else if (ua.includes('Macintosh')) os = 'Mac';
+  else if (ua.includes('Linux')) os = 'Linux PC';
 
-    let browser = '不明なブラウザ';
-    if (ua.includes('CriOS') || ua.includes('Chrome')) browser = 'Chrome';
-    else if (ua.includes('FxiOS') || ua.includes('Firefox')) browser = 'Firefox';
-    else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Safari';
-    else if (ua.includes('Edge') || ua.includes('Edg')) browser = 'Edge';
+  let browser = '不明なブラウザ';
+  if (ua.includes('CriOS') || ua.includes('Chrome')) browser = 'Chrome';
+  else if (ua.includes('FxiOS') || ua.includes('Firefox')) browser = 'Firefox';
+  else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Safari';
+  else if (ua.includes('Edge') || ua.includes('Edg')) browser = 'Edge';
 
-    return `${os} (${browser})`;
+  return `${os} (${browser})`;
 }
 
 // ==========================================
@@ -362,14 +362,14 @@ function sendReservationEmail(to, info) {
   // ステータス確認ページのURL (フロントエンドのURLに書き換える必要あり)
   // 仮: pages/reservation-status.html?id=xxx&pass=xxxx
   // 実際にはデプロイ先のURLが必要
-  
+
   // ScriptPropertyからフロントエンドのベースURLを取得する設計を推奨
   // 今回は仮置き
-  const baseUrl = 'https://j105588.github.io/tickets-new'; 
+  const baseUrl = 'https://j105588.github.io/tickets-new';
   const statusUrl = `${baseUrl}/pages/reservation-status.html?id=${info.bookingId}&pass=${info.passcode}`;
-  
+
   const subject = `【チケット予約完了】${info.group}公演`;
-  
+
   const body = `
 ${info.name} 様
 
@@ -421,11 +421,11 @@ function getPerformancesForGroup(group) {
     // 1. Supabaseから取得 (performancesテーブル)
     const endpoint = `performances?group_name=eq.${encodeURIComponent(group)}&select=day,timeslot,id`;
     const result = supabaseIntegration._request(endpoint);
-    
+
     if (!result.success) {
       return { success: false, error: '公演データの取得に失敗しました' };
     }
-    
+
     return { success: true, data: result.data };
   } catch (e) {
     return { success: false, error: e.message };

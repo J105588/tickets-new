@@ -7,7 +7,7 @@ class SupabaseIntegration {
     this.url = PropertiesService.getScriptProperties().getProperty('SUPABASE_URL');
     this.anonKey = PropertiesService.getScriptProperties().getProperty('SUPABASE_ANON_KEY');
     this.serviceRoleKey = PropertiesService.getScriptProperties().getProperty('SUPABASE_SERVICE_ROLE_KEY');
-    
+
     if (!this.url || !this.anonKey) {
       throw new Error('Supabase設定が不完全です。URLとAPIキーを設定してください。');
     }
@@ -18,11 +18,11 @@ class SupabaseIntegration {
     const url = `${this.url}/rest/v1/${endpoint}`;
     const method = (options.method || 'GET').toUpperCase();
     const isMutation = method !== 'GET' && method !== 'HEAD';
-    
+
     // useServiceRoleが明示的に指定されているか、更新系の操作であればService Role Keyを使用
     const useServiceKey = options.useServiceRole || (isMutation && this.serviceRoleKey);
     const authKey = useServiceKey ? this.serviceRoleKey : this.anonKey;
-    
+
     const headers = {
       'Content-Type': 'application/json',
       'apikey': authKey,
@@ -64,7 +64,7 @@ class SupabaseIntegration {
   // ==========================
   // Custom RPC (For transaction-safe operations)
   // ==========================
-  
+
   rpc(functionName, payload) {
     return this._request(`rpc/${functionName}`, {
       method: 'POST',
@@ -106,7 +106,7 @@ class SupabaseIntegration {
       ...updates,
       updated_at: new Date().toISOString()
     };
-    
+
     return this._request(`seats?performance_id=eq.${encodeURIComponent(performanceId)}&seat_id=eq.${encodeURIComponent(seatId)}`, {
       method: 'PATCH',
       body: data
@@ -116,7 +116,7 @@ class SupabaseIntegration {
   // 複数座席の一括更新
   updateMultipleSeats(performanceId, updates) {
     const results = [];
-    
+
     for (const update of updates) {
       const result = this.updateSeat(performanceId, update.seatId, update.data);
       results.push({
@@ -125,7 +125,7 @@ class SupabaseIntegration {
         data: result.data
       });
     }
-    
+
     return { success: true, data: results };
   }
 
@@ -139,7 +139,7 @@ class SupabaseIntegration {
         reserved_at: new Date().toISOString()
       }
     }));
-    
+
     return this.updateMultipleSeats(performanceId, updates);
   }
 
@@ -152,7 +152,7 @@ class SupabaseIntegration {
         checked_in_at: new Date().toISOString()
       }
     }));
-    
+
     return this.updateMultipleSeats(performanceId, updates);
   }
 
@@ -163,7 +163,7 @@ class SupabaseIntegration {
     if (!availableSeatsResult.success || availableSeatsResult.data.length < count) {
       return { success: false, error: '利用可能な座席が不足しています' };
     }
-    
+
     // ランダムに指定数の座席を選択（Fisher-Yatesでシャッフル）
     const pool = availableSeatsResult.data.slice();
     for (let i = pool.length - 1; i > 0; i--) {
@@ -180,7 +180,7 @@ class SupabaseIntegration {
         walkin_at: new Date().toISOString()
       }
     }));
-    
+
     return this.updateMultipleSeats(performanceId, updates);
   }
 
@@ -190,7 +190,7 @@ class SupabaseIntegration {
     if (!seatsResult.success) {
       return { success: false, error: '座席データの取得に失敗しました' };
     }
-    
+
     const seats = seatsResult.data;
     const stats = {
       total: seats.length,
@@ -200,7 +200,7 @@ class SupabaseIntegration {
       walkin: seats.filter(s => s.status === 'walkin').length,
       blocked: seats.filter(s => s.status === 'blocked').length
     };
-    
+
     return { success: true, data: stats };
   }
 
@@ -235,14 +235,14 @@ class SupabaseIntegration {
       method: 'GET',
       useServiceRole: true
     });
-    
+
     if (!result.success || !result.data || result.data.length === 0) {
       return { success: false, error: '予約が見つかりません' };
     }
     return { success: true, data: result.data[0] };
   }
 
-  // 予約情報の取得（IDとパスコード）- RLS回避のためService Roleを使用
+  // 予約情報の取得（IDと確認コード）- RLS回避のためService Roleを使用
   getBookingByCredentials(bookingId, passcode) {
     const query = `id=eq.${encodeURIComponent(bookingId)}&passcode=eq.${encodeURIComponent(passcode)}`;
     const result = this._request(`bookings?select=*,seats(seat_id,row_letter,seat_number),performances(group_name,day,timeslot)&${query}`, {
@@ -250,7 +250,7 @@ class SupabaseIntegration {
       useServiceRole: true // 機密情報取得のため管理者権限を使用
     });
     if (!result.success || !result.data || result.data.length === 0) {
-      return { success: false, error: '予約が見つからないか、パスコードが間違っています' };
+      return { success: false, error: '予約が見つからないか、確認コードが間違っています' };
     }
     return { success: true, data: result.data[0] };
   }
@@ -265,9 +265,9 @@ class SupabaseIntegration {
         checked_in_at: status === 'checked_in' ? new Date().toISOString() : null
       }
     });
-    
+
     if (!bookingUpdate.success) return bookingUpdate;
-    
+
     // 2. 関連座席のステータス更新（チェックインの場合）
     if (status === 'checked_in') {
       // 予約に紐付く座席を取得して更新するのが確実だが、ここでは簡易的にbooking_idで更新
@@ -280,7 +280,7 @@ class SupabaseIntegration {
       });
       // 座席更新の失敗は致命的ではないがログに残すべき（GAS側で処理）
     }
-    
+
     return bookingUpdate;
   }
 
@@ -290,7 +290,7 @@ class SupabaseIntegration {
       ...updates,
       updated_at: new Date().toISOString()
     };
-    
+
     return this._request(`bookings?id=eq.${encodeURIComponent(bookingId)}`, {
       method: 'PATCH',
       body: data
