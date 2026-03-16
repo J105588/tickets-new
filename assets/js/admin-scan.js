@@ -411,13 +411,17 @@ async function fetchBookingAndConfirm(id, passcode) {
     showResultModal('照会中...', '<div class="spinner"></div><p style="text-align:center">確認中...</p>');
     state.currentBooking = null;
 
-    // Direct Supabase RPC Call (Fast)
+    // Direct Supabase RPC Call (Fast) + Offline Fallback
     const result = await getBookingForScan(id, passcode);
 
     if (result.success) {
         state.currentBooking = result.data;
-        await processScanResult(result.data);
+        await processScanResult(result.data, result.offline, result.offlineTime);
     } else {
+        // Update banner if offline but failed
+        if (result.offline) showOfflineBanner();
+        else hideOfflineBanner();
+        
         // Fallback to error
         showResultModal('エラー', `<p style="color:var(--danger);text-align:center;font-weight:bold;font-size:1.2rem;">${result.error || 'データが見つかりません'}</p>`, 'error');
 
@@ -430,8 +434,14 @@ async function fetchBookingAndConfirm(id, passcode) {
     }
 }
 
-async function processScanResult(booking) {
+async function processScanResult(booking, isOffline = false, cachedAt = null) {
     const perf = booking.performances || {};
+
+    if (isOffline) {
+        showOfflineBanner(cachedAt);
+    } else {
+        hideOfflineBanner();
+    }
 
     // Status Logic
     const isTargetMatch = (perf.group_name === state.group && perf.timeslot === state.timeslot && perf.day == state.day);
@@ -575,6 +585,25 @@ function getStatusBadge(status) {
         'cancelled': '<span class="status-badge status-cancelled" style="font-size:1.1rem; padding:6px 16px;">無効</span>'
     };
     return map[status] || status;
+}
+
+function showOfflineBanner(timestamp) {
+    const banner = document.getElementById('offline-data-banner');
+    const timeEl = document.getElementById('offline-data-time');
+    if (banner && timeEl) {
+        banner.style.display = 'block';
+        if (timestamp) {
+            const dt = new Date(timestamp);
+            timeEl.textContent = `${dt.getMonth()+1}/${dt.getDate()} ${dt.getHours()}:${String(dt.getMinutes()).padStart(2, '0')}`;
+        } else {
+            timeEl.textContent = '不明';
+        }
+    }
+}
+
+function hideOfflineBanner() {
+    const banner = document.getElementById('offline-data-banner');
+    if (banner) banner.style.display = 'none';
 }
 
 

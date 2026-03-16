@@ -299,21 +299,41 @@ export async function checkInReservation(id, passcode) {
 
 export async function getBookingForScan(id, passcode) {
     const sb = getSupabase();
-    if (!sb) return { success: false, error: 'System Error' };
+    if (sb) {
+        try {
+            // First attempt network lookup if online
+            if (navigator.onLine !== false) {
+                const { data, error } = await sb.rpc('get_booking_for_scan', {
+                    p_id: parseInt(id),
+                    p_passcode: passcode || null
+                });
 
-    try {
-        const { data, error } = await sb.rpc('get_booking_for_scan', {
-            p_id: parseInt(id),
-            p_passcode: passcode || null
-        });
-
-        if (error) throw error;
-        return data;
-
-    } catch (e) {
-        console.error('RPC Error:', e);
-        return { success: false, error: e.message };
+                if (!error) {
+                    return { success: true, data: data };
+                }
+                console.warn('Network RPC failed, attempting fallback', error);
+            }
+        } catch (e) {
+            console.warn('Exception during network RPC, attempting fallback', e);
+        }
     }
+    
+    // Fallback to offline synchronization system if available
+    try {
+        if (window.OfflineSyncV2) {
+            console.log('[OfflineFallback] Checking local cached booking data');
+            const data = await window.OfflineSyncV2.getLocalBookingData(id, passcode);
+            if (data) {
+                 return { success: true, data: data.booking, offline: true, offlineTime: data.cachedAt };
+            } else {
+                 return { success: false, error: 'データが見つかりません', offline: true };
+            }
+        }
+    } catch(e) {
+        console.error('Offline lookup error:', e);
+    }
+
+    return { success: false, error: 'System Error / Network Unavailable' };
 }
 
 // --- Admin API Wrappers (GAS JSONP) ---
