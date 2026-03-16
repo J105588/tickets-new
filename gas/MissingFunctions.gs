@@ -10,22 +10,22 @@
  */
 function getSystemLock() {
   try {
-    // Supabaseから取得
-    // key=eq.SYSTEM_LOCK
-    // settings: { key, value, updated_at }
-    const endpoint = 'settings?key=eq.SYSTEM_LOCK&select=value,updated_at';
+    // Supabaseから取得 (SYSTEM_LOCK と SYSTEM_LOCK_MESSAGE をまとめて取得)
+    const endpoint = 'settings?key=in.(SYSTEM_LOCK,SYSTEM_LOCK_MESSAGE)&select=key,value,updated_at';
     const response = supabaseIntegration._request(endpoint);
 
-    // データがない、またはエラーの場合はデフォルトロック解除
-    if (!response.success || !response.data || response.data.length === 0) {
-      return { success: true, locked: false, lockedAt: null };
+    if (!response.success || !response.data) {
+      return { success: true, locked: false, message: null, lockedAt: null };
     }
 
-    const record = response.data[0];
-    const locked = record.value === 'true';
-    const lockedAt = locked ? record.updated_at : null;
+    const lockRecord = response.data.find(r => r.key === 'SYSTEM_LOCK');
+    const msgRecord = response.data.find(r => r.key === 'SYSTEM_LOCK_MESSAGE');
 
-    return { success: true, locked, lockedAt };
+    const locked = lockRecord ? lockRecord.value === 'true' : false;
+    const message = msgRecord ? msgRecord.value : null;
+    const lockedAt = locked && lockRecord ? lockRecord.updated_at : null;
+
+    return { success: true, locked, message, lockedAt };
 
   } catch (e) {
     Logger.log('getSystemLock Error: ' + e.message);
@@ -70,7 +70,7 @@ function verifyModePassword(mode, password) {
 /**
  * システムロックを設定する
  */
-function setSystemLock(shouldLock, password) {
+function setSystemLock(shouldLock, password, message = '') {
   try {
     const props = PropertiesService.getScriptProperties();
     const superAdminPassword = props.getProperty('SUPERADMIN_PASSWORD');
@@ -78,27 +78,33 @@ function setSystemLock(shouldLock, password) {
       return { success: false, message: '認証に失敗しました' };
     }
 
-    // Upsert (Insert or Update)
-    // settings table UNIQUE(key)
-    const payload = {
-      key: 'SYSTEM_LOCK',
-      value: shouldLock ? 'true' : 'false',
-      updated_at: new Date().toISOString()
-    };
+    const now = new Date().toISOString();
+    const payloads = [
+      {
+        key: 'SYSTEM_LOCK',
+        value: shouldLock ? 'true' : 'false',
+        updated_at: now
+      },
+      {
+        key: 'SYSTEM_LOCK_MESSAGE',
+        value: message || '',
+        updated_at: now
+      }
+    ];
 
-    // on_conflict=key
+    // Upsert (Insert or Update)
     const endpoint = 'settings?on_conflict=key';
     const options = {
       method: 'POST',
-      body: payload,
-      headers: { 'Prefer': 'resolution=merge-duplicates' }, // Upsert
-      useServiceRole: true // RLS might restrict write
+      body: payloads, // Array for multiple upserts
+      headers: { 'Prefer': 'resolution=merge-duplicates' },
+      useServiceRole: true
     };
 
     const response = supabaseIntegration._request(endpoint, options);
 
     if (response.success) {
-      return { success: true, locked: shouldLock === true };
+      return { success: true, locked: shouldLock === true, message: message };
     } else {
       throw new Error(response.error || 'Supabase update failed');
     }

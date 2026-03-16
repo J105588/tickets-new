@@ -398,8 +398,8 @@ class GasAPI {
     return this._callApi('getSystemLock', []);
   }
 
-  static setSystemLock(shouldLock, password) {
-    return this._callApi('setSystemLock', [shouldLock === true, password || ''], { suppressLog: true });
+  static setSystemLock(shouldLock, password, message = '') {
+    return this._callApi('setSystemLock', [shouldLock === true, password || '', message || ''], { suppressLog: true });
   }
 
   static async adminDeadlineSettings(value) {
@@ -915,9 +915,9 @@ if (typeof window !== 'undefined') {
 // 安全なコンソールコマンド（最高管理者パスワードが必要）
 if (typeof window !== 'undefined') {
   window.SeatApp = window.SeatApp || {};
-  window.SeatApp.lock = async (password) => {
+  window.SeatApp.lock = async (password, message = 'メンテナンス中のためアクセスを一時停止しています') => {
     if (!password) { console.warn('SeatApp.lock requires superadmin password'); return; }
-    return GasAPI.setSystemLock(true, password);
+    return GasAPI.setSystemLock(true, password, message);
   };
   window.SeatApp.unlock = async (password) => {
     if (!password) { console.warn('SeatApp.unlock requires superadmin password'); return; }
