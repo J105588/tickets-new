@@ -653,9 +653,17 @@ function getSeatDataMinimalSupabase(group, day, timeslot, isAdmin = false, token
 /**
  * 座席を予約する（Supabase版）
  */
-function reserveSeatsSupabase(group, day, timeslot, selectedSeats) {
+function reserveSeatsSupabase(group, day, timeslot, selectedSeats, operationId = null) {
   if (!Array.isArray(selectedSeats) || selectedSeats.length === 0) {
     return { success: false, message: '予約する座席が選択されていません。' };
+  }
+
+  // Idempotency Check using CacheService
+  if (operationId) {
+    if (checkAndMarkOperationProcessed(operationId)) {
+      Logger.log(`[Idempotency] Operation ${operationId} already processed. Skipping.`);
+      return { success: true, message: `予約が完了しました。(Idempotent)\n座席: ${selectedSeats.join(', ')}` };
+    }
   }
 
   try {

@@ -1779,7 +1779,7 @@ async function checkInSelected() {
 
         // オフライン同期システムに操作を追加
         if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
-          const operationId = window.OfflineSyncV2.addOperation({
+          await window.OfflineSyncV2.addOperation({
             type: response.functionName,
             args: response.params
           });
@@ -1793,25 +1793,7 @@ async function checkInSelected() {
         }
       }
 
-      // オフライン委譲レスポンスの処理
-      if (response.error === 'offline_delegate' && response.functionName && response.params) {
-        console.log('[チェックイン] オフライン委譲レスポンスを処理中...');
 
-        // オフライン同期システムに操作を追加
-        if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
-          const operationId = window.OfflineSyncV2.addOperation({
-            type: response.functionName,
-            args: response.params
-          });
-
-          showLoader(false);
-          showSuccessNotification('オフラインでチェックインを受け付けました。オンライン復帰時に自動同期されます。');
-
-          // 座席データを再取得してUIを復元
-          await refreshSeatData();
-          return;
-        }
-      }
     }
   } catch (error) {
     console.error('チェックインエラー:', error);
@@ -1961,7 +1943,7 @@ async function confirmReservation() {
 
         // オフライン同期システムに操作を追加
         if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
-          const operationId = window.OfflineSyncV2.addOperation({
+          await window.OfflineSyncV2.addOperation({
             type: response.functionName,
             args: response.params
           });
@@ -1975,25 +1957,7 @@ async function confirmReservation() {
         }
       }
 
-      // オフライン委譲レスポンスの処理
-      if (response.error === 'offline_delegate' && response.functionName && response.params) {
-        console.log('[予約] オフライン委譲レスポンスを処理中...');
 
-        // オフライン同期システムに操作を追加
-        if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
-          const operationId = window.OfflineSyncV2.addOperation({
-            type: response.functionName,
-            args: response.params
-          });
-
-          showLoader(false);
-          showSuccessNotification('オフラインで予約を受け付けました。オンライン復帰時に自動同期されます。');
-
-          // 座席データを再取得してUIを復元
-          await refreshSeatData();
-          return;
-        }
-      }
     }
   } catch (error) {
     console.error('予約エラー:', error);

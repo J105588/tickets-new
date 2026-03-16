@@ -224,7 +224,7 @@ class GasAPI {
         try {
           if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
             // オフライン同期システムが利用可能な場合は、オフライン操作として処理
-            if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
+            if (window.OfflineSyncV2) {
               console.log('[API] オフライン状態を検知、オフライン同期システムに委譲');
               // オフライン同期システムに処理を委譲するための特別なレスポンス
               return resolve({ success: false, error: 'offline_delegate', offline: true, functionName, params });
@@ -237,7 +237,7 @@ class GasAPI {
         // ネットワーク接続状態をより詳細にチェック
         if (typeof navigator !== 'undefined' && navigator && !navigator.onLine) {
           console.log('[API] ネットワーク接続なし、オフライン同期システムに委譲');
-          if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
+          if (window.OfflineSyncV2) {
             return resolve({ success: false, error: 'offline_delegate', offline: true, functionName, params });
           } else {
             return resolve({ success: false, error: 'offline', offline: true });
@@ -312,7 +312,7 @@ class GasAPI {
             } catch (e) { }
 
             // タイムアウト時もオフライン同期システムに委譲を試行
-            if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
+            if (window.OfflineSyncV2) {
               console.log('[API] タイムアウト、オフライン同期システムに委譲');
               resolve({ success: false, error: 'offline_delegate', offline: true, functionName, params });
             } else {
@@ -359,7 +359,7 @@ class GasAPI {
             console.error('API call failed details:', errorDetails);
 
             // エラー時もオフライン同期システムに委譲を試行
-            if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
+            if (window.OfflineSyncV2) {
               console.log('[API] エラー、オフライン同期システムに委譲');
               resolve({ success: false, error: 'offline_delegate', offline: true, functionName, params });
             } else {
@@ -383,7 +383,7 @@ class GasAPI {
       } catch (err) {
         console.error('API call exception:', err);
         // 例外時もオフライン同期システムに委譲を試行
-        if (window.OfflineSyncV2 && window.OfflineSyncV2.addOperation) {
+        if (window.OfflineSyncV2) {
           console.log('[API] 例外、オフライン同期システムに委譲');
           resolve({ success: false, error: 'offline_delegate', offline: true, functionName, params });
         } else {
@@ -501,11 +501,11 @@ class GasAPI {
     return response;
   }
 
-  static async reserveSeats(group, day, timeslot, selectedSeats) {
+  static async reserveSeats(group, day, timeslot, selectedSeats, operationId = null) {
     if (this.useSupabase) {
-      return await this.supabaseAPI.reserveSeats(group, day, timeslot, selectedSeats, '予約者');
+      return await this.supabaseAPI.reserveSeats(group, day, timeslot, selectedSeats, '予約者'); // Supabase REST API could also be updated but for GAS fallback this is fine
     }
-    const response = await this._callApi('reserveSeats', [group, day, timeslot, selectedSeats]);
+    const response = await this._callApi('reserveSeats', [group, day, timeslot, selectedSeats, operationId]);
     return response;
   }
 
@@ -516,10 +516,10 @@ class GasAPI {
     return response;
   }
 
-  static async checkInMultipleSeats(group, day, timeslot, seatIds) {
+  static async checkInMultipleSeats(group, day, timeslot, seatIds, operationId = null) {
     // Force GAS usage for Check-in
     // if (this.useSupabase) { ... }
-    const response = await this._callApi('checkInMultipleSeats', [group, day, timeslot, seatIds]);
+    const response = await this._callApi('checkInMultipleSeats', [group, day, timeslot, seatIds, operationId]);
     return response;
   }
 

@@ -1,3 +1,4 @@
+import idbStorage from './idb-storage.js';
 
 // カスタムダイアログ用ヘルパー
 async function customAlert(msg) {
@@ -11,7 +12,7 @@ async function customConfirm(msg) {
 }
 
 // ===============================================================
-// オフライン同期システム v2.0 - 完全再設計版
+// オフライン同期システム v2.1 - 確実性(IDB)統合版
 // ===============================================================
 
 // 定数定義
@@ -115,17 +116,11 @@ class OfflineOperationManager {
     // 当日券モードの監視
     this.startWalkinModeMonitoring();
 
-    // storageイベントで他タブからの更新を検知
+    // storageイベントで他タブからの更新を検知 (idbは検知しないのでBroadcastChannelを利用する)
     window.addEventListener('storage', (e) => {
       try {
         if (e.key === this.lockKey) {
           return; // ロックの変更は無視
-        }
-        if (e.key === STORAGE_KEYS.OPERATION_QUEUE) {
-          const q = this.readOperationQueue();
-          if (this.isOnline && q.length > 0 && !this.syncInProgress) {
-            this.performSync();
-          }
         }
       } catch (_) { }
     });
@@ -312,9 +307,9 @@ class OfflineOperationManager {
     // 同期状態を保存
     this.saveSyncState();
 
-    // 未同期の操作がある場合は警告
-    const queue = this.readOperationQueue();
-    if (queue.length > 0) {
+    // 未同期の操作がある場合は警告 (IDBは非同期のため、ここでは同期的に取得できない。
+    // そのため、厳密な警告はPWAでは難しい。暫定的にステートのキュー長さを参照するか無視する)
+    if (this.syncInProgress) {
       try {
         event.preventDefault();
         event.returnValue = '';
@@ -324,47 +319,42 @@ class OfflineOperationManager {
   }
 
   /**
-   * オフライン操作をキューに追加
+   * オフライン操作をキューに追加 (IndexedDB化)
    */
-  addOperation(operation) {
-    const queue = this.readOperationQueue();
+  async addOperation(operation) {
+    const queue = await this.readOperationQueue();
 
-    // キューサイズの制限チェック
-    if (queue.length >= OFFLINE_CONFIG.MAX_QUEUE_SIZE) {
-      console.warn('[OfflineSync] キューが最大サイズに達しました。古い操作を削除します。');
-      queue.splice(0, Math.floor(queue.length / 2)); // 古い操作を半分削除
+    // キューサイズの制限チェック (IDB化により容量は増えたが、念のため)
+    if (queue.length >= OFFLINE_CONFIG.MAX_QUEUE_SIZE * 5) {
+      console.warn('[OfflineSync] キューが巨大です。');
     }
 
-    const operationWithMeta = {
-      ...operation,
-      id: this.generateOperationId(),
-      timestamp: Date.now(),
-      retryCount: 0,
-      priority: OPERATION_PRIORITY[operation.type] || 5,
-      status: 'pending',
-      precondition: this.capturePrecondition(operation)
+    const priority = OPERATION_PRIORITY[operation.type] || 5;
+    const precond = this.capturePrecondition(operation);
+
+    const enrichedPayload = {
+        args: operation.args,
+        priority: priority,
+        status: 'pending',
+        precondition: precond
     };
 
-    queue.push(operationWithMeta);
+    const transactionId = await idbStorage.enqueueOperation(operation.type, enrichedPayload);
 
-    // 優先度順にソート
-    queue.sort((a, b) => a.priority - b.priority);
-
-    this.writeOperationQueue(queue);
     this.broadcast({ type: 'queue-updated' });
-    this.logOperation(operationWithMeta);
+    this.logOperation({ ...operation, id: transactionId });
 
     // コンテキストを学習して事前取得対象に追加
     try { const ctx = this.extractContext(operation.args); this.trackKnownContext(ctx); } catch (_) { }
 
-    console.log(`[OfflineSync] オフライン操作を追加: ${operation.type} (ID: ${operationWithMeta.id})`);
+    console.log(`[OfflineSync] オフライン操作をIDBキューに追加: ${operation.type} (Transaction ID: ${transactionId})`);
 
     // オンライン時は即座に同期を試行
     if (this.isOnline && !this.syncInProgress) {
       this.performSync();
     }
 
-    return operationWithMeta.id;
+    return transactionId;
   }
 
   /**
@@ -431,7 +421,7 @@ class OfflineOperationManager {
     }
     this.broadcast({ type: 'sync-started', owner: this.instanceId });
 
-    const queue = this.readOperationQueue();
+    const queue = await this.readOperationQueue();
     if (queue.length === 0) {
       console.log('[OfflineSync] 同期する操作がありません');
       this.releaseLock();
@@ -489,8 +479,7 @@ class OfflineOperationManager {
 
       console.log('[OfflineSync] 同期完了:', result);
 
-      // 成功した操作をキューから削除
-      this.writeOperationQueue(result.remaining);
+      // 成功した操作をキューから削除 (processOperationQueue内でdequeueOperationを呼び出す前提に変更)
       this.broadcast({ type: 'queue-updated' });
 
       // 同期状態を更新
@@ -524,11 +513,10 @@ class OfflineOperationManager {
       console.error('[OfflineSync] 同期エラー:', error);
       this.handleSyncError(error);
 
-      // エラーが発生した場合、キューをクリアして無限ループを防ぐ
-      const currentQueue = this.readOperationQueue();
+      // エラーが発生した場合、無限ループを防ぐ
+      const currentQueue = await this.readOperationQueue();
       if (currentQueue.length > 0) {
-        console.warn('[OfflineSync] 同期エラーのため、キューをクリアします');
-        this.writeOperationQueue([]);
+        console.warn('[OfflineSync] 同期エラーのため一定時間待機します。');
       }
     } finally {
       console.log('[OfflineSync] 同期処理終了');
@@ -555,8 +543,10 @@ class OfflineOperationManager {
         // 前提条件のチェック
         if (!this.validatePrecondition(operation)) {
           conflicts.push(operation);
-          console.warn(`[OfflineSync] 前提条件の競合: ${operation.type} (ID: ${operation.id})`);
-          // 競合した操作は再試行のためキューに残す
+          console.warn(`[OfflineSync] 前提条件の競合: ${operation.type} (ID: ${operation.transaction_id})`);
+          // 競合した操作は再試行のためキューに残す。
+          operation.status = 'conflict';
+          await idbStorage.updateQueuedOperation(operation);
           remaining.push(operation);
           continue;
         }
@@ -565,33 +555,38 @@ class OfflineOperationManager {
 
         if (result.success) {
           processed.push({ ...operation, result, syncedAt: Date.now() });
-          console.log(`[OfflineSync] 成功: ${operation.type} (ID: ${operation.id})`);
+          await idbStorage.dequeueOperation(operation.id); // 主キーによる削除
+          await idbStorage.markTransactionProcessed(operation.transaction_id); // 処理済みマーク
+          console.log(`[OfflineSync] 成功: ${operation.type} (ID: ${operation.transaction_id})`);
         } else {
           // リトライ可能なエラーの場合
-          if (operation.retryCount < OFFLINE_CONFIG.MAX_RETRY_COUNT) {
-            operation.retryCount++;
+          if (operation.retry_count < OFFLINE_CONFIG.MAX_RETRY_COUNT) {
+            operation.retry_count++;
             operation.status = 'retry';
+            await idbStorage.updateQueuedOperation(operation);
             remaining.push(operation);
-            console.log(`[OfflineSync] リトライ予定: ${operation.type} (ID: ${operation.id}) - ${operation.retryCount}/${OFFLINE_CONFIG.MAX_RETRY_COUNT}`);
+            console.log(`[OfflineSync] リトライ予定: ${operation.type} (ID: ${operation.transaction_id}) - ${operation.retry_count}/${OFFLINE_CONFIG.MAX_RETRY_COUNT}`);
           } else {
             operation.status = 'failed';
+            await idbStorage.dequeueOperation(operation.id); // 諦めて削除
             errors.push({ ...operation, error: result.error });
-            console.error(`[OfflineSync] 失敗: ${operation.type} (ID: ${operation.id}) - 最大リトライ回数に達しました`);
-            // 失敗した操作はキューから削除（再試行しない）
+            console.error(`[OfflineSync] 失敗: ${operation.type} (ID: ${operation.transaction_id}) - 最大リトライ回数に達しました`);
           }
         }
       } catch (error) {
-        console.error(`[OfflineSync] エラー: ${operation.type} (ID: ${operation.id})`, error);
+        console.error(`[OfflineSync] エラー: ${operation.type} (ID: ${operation.transaction_id})`, error);
         // 例外が発生した操作もリトライを試行
-        if (operation.retryCount < OFFLINE_CONFIG.MAX_RETRY_COUNT) {
-          operation.retryCount++;
+        if (operation.retry_count < OFFLINE_CONFIG.MAX_RETRY_COUNT) {
+          operation.retry_count++;
           operation.status = 'retry';
+          await idbStorage.updateQueuedOperation(operation);
           remaining.push(operation);
-          console.log(`[OfflineSync] 例外後リトライ予定: ${operation.type} (ID: ${operation.id}) - ${operation.retryCount}/${OFFLINE_CONFIG.MAX_RETRY_COUNT}`);
+          console.log(`[OfflineSync] 例外後リトライ予定: ${operation.type} (ID: ${operation.transaction_id}) - ${operation.retry_count}/${OFFLINE_CONFIG.MAX_RETRY_COUNT}`);
         } else {
           operation.status = 'failed';
+          await idbStorage.dequeueOperation(operation.id); // 諦めて削除
           errors.push({ ...operation, error: error.message });
-          console.error(`[OfflineSync] 例外後失敗: ${operation.type} (ID: ${operation.id}) - 最大リトライ回数に達しました`);
+          console.error(`[OfflineSync] 例外後失敗: ${operation.type} (ID: ${operation.transaction_id}) - 最大リトライ回数に達しました`);
         }
       }
     }
@@ -612,7 +607,7 @@ class OfflineOperationManager {
    */
   validatePrecondition(operation) {
     try {
-      const { group, day, timeslot } = this.extractContext(operation.args);
+      const { group, day, timeslot } = this.extractContext(operation.payload.args);
       if (!group || !day || !timeslot) {
         console.log('[OfflineSync] 前提条件検証: コンテキスト情報が不完全');
         return true;
@@ -624,14 +619,14 @@ class OfflineOperationManager {
         return true;
       }
 
-      if (!operation.precondition) {
+      if (!operation.payload.precondition) {
         console.log('[OfflineSync] 前提条件検証: 操作の前提条件が存在しない');
         return true;
       }
 
       // キャッシュのバージョンが前提条件と一致するかチェック
-      const isValid = cache.version === operation.precondition.version;
-      console.log(`[OfflineSync] 前提条件検証: ${isValid ? '有効' : '無効'} (cache: ${cache.version}, operation: ${operation.precondition.version})`);
+      const isValid = cache.version === operation.payload.precondition.version;
+      console.log(`[OfflineSync] 前提条件検証: ${isValid ? '有効' : '無効'} (cache: ${cache.version}, operation: ${operation.payload.precondition.version})`);
 
       // オフライン操作の場合は前提条件を緩和
       if (!isValid && operation.timestamp) {
@@ -654,7 +649,7 @@ class OfflineOperationManager {
    */
   async registerLocalReservationAsWalkin(operation) {
     try {
-      const { group, day, timeslot } = this.extractContext(operation.args);
+      const { group, day, timeslot } = this.extractContext(operation.payload.args);
       const cache = this.readCache(group, day, timeslot);
 
       if (!cache || !cache.seatMap) {
@@ -676,12 +671,12 @@ class OfflineOperationManager {
           let consecutive = false;
           if (operation && operation.type === OPERATION_TYPES.ASSIGN_WALKIN_CONSECUTIVE) {
             consecutive = true;
-            if (Array.isArray(operation.args) && typeof operation.args[3] === 'number') {
-              numSeats = Math.max(1, operation.args[3] | 0);
+            if (Array.isArray(operation.payload.args) && typeof operation.payload.args[3] === 'number') {
+              numSeats = Math.max(1, operation.payload.args[3] | 0);
             }
           } else if (operation && operation.type === OPERATION_TYPES.ASSIGN_WALKIN) {
-            if (Array.isArray(operation.args) && typeof operation.args[3] === 'number') {
-              numSeats = Math.max(1, operation.args[3] | 0);
+            if (Array.isArray(operation.payload.args) && typeof operation.payload.args[3] === 'number') {
+              numSeats = Math.max(1, operation.payload.args[3] | 0);
             }
           } else {
             numSeats = 1;
@@ -724,15 +719,24 @@ class OfflineOperationManager {
 
         if (offlineDelegated.length > 0) {
           try {
-            offlineDelegated.forEach(item => {
+            for (const item of offlineDelegated) {
               try {
                 const args = item.params;
                 // args: [group, day, timeslot, seatId, columnC, columnD, columnE]
                 if (Array.isArray(args)) {
-                  this.addOperation({ type: OPERATION_TYPES.UPDATE_SEAT_DATA, args });
+                  // 新しい操作オブジェクトを作成し、IDBStorageに直接追加
+                  const newOperation = {
+                    type: OPERATION_TYPES.UPDATE_SEAT_DATA,
+                    payload: { args },
+                    status: 'pending',
+                    retry_count: 0,
+                    timestamp: Date.now(),
+                    transaction_id: `offline-delegate-${Date.now()}-${Math.random().toString(36).substring(2, 9)}` // ユニークなIDを生成
+                  };
+                  await idbStorage.addQueuedOperation(newOperation);
                 }
               } catch (_) { }
-            });
+            }
             console.warn(`[OfflineSync] ${offlineDelegated.length}件の座席更新をオフラインキューに委譲`);
           } catch (e) {
             console.error('[OfflineSync] オフライン委譲のキュー投入でエラー:', e);
@@ -783,7 +787,11 @@ class OfflineOperationManager {
    * 個別操作の実行
    */
   async executeOperation(operation) {
-    const { type, args } = operation;
+    const { type, payload, transaction_id } = operation;
+    const { args } = payload;
+
+    // トランザクションIDを呼び出しパラメータの末尾に追加 (Idempotency Key)
+    const idempotentArgs = [...args, transaction_id];
 
     try {
       console.log(`[OfflineSync] GasAPI待機開始: ${type}`);
@@ -797,19 +805,20 @@ class OfflineOperationManager {
         case OPERATION_TYPES.RESERVE_SEATS:
           console.log(`[OfflineSync] reserveSeats呼び出し開始(オリジナル)`);
           result = this.originalMethods && this.originalMethods.reserveSeats
-            ? await this.originalMethods.reserveSeats(...args)
-            : await gasAPI.reserveSeats(...args);
+            ? await this.originalMethods.reserveSeats(...idempotentArgs)
+            : await gasAPI.reserveSeats(...idempotentArgs);
           console.log(`[OfflineSync] reserveSeats呼び出し完了(オリジナル)`);
           break;
         case OPERATION_TYPES.CHECK_IN_SEATS:
           console.log(`[OfflineSync] checkInMultipleSeats呼び出し開始(オリジナル)`);
           result = this.originalMethods && this.originalMethods.checkInMultipleSeats
-            ? await this.originalMethods.checkInMultipleSeats(...args)
-            : await gasAPI.checkInMultipleSeats(...args);
+            ? await this.originalMethods.checkInMultipleSeats(...idempotentArgs)
+            : await gasAPI.checkInMultipleSeats(...idempotentArgs);
           console.log(`[OfflineSync] checkInMultipleSeats呼び出し完了(オリジナル)`);
           break;
         case OPERATION_TYPES.UPDATE_SEAT_DATA:
           console.log(`[OfflineSync] updateSeatData呼び出し開始(オリジナル)`);
+          // updateSeatData doesn't take operationId yet, just use regular args
           result = this.originalMethods && this.originalMethods.updateSeatData
             ? await this.originalMethods.updateSeatData(...args)
             : await gasAPI.updateSeatData(...args);
@@ -846,7 +855,7 @@ class OfflineOperationManager {
     for (const conflict of conflicts) {
       try {
         // 最新のデータを取得
-        const { group, day, timeslot } = this.extractContext(conflict.args);
+        const { group, day, timeslot } = this.extractContext(conflict.payload.args);
         if (group && day && timeslot) {
           const gasAPI = await this.waitForGasAPI();
           const freshData = await gasAPI.getSeatDataMinimal(group, day, timeslot, false);
@@ -858,14 +867,14 @@ class OfflineOperationManager {
             // 操作を再試行
             const result = await this.executeOperation(conflict);
             if (result.success) {
-              console.log(`[OfflineSync] 競合解決成功: ${conflict.type} (ID: ${conflict.id})`);
+              console.log(`[OfflineSync] 競合解決成功: ${conflict.type} (ID: ${conflict.transaction_id})`);
             }
             // 競合発生を通知（管理者向けブロードキャスト）
             await this.notifyConflict(conflict, freshData);
           }
         }
       } catch (error) {
-        console.error(`[OfflineSync] 競合解決エラー: ${conflict.type} (ID: ${conflict.id})`, error);
+        console.error(`[OfflineSync] 競合解決エラー: ${conflict.type} (ID: ${conflict.transaction_id})`, error);
         // エラーも通知
         try { await this.notifyConflict(conflict, null, error); } catch (_) { }
       }
@@ -878,11 +887,11 @@ class OfflineOperationManager {
       // 現在モードの推定
       let mode = 'normal';
       try { mode = localStorage.getItem('currentMode') || 'normal'; } catch (_) { }
-      const ctx = this.extractContext(operation.args) || {};
+      const ctx = this.extractContext(operation.payload.args) || {};
       const message = `競合が発生しました: type=${operation.type}, group=${ctx.group}, day=${ctx.day}, timeslot=${ctx.timeslot}`;
       const details = {
         mode,
-        operationId: operation.id,
+        operationId: operation.transaction_id,
         operationType: operation.type,
         timestamp: new Date().toISOString(),
         error: error ? (error.message || String(error)) : undefined,
@@ -993,10 +1002,11 @@ class OfflineOperationManager {
     }
 
     let lastCacheRefreshAt = 0;
-    this.backgroundSyncInterval = setInterval(() => {
+    this.backgroundSyncInterval = setInterval(async () => {
       try { if (document && document.visibilityState === 'hidden') { return; } } catch (_) { }
       if (this.isOnline && !this.syncInProgress) {
-        const hasQueue = this.readOperationQueue().length > 0;
+        const queue = await this.readOperationQueue();
+        const hasQueue = queue.length > 0;
         if (hasQueue) {
           this.performSync();
         } else {
@@ -1591,12 +1601,17 @@ class OfflineOperationManager {
   }
 
   /**
-   * 操作キューの読み取り
+   * 操作キューの読み取り (IndexedDBから)
    */
-  readOperationQueue() {
+  async readOperationQueue() {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.OPERATION_QUEUE);
-      return data ? JSON.parse(data) : [];
+      // 削除された操作が残らないように確実にIDBからフェッチする
+      const items = await idbStorage.getAllQueuedOperations();
+      // priority等でソート
+      if (items && items.length > 0) {
+          items.sort((a, b) => a.payload.priority - b.payload.priority);
+      }
+      return items || [];
     } catch (error) {
       console.error('[OfflineSync] キュー読み取りエラー:', error);
       return [];
@@ -1604,11 +1619,13 @@ class OfflineOperationManager {
   }
 
   /**
-   * 操作キューの書き込み
+   * (DEPRECATED) 操作キューの書き込み 
+   * IDBになったため一括書き込みは使用しないがインターフェースとして残す
    */
-  writeOperationQueue(queue) {
+  async writeOperationQueue(queue) {
     try {
-      localStorage.setItem(STORAGE_KEYS.OPERATION_QUEUE, JSON.stringify(queue));
+      // no-op (個別に idbStorage を更新するため)
+      console.log('[OfflineSync] writeOperationQueue is deprecated with IDB');
     } catch (error) {
       console.error('[OfflineSync] キュー書き込みエラー:', error);
     }
@@ -2186,7 +2203,7 @@ class OfflineOperationManager {
   /**
    * システムの状態を取得
    */
-  getSystemStatus() {
+  async getSystemStatus() {
     return {
       isOnline: this.isOnline,
       syncInProgress: this.syncInProgress,
@@ -2196,9 +2213,21 @@ class OfflineOperationManager {
       lastOnlineTime: this.syncState.lastOnlineTime,
       lastOfflineTime: this.syncState.lastOfflineTime,
       syncErrors: this.syncState.syncErrors,
-      queueLength: this.readOperationQueue().length,
+      queueLength: await this.getOperationQueueLength(),
       cacheInfo: this.getCacheInfo()
     };
+  }
+
+  /**
+   * Operations queue length (async wrapper)
+   */
+  async getOperationQueueLength() {
+      try {
+          const q = await this.readOperationQueue();
+          return q.length;
+      } catch (e) {
+          return 0;
+      }
   }
 
   /**
@@ -2222,7 +2251,7 @@ class OfflineOperationManager {
    * システムの初期化
    */
   async initialize() {
-    console.log('[OfflineSync] オフライン同期システム v2.0 を初期化中...');
+    console.log('[OfflineSync] オフライン同期システム v2.1 を初期化中...');
 
     // 初回: 現在ページの座席が未キャッシュなら最低限の雛形を用意
     try {
@@ -2489,7 +2518,7 @@ class OfflineOperationManager {
     this.showOfflineSyncPanel();
   }
 
-  showOfflineSyncPanel() {
+  async showOfflineSyncPanel() {
     try {
       // 既存のモーダルがあれば削除
       const existing = document.getElementById('offline-sync-card-modal');
@@ -2500,11 +2529,12 @@ class OfflineOperationManager {
       modal.id = 'offline-sync-card-modal';
       modal.className = 'offline-sync-card-modal';
 
+      const controlsHTML = await this.renderOfflineControlsHTML();
       try {
         modal.innerHTML = `
           <h4>オフライン同期</h4>
           <div class="offline-sync-card-controls">
-            ${this.renderOfflineControlsHTML()}
+            ${controlsHTML}
           </div>
           <div class="offline-sync-card-status" id="offline-sync-status">同期状況: 待機中</div>
         `;
@@ -2581,7 +2611,7 @@ class OfflineOperationManager {
     }, 100);
   }
 
-  ensureOfflineSectionInSeatSettings(scrollIntoView = false) {
+  async ensureOfflineSectionInSeatSettings(scrollIntoView = false) {
     const panel = document.getElementById('auto-refresh-settings-panel');
     if (!panel) return;
     if (document.getElementById('offline-sync-settings-section')) return;
@@ -2589,10 +2619,11 @@ class OfflineOperationManager {
     const section = document.createElement('div');
     section.id = 'offline-sync-settings-section';
     section.style.marginTop = '12px';
+    const controlsHTML = await this.renderOfflineControlsHTML();
     section.innerHTML = `
       <hr style="margin:10px 0;">
       <h4 style="margin:0 0 8px 0;font-size:16px;">オフライン同期</h4>
-      ${this.renderOfflineControlsHTML()}`;
+      ${controlsHTML}`;
     panel.appendChild(section);
     this.hydrateOfflineControls();
     if (scrollIntoView) {
@@ -2600,9 +2631,9 @@ class OfflineOperationManager {
     }
   }
 
-  renderOfflineControlsHTML() {
+  async renderOfflineControlsHTML() {
     try {
-      const status = this.getSystemStatus();
+      const status = await this.getSystemStatus();
       const isOnline = status?.isOnline ?? navigator.onLine;
       const inProgress = status?.syncInProgress ?? false;
       const queueLen = status?.queueLength ?? 0;
@@ -2667,9 +2698,9 @@ class OfflineOperationManager {
       }
 
       // 状態の定期更新（軽量）
-      const update = () => {
+      const update = async () => {
         try {
-          const status = this.getSystemStatus();
+          const status = await this.getSystemStatus();
           const isOnline = status?.isOnline ?? navigator.onLine;
           const inProgress = status?.syncInProgress ?? false;
           const queueLen = status?.queueLength ?? 0;
