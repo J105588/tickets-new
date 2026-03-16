@@ -203,14 +203,8 @@ function doPost(e) {
 
 /**
  * WebアプリケーションにGETリクエストが来たときに実行されるメイン関数。
- * POSTリクエストと同様に関数呼び出しを処理する。
+ * GETリクエストのパラメータに基づいて関数を呼び出す。
  */
-// POSTリクエストもdoGetで処理（CORS対応のため、レスポンス形式はdoGet内で統一）
-function doPost(e) {
-  return doGet(e);
-}
-
-
 function doGet(e) {
   let response;
   let callback = e.parameter.callback;
@@ -435,7 +429,7 @@ function doGet(e) {
         response = {
           status: 'active',
           app: 'Nチケ',
-          version: '32.0.6',
+          version: '32.1.1',
           mode: 'Supabase'
         };
       } else {
@@ -913,8 +907,16 @@ function assignWalkInConsecutiveSeatsSupabase(group, day, timeslot, count) {
 /**
  * 座席データを更新する（Supabase版）
  */
-function updateSeatDataSupabase(group, day, timeslot, seatId, columnC, columnD, columnE) {
+function updateSeatDataSupabase(group, day, timeslot, seatId, columnC, columnD, columnE, operationId) {
   try {
+    // べき等性（二重処理防止）のチェック
+    if (operationId && typeof checkAndMarkOperationProcessed === 'function') {
+      if (!checkAndMarkOperationProcessed(operationId)) {
+        Logger.log('Operation already processed: ' + operationId);
+        return { success: true, message: '既に処理済みのリクエストです', idempotent: true };
+      }
+    }
+
     Logger.log(`[updateSeatDataSupabase] Start: Group=${group}, Day=${day}, Time=${timeslot}, Seat=${seatId}`);
     Logger.log(`[updateSeatDataSupabase] Inputs: C=${columnC}, D=${columnD}, E=${columnE}`);
 

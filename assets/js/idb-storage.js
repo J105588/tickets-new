@@ -106,11 +106,12 @@ class IDBStorage {
      * 操作をキューに追加する
      * @param {string} type - 操作タイプ (例: 'processCheckIn')
      * @param {object} payload - 送信データ
-     * @returns {Promise<string>} 生成された transaction_id
+     * @param {string} [explicitTransactionId] - べき等性維持のための明示的なトランザクションID (省略時は新規生成)
+     * @returns {Promise<string>} 生成または指定された transaction_id
      */
-    async enqueueOperation(type, payload) {
+    async enqueueOperation(type, payload, explicitTransactionId = null) {
         const store = await this._getStore(STORE_QUEUE, 'readwrite');
-        const transactionId = crypto.randomUUID();
+        const transactionId = explicitTransactionId || crypto.randomUUID();
         
         const operation = {
             transaction_id: transactionId,

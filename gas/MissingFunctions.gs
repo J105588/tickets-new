@@ -1243,3 +1243,55 @@ function setMaintenanceSchedule(enabled, start, end, password) {
     return { success: false, error: e.message };
   }
 }
+
+// ===============================================================
+// === べき等性・管理システム機能 ===
+// ===============================================================
+
+/**
+ * べき等性（二重処理防止）のチェック
+ * @param {string} operationId - トランザクションID
+ * @param {number} ttlSec - キャッシュ有効秒数 (デフォルト: 600s = 10m)
+ * @returns {boolean} - 新規処理なら true, 処理済みなら false
+ */
+function checkAndMarkOperationProcessed(operationId, ttlSec = 600) {
+  if (!operationId) return true; // IDがない場合は常に処理を許可（安全のため）
+  try {
+    const cache = CacheService.getScriptCache();
+    const key = 'OP_PROCESSED_' + operationId;
+    const cached = cache.get(key);
+    if (cached) {
+      Logger.log('Operation already processed: ' + operationId);
+      return false; // すでに処理済み
+    }
+    // 未処理なのでキャッシュに登録
+    cache.put(key, 'true', ttlSec);
+    return true;
+  } catch (e) {
+    Logger.log('checkAndMarkOperationProcessed Error: ' + e.message);
+    return true; // キャッシュエラー時は安全をとって処理を進める
+  }
+}
+
+/**
+ * 管理者向け通知のブロードキャスト
+ * @param {string} message - 通知メッセージ
+ * @param {object} details - 詳細情報
+ */
+function broadcastAdminNotice(message, details) {
+  try {
+    Logger.log('[ADMIN NOTICE] ' + message + ' \nDetails: ' + JSON.stringify(details));
+    recordClientAudit([{
+      ts: new Date().toISOString(),
+      type: 'admin_notice',
+      action: 'broadcast',
+      meta: { message, details },
+      ua: 'Server',
+      ip: 'Server'
+    }]);
+    return { success: true };
+  } catch (e) {
+    Logger.log('broadcastAdminNotice Error: ' + e.message);
+    return { success: false, error: e.message };
+  }
+}

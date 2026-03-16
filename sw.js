@@ -1,5 +1,5 @@
 // sw.js - 静的資産キャッシュとオフライン表示の強化版（PWA更新通知対応）
-const CACHE_NAME = 'nticket-v32.1.0-20260316';
+const CACHE_NAME = 'nticket-v32.1.1';
 // 自己修復（self-heal）機能のフラグ（デフォルトOFF。クライアントからメッセージでONにできる）
 let SELF_HEAL_ENABLED = false;
 // 最高管理者モードのクライアント（window client id の集合）
@@ -17,6 +17,9 @@ const SECONDARY_ASSETS = [
 	'./pages/timeslot.html',
 	'./pages/seats.html',
 	'./pages/walkin.html',
+	'./pages/admin-scan.html',
+	'./pages/admin.html',
+	'./pages/monitoring-dashboard.html',
 	'./assets/css/sidebar.css',
 	'./assets/css/seats.css',
 	'./assets/css/walkin.css',

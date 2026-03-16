@@ -321,7 +321,7 @@ class OfflineOperationManager {
   /**
    * オフライン操作をキューに追加 (IndexedDB化)
    */
-  async addOperation(operation) {
+  async addOperation(operation, explicitTransactionId = null) {
     const queue = await this.readOperationQueue();
 
     // キューサイズの制限チェック (IDB化により容量は増えたが、念のため)
@@ -339,7 +339,7 @@ class OfflineOperationManager {
         precondition: precond
     };
 
-    const transactionId = await idbStorage.enqueueOperation(operation.type, enrichedPayload);
+    const transactionId = await idbStorage.enqueueOperation(operation.type, enrichedPayload, explicitTransactionId);
 
     this.broadcast({ type: 'queue-updated' });
     this.logOperation({ ...operation, id: transactionId });
@@ -1068,10 +1068,12 @@ class OfflineOperationManager {
       // 予約のオフライン対応
       gasAPI.reserveSeats = async (...args) => {
         const [group, day, timeslot, seats] = args;
+        const operationId = crypto.randomUUID();
+        const callArgs = [...args, operationId]; // IDを付与
 
         if (this.isOnline) {
           try {
-            return await originalMethods.reserveSeats(...args);
+            return await originalMethods.reserveSeats(...callArgs);
           } catch (error) {
             console.log('[OfflineSync] オンライン予約失敗、オフライン処理を試行');
 
@@ -1081,7 +1083,7 @@ class OfflineOperationManager {
               const localResult = this.processLocalReservation(group, day, timeslot, seats);
               if (localResult.success) {
                 // ローカル処理成功時は同期キューにも追加
-                const operationId = this.addOperation({ type: OPERATION_TYPES.RESERVE_SEATS, args });
+                await this.addOperation({ type: OPERATION_TYPES.RESERVE_SEATS, args: callArgs }, operationId);
                 this.showSuccessNotification(localResult.message);
                 return { ...localResult, operationId };
               } else {
@@ -1090,7 +1092,7 @@ class OfflineOperationManager {
             }
 
             // ローカル処理できない場合はキューに追加
-            const operationId = this.addOperation({ type: OPERATION_TYPES.RESERVE_SEATS, args });
+            await this.addOperation({ type: OPERATION_TYPES.RESERVE_SEATS, args: callArgs }, operationId);
             return {
               success: true,
               message: 'オフラインで予約を受け付けました',
@@ -1105,7 +1107,7 @@ class OfflineOperationManager {
             const localResult = this.processLocalReservation(group, day, timeslot, seats);
             if (localResult.success) {
               // ローカル処理成功時は同期キューにも追加
-              const operationId = this.addOperation({ type: OPERATION_TYPES.RESERVE_SEATS, args });
+              await this.addOperation({ type: OPERATION_TYPES.RESERVE_SEATS, args: callArgs }, operationId);
               this.showSuccessNotification(localResult.message);
               return { ...localResult, operationId };
             } else {
@@ -1115,7 +1117,7 @@ class OfflineOperationManager {
           } else {
             // キャッシュがない場合は通常のオフライン処理
             this.showOfflineProcessingNotification('座席予約をオフラインで受け付けました');
-            const operationId = this.addOperation({ type: OPERATION_TYPES.RESERVE_SEATS, args });
+            await this.addOperation({ type: OPERATION_TYPES.RESERVE_SEATS, args: callArgs }, operationId);
             return {
               success: true,
               message: 'オフラインで予約を受け付けました',
@@ -1129,10 +1131,12 @@ class OfflineOperationManager {
       // チェックインのオフライン対応
       gasAPI.checkInMultipleSeats = async (...args) => {
         const [group, day, timeslot, seats] = args;
+        const operationId = crypto.randomUUID();
+        const callArgs = [...args, operationId];
 
         if (this.isOnline) {
           try {
-            return await originalMethods.checkInMultipleSeats(...args);
+            return await originalMethods.checkInMultipleSeats(...callArgs);
           } catch (error) {
             console.log('[OfflineSync] オンラインチェックイン失敗、オフライン処理を試行');
 
@@ -1141,13 +1145,13 @@ class OfflineOperationManager {
               const localResult = this.processLocalCheckIn(group, day, timeslot, seats);
               if (localResult.success) {
                 // ローカル処理成功時は同期キューにも追加
-                const operationId = this.addOperation({ type: OPERATION_TYPES.CHECK_IN_SEATS, args });
+                await this.addOperation({ type: OPERATION_TYPES.CHECK_IN_SEATS, args: callArgs }, operationId);
                 return { ...localResult, operationId };
               }
             }
 
             // ローカル処理できない場合はキューに追加
-            const operationId = this.addOperation({ type: OPERATION_TYPES.CHECK_IN_SEATS, args });
+            await this.addOperation({ type: OPERATION_TYPES.CHECK_IN_SEATS, args: callArgs }, operationId);
             return {
               success: true,
               message: 'オフラインでチェックインを受け付けました',
@@ -1161,14 +1165,14 @@ class OfflineOperationManager {
             const localResult = this.processLocalCheckIn(group, day, timeslot, seats);
             if (localResult.success) {
               // ローカル処理成功時は同期キューにも追加
-              const operationId = this.addOperation({ type: OPERATION_TYPES.CHECK_IN_SEATS, args });
+              await this.addOperation({ type: OPERATION_TYPES.CHECK_IN_SEATS, args: callArgs }, operationId);
               return { ...localResult, operationId };
             } else {
               return localResult; // ローカル処理失敗時はエラーを返す
             }
           } else {
             // キャッシュがない場合は通常のオフライン処理
-            const operationId = this.addOperation({ type: OPERATION_TYPES.CHECK_IN_SEATS, args });
+            await this.addOperation({ type: OPERATION_TYPES.CHECK_IN_SEATS, args: callArgs }, operationId);
             return {
               success: true,
               message: 'オフラインでチェックインを受け付けました',
@@ -1181,12 +1185,15 @@ class OfflineOperationManager {
 
       // 座席データ更新のオフライン対応
       gasAPI.updateSeatData = async (...args) => {
+        const operationId = crypto.randomUUID();
+        const callArgs = [...args, operationId];
+
         if (this.isOnline) {
           try {
-            return await originalMethods.updateSeatData(...args);
+            return await originalMethods.updateSeatData(...callArgs);
           } catch (error) {
             console.log('[OfflineSync] オンライン更新失敗、オフライン操作として処理');
-            const operationId = this.addOperation({ type: OPERATION_TYPES.UPDATE_SEAT_DATA, args });
+            await this.addOperation({ type: OPERATION_TYPES.UPDATE_SEAT_DATA, args: callArgs }, operationId);
             return {
               success: true,
               message: 'オフラインで更新を受け付けました',
@@ -1195,7 +1202,7 @@ class OfflineOperationManager {
             };
           }
         } else {
-          const operationId = this.addOperation({ type: OPERATION_TYPES.UPDATE_SEAT_DATA, args });
+          await this.addOperation({ type: OPERATION_TYPES.UPDATE_SEAT_DATA, args: callArgs }, operationId);
           return {
             success: true,
             message: 'オフラインで更新を受け付けました',
@@ -1208,10 +1215,12 @@ class OfflineOperationManager {
       // 当日券発行のオフライン対応（単発）
       gasAPI.assignWalkInSeat = async (...args) => {
         const [group, day, timeslot] = args;
+        const operationId = crypto.randomUUID();
+        const callArgs = [...args, operationId];
 
         if (this.isOnline) {
           try {
-            return await originalMethods.assignWalkInSeat(...args);
+            return await originalMethods.assignWalkInSeat(...callArgs);
           } catch (error) {
             console.log('[OfflineSync] オンライン当日券発行失敗、オフライン処理を試行');
 
@@ -1221,7 +1230,7 @@ class OfflineOperationManager {
               const localResult = this.processLocalWalkinAssignment(group, day, timeslot, 1, false);
               if (localResult.success) {
                 // ローカル処理成功時は同期キューにも追加
-                const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
+                await this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args: callArgs }, operationId);
                 this.showSuccessNotification(localResult.message);
                 return { ...localResult, operationId };
               } else {
@@ -1230,7 +1239,7 @@ class OfflineOperationManager {
             }
 
             // ローカル処理できない場合はキューに追加
-            const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
+            await this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args: callArgs }, operationId);
             return {
               success: true,
               message: 'オフラインで当日券発行を受け付けました',
@@ -1245,7 +1254,7 @@ class OfflineOperationManager {
             const localResult = this.processLocalWalkinAssignment(group, day, timeslot, 1, false);
             if (localResult.success) {
               // ローカル処理成功時は同期キューにも追加
-              const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
+              await this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args: callArgs }, operationId);
               this.showSuccessNotification(localResult.message);
               return { ...localResult, operationId };
             } else {
@@ -1255,7 +1264,7 @@ class OfflineOperationManager {
           } else {
             // キャッシュがない場合は通常のオフライン処理
             this.showOfflineProcessingNotification('当日券発行をオフラインで受け付けました');
-            const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
+            await this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args: callArgs }, operationId);
             return {
               success: true,
               message: 'オフラインで当日券発行を受け付けました',
@@ -1269,10 +1278,12 @@ class OfflineOperationManager {
       // 当日券発行のオフライン対応（複数）
       gasAPI.assignWalkInSeats = async (...args) => {
         const [group, day, timeslot, numSeats] = args;
+        const operationId = crypto.randomUUID();
+        const callArgs = [...args, operationId];
 
         if (this.isOnline) {
           try {
-            return await originalMethods.assignWalkInSeats(...args);
+            return await originalMethods.assignWalkInSeats(...callArgs);
           } catch (error) {
             console.log('[OfflineSync] オンライン当日券発行失敗、オフライン処理を試行');
 
@@ -1281,13 +1292,13 @@ class OfflineOperationManager {
               const localResult = this.processLocalWalkinAssignment(group, day, timeslot, numSeats, false);
               if (localResult.success) {
                 // ローカル処理成功時は同期キューにも追加
-                const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
+                await this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args: callArgs }, operationId);
                 return { ...localResult, operationId };
               }
             }
 
             // ローカル処理できない場合はキューに追加
-            const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
+            await this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args: callArgs }, operationId);
             return {
               success: true,
               message: 'オフラインで当日券発行を受け付けました',
@@ -1301,14 +1312,14 @@ class OfflineOperationManager {
             const localResult = this.processLocalWalkinAssignment(group, day, timeslot, numSeats, false);
             if (localResult.success) {
               // ローカル処理成功時は同期キューにも追加
-              const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
+              await this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args: callArgs }, operationId);
               return { ...localResult, operationId };
             } else {
               return localResult; // ローカル処理失敗時はエラーを返す
             }
           } else {
             // キャッシュがない場合は通常のオフライン処理
-            const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args });
+            await this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN, args: callArgs }, operationId);
             return {
               success: true,
               message: 'オフラインで当日券発行を受け付けました',
@@ -1322,10 +1333,12 @@ class OfflineOperationManager {
       // 連続席当日券発行のオフライン対応
       gasAPI.assignWalkInConsecutiveSeats = async (...args) => {
         const [group, day, timeslot, numSeats] = args;
+        const operationId = crypto.randomUUID();
+        const callArgs = [...args, operationId];
 
         if (this.isOnline) {
           try {
-            return await originalMethods.assignWalkInConsecutiveSeats(...args);
+            return await originalMethods.assignWalkInConsecutiveSeats(...callArgs);
           } catch (error) {
             console.log('[OfflineSync] オンライン連続席発行失敗、オフライン処理を試行');
 
@@ -1334,13 +1347,13 @@ class OfflineOperationManager {
               const localResult = this.processLocalWalkinAssignment(group, day, timeslot, numSeats, true);
               if (localResult.success) {
                 // ローカル処理成功時は同期キューにも追加
-                const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN_CONSECUTIVE, args });
+                await this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN_CONSECUTIVE, args: callArgs }, operationId);
                 return { ...localResult, operationId };
               }
             }
 
             // ローカル処理できない場合はキューに追加
-            const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN_CONSECUTIVE, args });
+            await this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN_CONSECUTIVE, args: callArgs }, operationId);
             return {
               success: true,
               message: 'オフラインで連続席発行を受け付けました',
@@ -1354,14 +1367,14 @@ class OfflineOperationManager {
             const localResult = this.processLocalWalkinAssignment(group, day, timeslot, numSeats, true);
             if (localResult.success) {
               // ローカル処理成功時は同期キューにも追加
-              const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN_CONSECUTIVE, args });
+              await this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN_CONSECUTIVE, args: callArgs }, operationId);
               return { ...localResult, operationId };
             } else {
               return localResult; // ローカル処理失敗時はエラーを返す
             }
           } else {
             // キャッシュがない場合は通常のオフライン処理
-            const operationId = this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN_CONSECUTIVE, args });
+            await this.addOperation({ type: OPERATION_TYPES.ASSIGN_WALKIN_CONSECUTIVE, args: callArgs }, operationId);
             return {
               success: true,
               message: 'オフラインで連続席発行を受け付けました',
