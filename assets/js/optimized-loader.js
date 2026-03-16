@@ -120,6 +120,7 @@ class OptimizedLoader {
       }
 
       const script = document.createElement('script');
+      script.type = 'module';
       // Resolve path relative to this module
       const basePath = new URL('./', import.meta.url).href;
       script.src = new URL('offline-sync-v2.js', basePath).href;
@@ -138,6 +139,7 @@ class OptimizedLoader {
       }
 
       const script = document.createElement('script');
+      script.type = 'module';
       // Resolve path relative to this module
       const basePath = new URL('./', import.meta.url).href;
       script.src = new URL('pwa-install.js', basePath).href;

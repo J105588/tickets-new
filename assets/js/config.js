@@ -411,3 +411,17 @@ function debugLog(message, obj = null) {
 // 個別にエクスポート
 export { GAS_API_URLS, BACKGROUND_SYNC_URL, DEBUG_MODE, debugLog, apiUrlManager, DemoMode, SUPABASE_CONFIG };
 export { FEATURE_FLAGS, FULL_CAPACITY_NOTIFICATION_EMAILS, ENHANCED_MONITORING_CONFIG };
+
+// グローバルに公開（レガシー互換性のため）
+if (typeof window !== 'undefined') {
+  window.GAS_API_URLS = GAS_API_URLS;
+  window.BACKGROUND_SYNC_URL = BACKGROUND_SYNC_URL;
+  window.DEBUG_MODE = DEBUG_MODE;
+  window.debugLog = debugLog;
+  window.apiUrlManager = apiUrlManager;
+  window.DemoMode = DemoMode;
+  window.SUPABASE_CONFIG = SUPABASE_CONFIG;
+  window.FEATURE_FLAGS = FEATURE_FLAGS;
+  window.FULL_CAPACITY_NOTIFICATION_EMAILS = FULL_CAPACITY_NOTIFICATION_EMAILS;
+  window.ENHANCED_MONITORING_CONFIG = ENHANCED_MONITORING_CONFIG;
+}

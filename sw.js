@@ -1,5 +1,5 @@
 // sw.js - 静的資産キャッシュとオフライン表示の強化版（PWA更新通知対応）
-const CACHE_NAME = 'nticket-v32.1.0';
+const CACHE_NAME = 'nticket-v32.1.0-20260316';
 // 自己修復（self-heal）機能のフラグ（デフォルトOFF。クライアントからメッセージでONにできる）
 let SELF_HEAL_ENABLED = false;
 // 最高管理者モードのクライアント（window client id の集合）
@@ -160,7 +160,11 @@ self.addEventListener('fetch', (event) => {
 				const isReservationStatus = req.url.includes('reservation-status.html');
 
 				const cached = await caches.match(req, { ignoreSearch: true });
-				if (cached && !isReservationStatus) return cached;
+				if (cached && !isReservationStatus) {
+					// Consume preloadResponse in background to avoid cancellation warning
+					event.waitUntil(event.preloadResponse);
+					return cached;
+				}
 
 				// navigation preload があれば先に利用
 				const preloadResponse = await event.preloadResponse;
