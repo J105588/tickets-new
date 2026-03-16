@@ -915,7 +915,7 @@ if (typeof window !== 'undefined') {
 // 安全なコンソールコマンド（最高管理者パスワードが必要）
 if (typeof window !== 'undefined') {
   window.SeatApp = window.SeatApp || {};
-  window.SeatApp.lock = async (password, message = 'メンテナンス中のためアクセスを一時停止しています') => {
+  window.SeatApp.lock = async (password, message = 'アクセス拒否') => {
     if (!password) { console.warn('SeatApp.lock requires superadmin password'); return; }
     return GasAPI.setSystemLock(true, password, message);
   };

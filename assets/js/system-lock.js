@@ -9,7 +9,7 @@ class SystemLock {
     this.isLocked = false;
     this.message = null;
     this.domObserver = null;
-    
+
     // BroadcastChannel for cross-tab sync
     this.bc = (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel('system_lock_sync') : null;
 
@@ -38,7 +38,7 @@ class SystemLock {
 
     // 3. サーバー監視開始
     this.startSystemLockWatcher();
-    
+
     // 4. セキュリティ: ウィンドウのリサイズやスクロールを制御
     window.addEventListener('scroll', () => {
       if (this.isLocked) window.scrollTo(0, 0);
@@ -56,7 +56,7 @@ class SystemLock {
           this.applyLockState(true, message, false);
         }
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   saveToCache(locked, message) {
@@ -68,7 +68,7 @@ class SystemLock {
           ts: Date.now()
         }));
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   async startSystemLockWatcher() {
@@ -78,11 +78,11 @@ class SystemLock {
 
       const tick = async () => {
         if (_lockCheckInFlight) return;
-        
+
         try {
           // バックグラウンドタブでは頻度を下げるかスキップ
           if (document.visibilityState === 'hidden' && Math.random() > 0.1) return;
-          
+
           _lockCheckInFlight = true;
 
           // オフライン時はキャッシュを信じる（オンラインになるまで変更しない）
@@ -116,7 +116,7 @@ class SystemLock {
 
   applyLockState(locked, message, shouldBroadcast = true) {
     this.isLocked = locked;
-    this.message = message || 'メンテナンス中のためアクセスを一時停止しています';
+    this.message = message || 'システムの同期に問題が発生したか、無効化されています。管理者にお問い合わせください。';
 
     if (locked) {
       this.ensureGate();
@@ -140,7 +140,7 @@ class SystemLock {
     if (!gate) {
       gate = document.createElement('div');
       gate.id = 'system-lock-gate';
-      gate.className = 'glass-morphism';
+      // CSSは styles.css の定義を利用し、基本的なレイアウトをJSで保証
       gate.style.cssText = `
         position: fixed;
         inset: 0;
@@ -148,54 +148,32 @@ class SystemLock {
         display: flex;
         align-items: center;
         justify-content: center;
-        backdrop-filter: blur(12px) saturate(180%);
-        -webkit-backdrop-filter: blur(12px) saturate(180%);
-        background-color: rgba(17, 25, 40, 0.75);
-        opacity: 0;
-        transition: opacity 0.5s ease;
+        background: rgba(0, 0, 0, 0.85);
         pointer-events: all;
         user-select: none;
-        -webkit-user-select: none;
       `;
 
       const content = document.createElement('div');
       content.style.cssText = `
-        background: rgba(255, 255, 255, 0.95);
-        padding: 40px;
-        border-radius: 24px;
-        max-width: 420px;
+        background: #fff;
+        padding: 24px;
+        border-radius: 8px;
+        max-width: 360px;
         width: 90%;
         text-align: center;
-        box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-        color: #1a202c;
-        transform: translateY(20px);
-        transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        color: #333;
       `;
 
       content.innerHTML = `
-        <div style="margin-bottom: 24px;">
-          <div style="width: 64px; height: 64px; background: #feb2b2; color: #c53030; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
-            <svg style="width: 32px; height: 32px;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m0 0v2m0-2h2m-2 0h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
-          </div>
-        </div>
-        <h2 style="font-size: 24px; font-weight: 800; margin: 0 0 12px 0; color: #2d3748;">System Locked</h2>
-        <p id="system-lock-message" style="margin: 0 0 24px 0; color: #4a5568; font-size: 16px; line-height: 1.6;">${this.message}</p>
-        <div style="font-size: 12px; color: #a0aec0; margin-bottom: 20px;">
-          管理者がメンテナンスを行っています。しばらくお待ちください。
-        </div>
-        <button id="system-lock-retry" style="background: #3182ce; color: white; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;">
-          再試行
-        </button>
+        <h3 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 800; color: #e53e3e;">System Locked</h3>
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 0 0 16px 0;">
+        <p id="system-lock-message" style="margin: 0 0 20px 0; color: #555; font-size: 14px; line-height: 1.5;">${this.message}</p>
       `;
 
       gate.appendChild(content);
       document.body.appendChild(gate);
 
-      // アニメーション開始
-      requestAnimationFrame(() => {
-        gate.style.opacity = '1';
-        content.style.transform = 'translateY(0)';
-      });
 
       // 再試行ボタン
       gate.querySelector('#system-lock-retry').onclick = () => {
@@ -264,7 +242,7 @@ class SystemLock {
 
   resolveReadyOnce() {
     if (!this._readyResolved && this._resolveReady) {
-      try { this._resolveReady(); } catch (_) {}
+      try { this._resolveReady(); } catch (_) { }
       this._readyResolved = true;
     }
   }
