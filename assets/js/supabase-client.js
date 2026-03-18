@@ -309,6 +309,11 @@ export async function getBookingForScan(id, passcode) {
                 });
 
                 if (!error) {
+                    // Fix: The get_booking_for_scan RPC returns {"success": true, "data": {...}} as JSONB
+                    // Return it directly instead of double-wrapping it
+                    if (data && typeof data === 'object' && 'success' in data) {
+                        return data;
+                    }
                     return { success: true, data: data };
                 }
                 console.warn('Network RPC failed, attempting fallback', error);
