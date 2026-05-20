@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="システムログ">
+    <title>Nチケ - システム監査ログ</title>
+    <link rel="icon" href="https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg">
+    <link rel="stylesheet" href="../assets/css/admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../assets/js/custom-dialog.js"></script>
+
+    <style>
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 22px;
+            margin-right: 8px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 22px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #27ae60;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+
+        .auto-refresh-container {
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        /* ===== ログ画面固有スタイル ===== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--card-bg, #fff);
+            border: 1px solid var(--border-color, #e1e5eb);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+        }
+
+        .stat-card .stat-icon {
+            font-size: 22px;
+            color: var(--primary-color, #667eea);
+        }
+
+        .stat-card .stat-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #888;
+        }
+
+        .stat-card .stat-value {
+            font-size: 26px;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .stat-card.success {
+            border-left: 4px solid #28a745;
+        }
+
+        .stat-card.error {
+            border-left: 4px solid #dc3545;
+        }
+
+        .stat-card.warning {
+            border-left: 4px solid #f0ad4e;
+        }
+
+
+        /* フィルターバー */
+        .logs-filter-bar {
+            background: var(--card-bg, #fff);
+            border: 1px solid var(--border-color, #e1e5eb);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .logs-filter-bar .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 0;
+        }
+
+        .logs-filter-bar .filter-group label {
+            font-size: 11px;
+            font-weight: 700;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .logs-filter-bar .filter-group select,
+        .logs-filter-bar .filter-group input[type="text"],
+        .logs-filter-bar .filter-group input[type="date"] {
+            padding: 7px 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            background: #fff;
+        }
+
+        .logs-filter-bar .filter-group select:focus,
+        .logs-filter-bar .filter-group input:focus {
+            outline: none;
+            border-color: var(--primary-color, #667eea);
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding-bottom: 4px;
+        }
+
+        .checkbox-group label {
+            font-size: 12px;
+            color: #666;
+            cursor: pointer;
+        }
+
+
+        /* テーブル */
+        .logs-table-wrapper {
+            background: var(--card-bg, #fff);
+            border: 1px solid var(--border-color, #e1e5eb);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .logs-table-wrapper table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .logs-table-wrapper th,
+        .logs-table-wrapper td {
+            padding: 10px 14px;
+            text-align: left;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 13px;
+        }
+
+        .logs-table-wrapper th {
+            background: #fafafa;
+            font-weight: 600;
+            color: #555;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .logs-table-wrapper tr:hover {
+            background: #f8f9fe;
+        }
+
+        .logs-table-wrapper .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #aaa;
+        }
+
+
+        /* エラーハイライト */
+        .error-row {
+            background-color: rgba(220, 53, 69, 0.04) !important;
+        }
+
+        .error-row-critical {
+            background-color: #fff5f5 !important;
+            border-left: 4px solid #cc0000;
+        }
+
+        .error-row-timeout {
+            background-color: #fff9db !important;
+            border-left: 4px solid #f08c00;
+        }
+
+        .error-row-network {
+            background-color: #e7f5ff !important;
+            border-left: 4px solid #1971c2;
+        }
+
+        .error-icon {
+            margin-right: 4px;
+        }
+
+        .status-error {
+            color: #dc3545;
+            font-weight: 600;
+        }
+
+        .status-success {
+            color: #28a745;
+            font-weight: 600;
+        }
+
+
+        /* detail-btn */
+        .detail-btn {
+            padding: 4px 10px;
+            font-size: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #fff;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .detail-btn:hover {
+            background: var(--primary-color, #667eea);
+            color: #fff;
+            border-color: var(--primary-color, #667eea);
+        }
+
+
+        /* モーダル */
+        .logs-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1050;
+        }
+
+        .logs-modal.show {
+            display: flex;
+        }
+
+        .logs-modal-content {
+            background: #fff;
+            width: 92%;
+            max-width: 700px;
+            max-height: 85vh;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        }
+
+        .logs-modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logs-modal-header h3 {
+            margin: 0;
+            font-size: 16px;
+        }
+
+        .logs-modal-body {
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: 110px 1fr;
+            gap: 8px 12px;
+            margin-bottom: 16px;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #666;
+            font-size: 13px;
+        }
+
+        .detail-value {
+            word-break: break-all;
+            font-size: 13px;
+        }
+
+        .logs-modal-body pre {
+            background: #f4f5f7;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #333;
+            overflow-x: auto;
+            margin: 8px 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .btn-modal-close {
+            border: none;
+            background: transparent;
+            font-size: 20px;
+            cursor: pointer;
+            color: #888;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-modal-close:hover {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+
+        /* ツールバー */
+        .logs-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .logs-toolbar .logs-count {
+            font-size: 13px;
+            font-weight: 600;
+            color: #666;
+        }
+
+        .logs-toolbar .logs-loading {
+            font-size: 12px;
+            color: var(--primary-color, #667eea);
+        }
+
+
+        /* エクスポート進捗 */
+        .export-progress {
+            padding: 30px;
+            text-align: center;
+        }
+
+        .export-progress h4 {
+            margin: 0 0 12px;
+        }
+
+        .progress-track {
+            background: #eee;
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            background: var(--primary-color, #667eea);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+
+        /* 満席バナー */
+        .full-alert-banner {
+            background: linear-gradient(135deg, #ff4757 0%, #ff6b81 100%);
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 14px;
+            display: none;
+        }
+
+
+        /* レスポンシブ */
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+
+            .stat-card .stat-value {
+                font-size: 20px;
+            }
+
+            .logs-filter-bar {
+                gap: 8px;
+            }
+
+            .logs-filter-bar .filter-group {
+                min-width: calc(50% - 8px);
+            }
+
+            .logs-table-wrapper {
+                overflow-x: auto;
+            }
+
+            .logs-table-wrapper table {
+                min-width: 700px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Overlay Loader -->
+    <div id="loading">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <div>処理中...</div>
+        </div>
+    </div>
+
+    <!-- ===== ADMIN SIDEBAR (Injected by AdminLayout) ===== -->
+    <div id="admin-sidebar-container"></div>
+
+    <!-- ===== MAIN WRAPPER ===== -->
+    <div class="main-wrapper">
+
+        <!-- Top Bar -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="mobile-menu-btn" id="mobile-menu-btn" onclick="toggleSidebar()"
+                    aria-label="メニューを開く">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1 class="topbar-title">システム監査ログ</h1>
+            </div>
+            <div class="topbar-actions">
+                <button class="btn btn-sm btn-secondary" onclick="refreshLogs()">
+                    <i class="fas fa-rotate"></i>
+                    <span>更新</span>
+                </button>
+                <div class="auto-refresh-container">
+                    <span style="margin-right:8px;">自動更新</span>
+                    <label class="switch">
+                        <input type="checkbox" id="auto-refresh-toggle">
+                        <span class="slider"></span>
+                    </label>
+                    <span id="auto-refresh-status" style="font-size:11px; opacity:0.8; min-width:24px;">OFF</span>
+                </div>
+                <button class="btn btn-sm btn-primary" onclick="exportLogsCSV()">
+                    <i class="fas fa-file-csv"></i>
+                    <span>CSV</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- ===== PAGE CONTENT ===== -->
+        <div class="page-content">
+
+            <!-- エラー表示 -->
+            <div id="error-container" style="display:none; background:#fff3f3; border:1px solid #f5c6cb; border-radius:8px; padding:12px 16px; margin-bottom:16px; color:#842029; font-size:14px; align-items:center; gap:8px;">
+                <i class="fas fa-exclamation-triangle"></i>
+                <span id="error-message"></span>
+            </div>
+
+            <!-- 満席バナー -->
+            <div id="full-alert" class="full-alert-banner"></div>
+
+            <!-- 統計カード -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-icon"><i class="fas fa-list-check"></i></span>
+                    <span class="stat-label">総操作数 (30日)</span>
+                    <span class="stat-value" id="total-operations">—</span>
+                </div>
+                <div class="stat-card success">
+                    <span class="stat-icon"><i class="fas fa-circle-check"></i></span>
+                    <span class="stat-label">成功</span>
+                    <span class="stat-value" id="success-count">—</span>
+                </div>
+                <div class="stat-card error">
+                    <span class="stat-icon"><i class="fas fa-circle-xmark"></i></span>
+                    <span class="stat-label">エラー</span>
+                    <span class="stat-value" id="error-count">—</span>
+                </div>
+                <div class="stat-card warning" id="full-capacity-card" style="display:none;">
+                    <span class="stat-icon"><i class="fas fa-users-slash"></i></span>
+                    <span class="stat-label">満席 / 総公演</span>
+                    <span class="stat-value" id="full-capacity-count">0/0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-icon"><i class="fas fa-clock-rotate-left"></i></span>
+                    <span class="stat-label">最終更新</span>
+                    <span class="stat-value" id="last-update" style="font-size:16px;">—</span>
+                </div>
+            </div>
+
+            <!-- フィルター -->
+            <div class="logs-filter-bar">
+                <div class="filter-group">
+                    <label>操作種別</label>
+                    <select id="operation-filter">
+                        <option value="">すべて</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>ログタイプ</label>
+                    <select id="status-filter">
+                        <option value="">すべて</option>
+                        <option value="UI">UI (クライアント)</option>
+                        <option value="API">API (サーバー)</option>
+                        <option value="System">System (自動)</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>表示件数</label>
+                    <select id="limit-filter">
+                        <option value="100">100件</option>
+                        <option value="500">500件</option>
+                        <option value="1000">1000件</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>開始日</label>
+                    <input type="date" id="date-start">
+                </div>
+                <div class="filter-group">
+                    <label>終了日</label>
+                    <input type="date" id="date-end">
+                </div>
+                <div class="filter-group" style="flex-grow:1; min-width:150px;">
+                    <label>テキスト検索</label>
+                    <input type="text" id="text-filter" placeholder="アクション, IP, セッション...">
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="error-highlight-toggle" checked>
+                    <label for="error-highlight-toggle">エラー強調</label>
+                </div>
+                <button class="btn btn-secondary btn-sm" onclick="clearFilters()">
+                    <i class="fas fa-filter-circle-xmark"></i> リセット
+                </button>
+            </div>
+
+            <!-- ツールバー -->
+            <div class="logs-toolbar">
+                <div class="logs-count" id="logs-count">0件</div>
+                <div class="logs-loading" id="logs-loading" style="display:none;">
+                    <i class="fas fa-spinner fa-spin"></i> データ取得中...
+                </div>
+            </div>
+
+            <!-- ログテーブル -->
+            <div class="logs-table-wrapper">
+                <table id="logs-table">
+                    <thead>
+                        <tr>
+                            <th>日時</th>
+                            <th>種別</th>
+                            <th>操作内容</th>
+                            <th style="width: 80px; text-align: center;">詳細</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logs-table-body">
+                        <tr>
+                            <td colspan="7" class="no-data">
+                                <i class="fas fa-spinner fa-spin"></i> 読み込み中...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== モーダル: ログ詳細 ========== -->
+    <div class="logs-modal" id="log-detail-modal">
+        <div class="logs-modal-content">
+            <div class="logs-modal-header">
+                <h3><i class="fas fa-file-lines"></i> ログ詳細</h3>
+                <button class="btn-modal-close" onclick="closeLogDetail()"><i class="fas fa-xmark"></i></button>
+            </div>
+            <div class="logs-modal-body">
+                <div class="detail-grid">
+                    <div class="detail-label">日時</div>
+                    <div class="detail-value" id="detail-timestamp"></div>
+                    <div class="detail-label">操作</div>
+                    <div class="detail-value" id="detail-operation"></div>
+                    <div class="detail-label">ステータス</div>
+                    <div class="detail-value" id="detail-status"></div>
+                    <div class="detail-label">IPアドレス</div>
+                    <div class="detail-value" id="detail-ip"></div>
+                    <div class="detail-label">セッション</div>
+                    <div class="detail-value" id="detail-session"></div>
+                </div>
+                <div class="detail-label" style="margin-top:12px; margin-bottom:6px;">エラー解説</div>
+                <div id="detail-description" style="background:#fff5f5; border:1px solid #feb2b2; padding:10px; border-radius:6px; font-size:13px; color:#c53030; display:none; margin-bottom:12px;"></div>
+                
+                <div class="detail-label" style="margin-bottom:6px;">実行パラメータ (Metadata)</div>
+                <pre id="detail-parameters"></pre>
+                <div class="detail-label" style="margin-top:12px; margin-bottom:6px;">結果/エラー詳細</div>
+                <pre id="detail-result"></pre>
+                <div class="detail-label" style="margin-top:12px; margin-bottom:6px;">ブラウザ情報 (User Agent)</div>
+                <div class="detail-value" id="detail-useragent"
+                    style="font-size:11px; color:#999; background:#f9f9f9; padding:8px; border-radius:4px; word-break:break-all;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== モーダル: CSVエクスポート進捗 ========== -->
+    <div class="logs-modal" id="export-progress-container">
+        <div class="logs-modal-content" style="max-width:400px;">
+            <div class="export-progress">
+                <h4 id="export-progress-text">エクスポート中...</h4>
+                <div class="progress-track">
+                    <div class="progress-fill" id="export-progress-bar"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== モーダル: 満席通知設定 ========== -->
+    <div class="logs-modal" id="full-capacity-settings-modal">
+        <div class="logs-modal-content">
+            <div class="logs-modal-header">
+                <h3><i class="fas fa-bell"></i> 満席通知設定</h3>
+                <button class="btn-modal-close" onclick="closeFullCapacitySettings()"><i
+                        class="fas fa-xmark"></i></button>
+            </div>
+            <div class="logs-modal-body">
+                <div class="detail-grid">
+                    <div class="detail-label">状態</div>
+                    <div class="detail-value" id="monitor-status">停止中</div>
+                </div>
+                <div style="margin-top:12px;">
+                    <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                        <input type="checkbox" id="notification-enabled">
+                        <span>満席時にメール通知を送信する</span>
+                    </label>
+                </div>
+                <div style="margin-top:16px;">
+                    <label style="font-size:12px; font-weight:600; color:#888;">監視間隔</label>
+                    <select id="check-interval"
+                        style="display:block; margin-top:4px; padding:6px 10px; border:1px solid #ddd; border-radius:6px;">
+                        <option value="30000">30秒</option>
+                        <option value="60000">1分</option>
+                        <option value="300000">5分</option>
+                    </select>
+                </div>
+                <div style="margin-top:16px;">
+                    <div class="detail-label" style="margin-bottom:6px;">通知先メールアドレス</div>
+                    <div id="notification-emails-display"
+                        style="white-space:pre-wrap; background:#f4f5f7; padding:10px; border-radius:6px; font-size:12px; color:#555; min-height:30px;">
+                        設定されていません
+                    </div>
+                </div>
+                <div style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
+                    <button class="btn btn-primary" onclick="saveFullCapacitySettings()">保存</button>
+                    <button class="btn btn-secondary" onclick="testFullCapacityNotification()">テスト送信</button>
+                    <button class="btn btn-secondary" onclick="manualFullCapacityCheck()">手動チェック</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== Scripts ===== -->
+    <script>
+
+
+        // CSV Export (logs-main.jsが module なので window に公開)
+        function exportLogsCSV() {
+            if (typeof window._exportLogsCSV === 'function') {
+                window._exportLogsCSV();
+            } else {
+                alert('CSVエクスポート機能はまだ読み込まれていません。');
+            }
+        }
+
+        // フィルタークリア
+        function clearFilters() {
+            if (typeof window._clearFilters === 'function') {
+                window._clearFilters();
+            }
+        }
+    </script>
+
+    <script type="module" src="../assets/js/logs-main.js"></script>
+</body>
+
+</html>

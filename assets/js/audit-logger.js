@@ -33,12 +33,13 @@ class AuditLogger {
     this.boundHandlers = [];
   }
 
-  log(eventType, action, meta = {}) {
+  log(eventType, action, meta = {}, isError = false) {
     try {
       const entry = {
         ts: Date.now(),
-        type: eventType,
+        type: isError ? 'error' : eventType,
         action,
+        isError: !!isError,
         meta: this._sanitizeMeta(meta),
         sessionId: this.sessionId,
         userId: meta && meta.userId ? meta.userId : '',
@@ -82,11 +83,12 @@ class AuditLogger {
 
   wrapApiCall(functionName, params, result) {
     // すべてのAPI呼び出しを記録
+    const isError = result && result.success === false;
     this.log('api', functionName, {
       params,
-      success: !!(result && result.success !== false),
-      error: result && result.success === false ? (result.error || '') : ''
-    });
+      success: !isError,
+      error: isError ? (result.error || result.message || '') : ''
+    }, isError);
   }
 
   _installGlobalEventCapture() {
@@ -119,16 +121,21 @@ class AuditLogger {
     this.log('nav', 'load', { url: location.href });
 
     // エラー
-    add(window, 'error', (e) => {
-      try {
-        this.log('error', 'window_error', { message: e && e.message, source: e && e.filename, lineno: e && e.lineno });
-      } catch (_) { }
-    }, true);
-    add(window, 'unhandledrejection', (e) => {
-      try {
-        this.log('error', 'unhandledrejection', { reason: (e && e.reason && (e.reason.message || e.reason)) || '' });
-      } catch (_) { }
-    }, true);
+    window.addEventListener('error', (e) => {
+      this.log('error', 'window_error', {
+        message: e.message,
+        filename: e.filename,
+        lineno: e.lineno,
+        colno: e.colno,
+        stack: e.error ? e.error.stack : ''
+      }, true);
+    });
+
+    window.addEventListener('unhandledrejection', (e) => {
+      this.log('error', 'promise_rejection', {
+        reason: String(e.reason)
+      }, true);
+    });
   }
 
   _elementInfo(node) {
@@ -214,7 +221,10 @@ class AuditLogger {
   _sanitizeMeta(meta) {
     try {
       const plain = {};
-      const allow = ['params', 'success', 'error', 'url', 'tag', 'id', 'cls', 'name', 'role', 'text'];
+      const allow = [
+        'params', 'success', 'error', 'url', 'tag', 'id', 'cls', 'name', 'role', 'text',
+        'message', 'filename', 'lineno', 'colno', 'stack', 'reason' // エラー関連のキーを追加
+      ];
       for (const k of allow) {
         if (meta && meta[k] !== undefined) {
           let v = meta[k];

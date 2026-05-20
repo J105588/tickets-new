@@ -1,7 +1,7 @@
 // logs-main.js - ログ表示システムのメイン処理
 
 import GasAPI from './api.js';
-import { loadSidebar, toggleSidebar } from './sidebar.js';
+import AdminLayout from './admin/AdminLayout.js';
 import fullCapacityMonitor from './full-capacity-monitor.js';
 
 
@@ -37,11 +37,10 @@ function escapeHTML(str) {
 // 初期化
 window.onload = async () => {
   try {
-    // サイドバー読み込み
-    loadSidebar();
+    // 0. Initialize Layout and Auth
+    if (!AdminLayout.init('logs')) return;
 
-    // グローバル関数を登録
-    window.toggleSidebar = toggleSidebar;
+    // グローバル関数を登録（既存定義がある場合は上書きしない）
     window.refreshLogs = refreshLogs;
     window.toggleAutoRefresh = toggleAutoRefresh;
     window.applyFilters = applyFilters;
@@ -52,6 +51,8 @@ window.onload = async () => {
     window.saveFullCapacitySettings = saveFullCapacitySettings;
     window.testFullCapacityNotification = testFullCapacityNotification;
     window.manualFullCapacityCheck = manualFullCapacityCheck;
+    window._exportLogsCSV = exportLogsCSV;
+    window._clearFilters = clearFilters;
 
     // 初期データ読み込み
     await loadStatistics();
@@ -97,10 +98,13 @@ try {
 
 // イベントリスナー設定
 function setupEventListeners() {
-  // フィルター変更時のイベント
-  document.getElementById('operation-filter').addEventListener('change', applyFilters);
-  document.getElementById('status-filter').addEventListener('change', applyFilters);
-  document.getElementById('limit-filter').addEventListener('change', applyFilters);
+  // フィルター変更時のイベント（null安全）
+  const opFilter = document.getElementById('operation-filter');
+  const stFilter = document.getElementById('status-filter');
+  const limFilter = document.getElementById('limit-filter');
+  if (opFilter) opFilter.addEventListener('change', applyFilters);
+  if (stFilter) stFilter.addEventListener('change', applyFilters);
+  if (limFilter) limFilter.addEventListener('change', applyFilters);
   const textFilter = document.getElementById('text-filter');
   if (textFilter) textFilter.addEventListener('input', () => updateLogsTable());
   const dateStart = document.getElementById('date-start');
@@ -110,12 +114,23 @@ function setupEventListeners() {
   const errToggle = document.getElementById('error-highlight-toggle');
   if (errToggle) errToggle.addEventListener('change', () => updateLogsTable());
 
+  // 自動更新トグルのイベント
+  const refreshToggle = document.getElementById('auto-refresh-toggle');
+  if (refreshToggle) {
+    refreshToggle.addEventListener('change', (e) => {
+      toggleAutoRefresh(e.target.checked);
+    });
+  }
+
   // モーダル外クリックで閉じる
-  document.getElementById('log-detail-modal').addEventListener('click', (e) => {
-    if (e.target.id === 'log-detail-modal') {
-      closeLogDetail();
-    }
-  });
+  const modal = document.getElementById('log-detail-modal');
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target.id === 'log-detail-modal') {
+        closeLogDetail();
+      }
+    });
+  }
 
   // ESCキーでモーダルを閉じる
   document.addEventListener('keydown', (e) => {
@@ -283,18 +298,22 @@ function getCachedStatistics() {
 function updateStatistics(stats) {
   // 総操作数
   const totalOps = stats.totalOperations || 0;
-  document.getElementById('total-operations').textContent = totalOps.toLocaleString();
+  const totalEl = document.getElementById('total-operations');
+  if (totalEl) totalEl.textContent = totalOps.toLocaleString();
 
   // 成功数
   const successCount = stats.successCount || 0;
-  document.getElementById('success-count').textContent = successCount.toLocaleString();
+  const successEl = document.getElementById('success-count');
+  if (successEl) successEl.textContent = successCount.toLocaleString();
 
   // エラー数
   const errorCount = stats.errorCount || 0;
-  document.getElementById('error-count').textContent = errorCount.toLocaleString();
+  const errorEl = document.getElementById('error-count');
+  if (errorEl) errorEl.textContent = errorCount.toLocaleString();
 
   // 最終更新時刻
-  document.getElementById('last-update').textContent = new Date().toLocaleTimeString('ja-JP');
+  const lastUpdateEl = document.getElementById('last-update');
+  if (lastUpdateEl) lastUpdateEl.textContent = new Date().toLocaleTimeString('ja-JP');
 
   // デバッグ情報をコンソールに出力
   console.log('統計情報更新:', {
@@ -366,7 +385,7 @@ function updateLogsTable() {
   const filtered = getFilteredLogs();
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="no-data">ログがありません</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="no-data">ログがありません</td></tr>';
     return;
   }
 
@@ -420,11 +439,10 @@ function updateLogsTable() {
       <tr class="${rowClass}">
         <td>${escapeHTML(timestamp)}</td>
         <td>${escapeHTML(log.type)}</td>
-        <td>${errorIcon}${escapeHTML(log.action)}</td>
-        <td><code>${escapeHTML(shortMeta)}</code></td>
-        <td>${escapeHTML(log.sessionId || '-')}</td>
-        <td>${escapeHTML(log.ipAddress || '-')}</td>
-        <td><button class="detail-btn" onclick="showLogDetail('${escapeHTML(log.timestamp)}')">詳細</button></td>
+        <td class="action-cell">${errorIcon}${escapeHTML(log.action)}</td>
+        <td style="text-align:center;">
+            <button class="detail-btn" onclick="showLogDetail('${escapeHTML(log.timestamp)}')">詳細</button>
+        </td>
       </tr>
     `;
   }).join('');
@@ -500,7 +518,8 @@ async function exportLogsCSV() {
           let v = r[h];
           if (h === 'metadata') {
             try {
-              v = JSON.stringify(JSON.parse(r.metadata || '{}'));
+              const meta = typeof r.metadata === 'string' ? JSON.parse(r.metadata || '{}') : r.metadata;
+              v = JSON.stringify(meta || {});
             } catch (_) {
               v = String(r.metadata || '');
             }
@@ -590,7 +609,18 @@ function hideExportProgress() {
 // エラーログかどうかを判定（強化版）
 function isErrorLog(log) {
   try {
-    // アクション名での判定
+    const metaObj = log.metadata && (typeof log.metadata === 'string' ? JSON.parse(log.metadata) : log.metadata);
+    
+    // Explicit success flag (High priority override)
+    if (metaObj && metaObj.success === true) return false;
+
+    // 1. Explicit flag from database (most reliable for recent logs)
+    if (log.is_error === true || log.isError === true) return true;
+
+    // 2. Type based (fallback/inclusive)
+    if ((log.type || '').toLowerCase().includes('error')) return true;
+
+    // 3. Action based (fallback/inclusive)
     const actionLower = (log.action || '').toLowerCase();
     if (actionLower.includes('error') || actionLower.includes('fail') ||
       actionLower.includes('exception') || actionLower.includes('timeout')) {
@@ -599,7 +629,7 @@ function isErrorLog(log) {
 
     // メタデータでの判定
     if (log.metadata && log.metadata !== 'null') {
-      const metaObj = JSON.parse(log.metadata);
+      const metaObj = typeof log.metadata === 'string' ? JSON.parse(log.metadata) : log.metadata;
 
       // 明示的なエラーフラグ
       if (metaObj.success === false || metaObj.error || metaObj.failed) {
@@ -674,17 +704,19 @@ function truncateJson(jsonStr, maxLength) {
   if (!jsonStr || jsonStr === 'null') return '-';
 
   try {
-    const parsed = JSON.parse(jsonStr);
+    const parsed = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
     const str = JSON.stringify(parsed, null, 2);
     return str.length > maxLength ? str.substring(0, maxLength) + '...' : str;
   } catch (e) {
-    return jsonStr.length > maxLength ? jsonStr.substring(0, maxLength) + '...' : jsonStr;
+    const fallback = String(jsonStr);
+    return fallback.length > maxLength ? fallback.substring(0, maxLength) + '...' : fallback;
   }
 }
 
 // ログ件数を更新
 function updateLogsCount() {
-  document.getElementById('logs-count').textContent = `${currentLogs.length}件`;
+  const el = document.getElementById('logs-count');
+  if (el) el.textContent = `${currentLogs.length}件`;
 }
 
 // ログ詳細を表示
@@ -699,30 +731,90 @@ function showLogDetail(timestamp) {
   document.getElementById('detail-timestamp').textContent = new Date(log.timestamp).toLocaleString('ja-JP');
   document.getElementById('detail-operation').textContent = `${log.type} / ${log.action}`;
 
-  // ステータス表示（エラーの場合は赤色で強調）
+  // ステータス表示
   const statusElement = document.getElementById('detail-status');
   if (isError) {
-    statusElement.innerHTML = '<span class="status-error">エラー</span>';
+    statusElement.innerHTML = '<span class="status-error" style="background:#fff5f5; color:#c53030; padding:2px 8px; border-radius:4px; font-weight:600; border:1px solid #feb2b2;">エラー</span>';
   } else {
-    statusElement.innerHTML = '<span class="status-success">成功</span>';
+    statusElement.innerHTML = '<span class="status-success" style="background:#f0fff4; color:#2f855a; padding:2px 8px; border-radius:4px; font-weight:600; border:1px solid #9ae6b4;">成功</span>';
+  }
+
+  // エラー解説
+  const descElement = document.getElementById('detail-description');
+  if (isError) {
+    const description = getErrorDescription(log);
+    descElement.textContent = description;
+    descElement.style.display = 'block';
+  } else {
+    descElement.style.display = 'none';
   }
 
   document.getElementById('detail-ip').textContent = log.ipAddress || '-';
+  document.getElementById('detail-session').textContent = log.sessionId || '-';
 
   // JSON表示
   try {
-    const meta = JSON.parse(log.metadata);
+    const meta = typeof log.metadata === 'string' ? JSON.parse(log.metadata) : log.metadata;
     document.getElementById('detail-parameters').textContent = JSON.stringify(meta, null, 2);
+    
+    // 結果表示（メタデータ内にエラーメッセージ等があれば）
+    const result = meta.message || meta.error || meta.errorMessage || meta.errorMsg || meta.reason || (isError ? '詳細不明のエラー' : '-');
+    let detailText = typeof result === 'object' ? JSON.stringify(result, null, 2) : result;
+    
+    // stack情報があれば追記
+    if (meta.stack) {
+        detailText += '\n\n[Stack Trace]\n' + meta.stack;
+    }
+    // ファイル情報があれば追記
+    if (meta.filename) {
+        detailText += `\n\n[Source] ${meta.filename}:${meta.lineno || '?'}${meta.colno ? ':' + meta.colno : ''}`;
+    }
+    
+    document.getElementById('detail-result').textContent = detailText;
   } catch (e) {
-    document.getElementById('detail-parameters').textContent = log.metadata;
+    document.getElementById('detail-parameters').textContent = String(log.metadata);
+    document.getElementById('detail-result').textContent = isError ? 'データ解析エラー' : '-';
   }
 
-  document.getElementById('detail-result').textContent = '';
-
-  document.getElementById('detail-useragent').textContent = log.userAgent;
+  document.getElementById('detail-useragent').textContent = log.userAgent || '-';
 
   // モーダルを表示
   document.getElementById('log-detail-modal').classList.add('show');
+}
+
+// エラー内容に基づいた日本語解説を取得
+function getErrorDescription(log) {
+    const action = (log.action || '').toLowerCase();
+    const metaStr = (typeof log.metadata === 'string' ? log.metadata : JSON.stringify(log.metadata || {})).toLowerCase();
+    
+    if (action.includes('fetch') || metaStr.includes('network') || metaStr.includes('failed to fetch')) {
+        return 'ネットワークエラー: サーバーとの通信に失敗しました。インターネット接続やSupabaseの稼働状態を確認してください。';
+    }
+    if (action.includes('timeout') || metaStr.includes('timeout')) {
+        return 'タイムアウト: 処理に時間がかかりすぎたため中断されました。データ量が多すぎるか、サーバーの応答が遅延しています。';
+    }
+    if (metaStr.includes('permission') || metaStr.includes('denied') || metaStr.includes('authorized')) {
+        return '権限エラー: この操作を実行する権限がありません。管理者権限の設定を確認してください。';
+    }
+    if (metaStr.includes('not found') || metaStr.includes('404')) {
+        return 'データ未検出: 指定されたリソースが見つかりませんでした。IDが正しいか確認してください。';
+    }
+    if (metaStr.includes('validation') || metaStr.includes('invalid')) {
+        return '入力エラー: 送信されたパラメータの形式が正しくありません。入力内容を見直してください。';
+    }
+    if (metaStr.includes('quota') || metaStr.includes('limit')) {
+        return '制限超過: APIの実行制限や容量制限に達しました。しばらく待ってから再試行してください。';
+    }
+
+    // ブラウザエラーの個別ハンドリング
+    if (action === 'window_error') {
+        return 'ブラウザ・スクリプトエラー: 実行中に予期しない例外が発生しました。ブラウザの互換性またはバグの可能性があります。';
+    }
+    if (action === 'promise_rejection') {
+        return '非同期処理エラー: Promiseが拒否されましたが、キャッチされませんでした。通信エラーまたは内部ロジックの不具合が疑われます。';
+    }
+    
+    return 'システムエラー: 予期しないエラーが発生しました。エンジニアにメタデータの内容を添えて報告してください。';
 }
 
 // 満席通知のバナー表示
@@ -742,7 +834,8 @@ function showFullAlertBanner(data) {
 
 // ログ詳細を閉じる
 function closeLogDetail() {
-  document.getElementById('log-detail-modal').classList.remove('show');
+  const modal = document.getElementById('log-detail-modal');
+  if (modal) modal.classList.remove('show');
 }
 
 // フィルターを適用
@@ -757,17 +850,23 @@ async function refreshLogs() {
 }
 
 // 自動更新を切り替え
-function toggleAutoRefresh() {
-  isAutoRefreshEnabled = !isAutoRefreshEnabled;
-  const button = document.getElementById('auto-refresh-btn');
+function toggleAutoRefresh(enabled) {
+  isAutoRefreshEnabled = enabled !== undefined ? enabled : !isAutoRefreshEnabled;
+  
+  const toggle = document.getElementById('auto-refresh-toggle');
+  const statusLabel = document.getElementById('auto-refresh-status');
 
   if (isAutoRefreshEnabled) {
-    button.textContent = '自動更新: ON';
-    button.classList.add('active');
-    autoRefreshInterval = setInterval(refreshLogs, 30000); // 30秒ごと
+    if (statusLabel) statusLabel.textContent = 'ON';
+    if (toggle) toggle.checked = true;
+    
+    if (!autoRefreshInterval) {
+      autoRefreshInterval = setInterval(refreshLogs, 30000); // 30秒ごと
+    }
   } else {
-    button.textContent = '自動更新: OFF';
-    button.classList.remove('active');
+    if (statusLabel) statusLabel.textContent = 'OFF';
+    if (toggle) toggle.checked = false;
+    
     if (autoRefreshInterval) {
       clearInterval(autoRefreshInterval);
       autoRefreshInterval = null;
@@ -778,6 +877,7 @@ function toggleAutoRefresh() {
 // ローディング表示
 function showLoading(show) {
   const loading = document.getElementById('logs-loading');
+  if (!loading) return;
   if (show) {
     loading.style.display = 'inline';
   } else {
@@ -787,15 +887,7 @@ function showLoading(show) {
 
 // エラー表示
 async function showError(message) {
-  const errorContainer = document.getElementById('error-container');
-  const errorMessage = document.getElementById('error-message');
-
-  if (errorContainer && errorMessage) {
-    errorMessage.textContent = message;
-    errorContainer.style.display = 'flex';
-  } else {
-    await customAlert(message);
-  }
+  AdminLayout.showError(message);
 }
 
 // ページが非表示になったら自動更新を停止

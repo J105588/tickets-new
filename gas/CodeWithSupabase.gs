@@ -165,27 +165,46 @@ function doPost(e) {
 
       if (functionMap[funcName]) {
         response = functionMap[funcName].apply(null, funcParams);
-        // ログ記録
-        try {
-          const userAgent = e.parameter.userAgent || 'Unknown';
-          const ipAddress = e.parameter.ipAddress || 'Unknown';
-          logOperation(funcName, funcParams, response, userAgent, ipAddress);
-        } catch (_) { }
       } else {
         throw new Error("無効な関数名です: " + funcName);
       }
     }
-
   } catch (err) {
-    response = { error: err.message };
+    response = { success: false, error: err.message };
   }
 
-  // レスポンス返却
-  const headers = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, GET, OPTIONS, DELETE",
-    "Access-Control-Allow-Headers": "Content-Type"
-  };
+  // 中央集中型ログ記録：すべての操作を自動的に記録
+  try {
+    const postData = (e.postData && e.postData.contents) || "";
+    let actionName = e.parameter.action || 'post_request';
+    
+    // JSONPやフォームの func/action を抽出してアクション名とする
+    try {
+      const params = JSON.parse(postData);
+      actionName = params.action || params.func || actionName;
+    } catch (_) { }
+
+    const skipActions = ['recordClientAudit', 'getClientAuditLogs', 'getClientAuditStatistics', 'get_audit_stats'];
+    if (skipActions.indexOf(actionName) === -1) {
+      const isError = !!(response && (response.error || response.success === false));
+      safeLogOperation(
+        actionName,
+        e.parameter, // パラメータ全体
+        response,
+        e.parameter.userAgent || 'Unknown',
+        '',
+        isError
+      );
+    }
+  } catch (logErr) {
+    console.error('Centralized logging (doPost) failed:', logErr);
+  }
+
+  // エラーレスポンスの互換性確保 (error と message の両方を設定)
+  if (response && response.success === false) {
+    if (response.error && !response.message) response.message = response.error;
+    if (response.message && !response.error) response.error = response.message;
+  }
 
   const outputStr = JSON.stringify(response);
   if (callback) {
@@ -493,7 +512,34 @@ function doGet(e) {
       }
     }
   } catch (err) {
-    response = { error: err.message };
+    response = { success: false, error: err.message };
+  }
+
+  // 中央集中型ログ記録：すべての操作を自動的に記録
+  try {
+    const logAction = e.parameter.action || e.parameter.func || 'unknown_request';
+    // ログ記録自体の記録は無限ループを避けるため除外
+    const skipActions = ['recordClientAudit', 'getClientAuditLogs', 'getClientAuditStatistics', 'get_audit_stats'];
+    if (skipActions.indexOf(logAction) === -1) {
+      const isError = !!(response && (response.error || response.success === false));
+      // logOperation を呼び出して記録
+      safeLogOperation(
+        logAction, 
+        e.parameter, 
+        response, 
+        e.parameter.userAgent || 'Unknown', 
+        '', // IPは必要に応じて補完
+        isError
+      );
+    }
+  } catch (logErr) {
+    console.error('Centralized logging failed:', logErr);
+  }
+
+  // エラーレスポンスの互換性確保 (error と message の両方を設定)
+  if (response && response.success === false) {
+    if (response.error && !response.message) response.message = response.error;
+    if (response.message && !response.error) response.error = response.message;
   }
 
   const outputStr = JSON.stringify(response);

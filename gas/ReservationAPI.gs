@@ -151,6 +151,9 @@ function createReservation(data) {
       passcode: passcode
     });
 
+    // 5. ログ記録
+    safeLogOperation('createReservation', { bookingId: bookingId, group: data.group, seats: seatIds }, { success: true });
+
     return {
       success: true,
       data: {
@@ -290,6 +293,9 @@ function cancelReservation(bookingId, passcode, ip, userAgent) {
       ip: ip || 'unknown',
       userAgent: userAgent || 'unknown'
     });
+
+    // 5. ログ記録
+    safeLogOperation('cancelReservation', { bookingId: bookingId }, { success: true }, userAgent, ip);
 
     return { success: true, message: '予約をキャンセルしました' };
 

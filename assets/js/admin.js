@@ -5,6 +5,7 @@
  */
 
 import { apiUrlManager } from './config.js';
+import AdminLayout from './admin/AdminLayout.js';
 
 import {
     fetchMasterDataFromSupabase,
@@ -64,64 +65,8 @@ function escapeHTML(str) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // 0. Session Check (Idle Timeout)
-    const session = sessionStorage.getItem('admin_session');
-    let lastActive = sessionStorage.getItem('admin_last_active');
-
-    // Fallback for existing sessions without last_active
-    if (session && !lastActive) {
-        lastActive = new Date().getTime().toString();
-        sessionStorage.setItem('admin_last_active', lastActive);
-    }
-
-    const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes idle timeout
-
-    if (!session) {
-        window.location.href = 'admin-login.html';
-        return;
-    }
-
-    const now = new Date().getTime();
-    if (now - parseInt(lastActive) > SESSION_TIMEOUT_MS) {
-        await customAlert('一定時間操作がなかったため、ログアウトしました。');
-        sessionStorage.removeItem('admin_session');
-        sessionStorage.removeItem('admin_verified_at');
-        sessionStorage.removeItem('admin_last_active');
-        window.location.href = 'admin-login.html';
-        return;
-    }
-
-    // Update activity timestamp on user interaction
-    const updateActivity = () => {
-        sessionStorage.setItem('admin_last_active', new Date().getTime().toString());
-    };
-
-    // Throttle updates to avoid excessive storage writes (e.g., every 10s)
-    let activityThrottle = false;
-    ['mousedown', 'keydown', 'touchstart'].forEach(evt => {
-        document.addEventListener(evt, () => {
-            if (!activityThrottle) {
-                updateActivity();
-                activityThrottle = true;
-                setTimeout(() => activityThrottle = false, 10000);
-            }
-        });
-    });
-
-    // Update usage on valid load
-    updateActivity();
-
-    // Inactivity Watcher Loop
-    setInterval(async () => {
-        const last = parseInt(sessionStorage.getItem('admin_last_active') || '0', 10);
-        if (last && (new Date().getTime() - last) > SESSION_TIMEOUT_MS) {
-            await customAlert('一定時間操作がなかったため、自動的にログアウトしました。');
-            sessionStorage.removeItem('admin_session');
-            sessionStorage.removeItem('admin_verified_at');
-            sessionStorage.removeItem('admin_last_active');
-            window.location.href = 'admin-login.html';
-        }
-    }, 60 * 1000); // Check every minute
+    // 0. Initialize Layout and Auth
+    if (!AdminLayout.init('dashboard')) return;
 
 
     // 1. Load All Data (Parallel)

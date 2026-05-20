@@ -56,6 +56,10 @@ class GasAPI {
         console.error(`Supabase API Error (${method}):`, result);
       }
 
+      if (typeof window !== 'undefined' && window.AuditLogger) {
+        try { audit.wrapApiCall(method, args, result); } catch (_) { }
+      }
+
       return result;
     } catch (error) {
       console.error(`Supabase API Exception (${method}):`, error);
@@ -197,6 +201,7 @@ class GasAPI {
                 data.data.seats = flattenedSeats;
               }
             }
+            try { audit.wrapApiCall(functionName, params, data); } catch (_) { }
             return resolve(data);
           } catch (err) {
             if (i === candidates.length - 1) {

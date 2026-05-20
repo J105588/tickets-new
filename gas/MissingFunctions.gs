@@ -179,27 +179,48 @@ function performDangerAction(action, payload) {
 // === ログ・監査機能 ===
 // ===============================================================
 
+// ===============================================================
+// === ログ・監査機能 ===
+// ===============================================================
+
+/**
+ * 失敗しても処理を止めないログ記録
+ */
+function safeLogOperation(operation, params, result, userAgent = 'Unknown', ipAddress = 'Unknown', isError = undefined) {
+  try {
+    logOperation(operation, params, result, userAgent, ipAddress, isError);
+  } catch (e) {
+    console.error('Safe log recording failed for ' + operation + ': ' + e.message);
+  }
+}
+
 /**
  * 操作ログを記録する
  */
-function logOperation(operation, params, result, userAgent, ipAddress, skipDuplicateCheck = false) {
+function logOperation(operation, params, result, userAgent, ipAddress, isErrorInput) {
   try {
-    // Supabase版のログ記録（簡易実装）
+    const isError = isErrorInput !== undefined ? isErrorInput : (result && result.success === false);
     const logData = {
-      operation: operation,
-      params: JSON.stringify(params),
-      result: JSON.stringify(result),
+      type: isError ? 'error' : 'system',
+      action: operation,
+      is_error: isError,
+      metadata: {
+        params: params,
+        success: !isError,
+        error: isError ? (result && (result.error || result.message) || 'Error') : ''
+      },
       user_agent: userAgent || 'Unknown',
-      ip_address: ipAddress || 'Unknown',
-      status: result.success ? 'SUCCESS' : 'ERROR',
-      timestamp: new Date().toISOString()
+      ip_address: ipAddress || 'Unknown'
     };
 
-    // ログをSupabaseに記録（実装は簡易版）
-    console.log('Operation Log:', logData);
-
+    return supabaseIntegration._request('audit_logs', {
+      method: 'POST',
+      body: logData,
+      useServiceRole: true
+    });
   } catch (e) {
-    Logger.log('Log recording failed: ' + e.message);
+    console.error('logOperation failed:', e);
+    return { success: false, error: e.message };
   }
 }
 
@@ -212,25 +233,27 @@ function recordClientAudit(entries) {
       return { success: false, message: 'No entries' };
     }
 
-    // Supabase版の監査ログ記録（簡易実装）
-    entries.forEach(entry => {
-      const auditData = {
-        timestamp: entry.ts || new Date().toISOString(),
-        event_type: entry.type || '',
-        action: entry.action || '',
-        metadata: JSON.stringify(entry.meta || {}),
-        session_id: entry.sessionId || '',
-        user_id: entry.userId || '',
-        user_agent: entry.ua || 'Unknown',
-        ip_address: entry.ip || 'Unknown'
-      };
+    const payload = entries.map(entry => ({
+      timestamp: entry.ts ? new Date(entry.ts).toISOString() : new Date().toISOString(),
+      type: entry.type || (entry.isError ? 'error' : 'unknown'),
+      action: entry.action || 'unknown',
+      is_error: !!entry.isError,
+      metadata: entry.meta || {},
+      session_id: entry.sessionId || '',
+      user_id: entry.userId || '',
+      user_agent: entry.ua || 'Unknown',
+      ip_address: entry.ip || 'Unknown'
+    }));
 
-      console.log('Client Audit Log:', auditData);
+    const response = supabaseIntegration._request('audit_logs', {
+      method: 'POST',
+      body: payload,
+      useServiceRole: true
     });
 
-    return { success: true, saved: entries.length };
+    return response.success ? { success: true, saved: entries.length } : response;
   } catch (e) {
-    Logger.log('recordClientAudit failed: ' + e.message);
+    console.error('recordClientAudit failed:', e);
     return { success: false, message: e.message };
   }
 }
@@ -240,10 +263,29 @@ function recordClientAudit(entries) {
  */
 function getClientAuditLogs(limit = 200, type = null, action = null) {
   try {
-    // Supabase版の監査ログ取得（簡易実装）
-    return { success: true, logs: [] };
+    let endpoint = `audit_logs?select=*&order=timestamp.desc&limit=${limit}`;
+    if (type) endpoint += `&type=eq.${encodeURIComponent(type)}`;
+    if (action) endpoint += `&action=eq.${encodeURIComponent(action)}`;
+
+    const response = supabaseIntegration._request(endpoint, { useServiceRole: true });
+    if (!response.success) return response;
+    
+    // フロントエンド互換のためのフィールド変換 (tsミリ秒など)
+    const logs = response.data.map(d => ({
+      timestamp: d.timestamp,
+      type: d.type,
+      action: d.action,
+      is_error: !!d.is_error,
+      metadata: d.metadata,
+      sessionId: d.session_id,
+      userId: d.user_id,
+      userAgent: d.user_agent,
+      ipAddress: d.ip_address
+    }));
+
+    return { success: true, logs: logs };
   } catch (e) {
-    Logger.log('getClientAuditLogs failed: ' + e.message);
+    console.error('getClientAuditLogs failed:', e);
     return { success: false, message: e.message };
   }
 }
@@ -253,44 +295,101 @@ function getClientAuditLogs(limit = 200, type = null, action = null) {
  */
 function getClientAuditStatistics() {
   try {
-    return {
-      success: true,
-      statistics: {
-        totalOperations: 0,
-        successCount: 0,
-        errorCount: 0,
-        byType: {},
-        byAction: {}
-      }
-    };
+    const response = supabaseIntegration.rpc('get_audit_stats');
+    if (response.success && response.data) {
+      return { success: true, statistics: response.data };
+    } else {
+      // フォールバック: RPCがない、またはエラーの場合は手動集計を使用
+      console.warn('RPC get_audit_stats failed, falling back to manual aggregation.');
+      return getClientAuditStatisticsLegacy();
+    }
   } catch (e) {
-    Logger.log('getClientAuditStatistics failed: ' + e.message);
+    console.error('getClientAuditStatistics failed:', e);
     return { success: false, message: e.message };
+  }
+}
+
+/**
+ * クライアント監査統計を取得する (手動集計版 - フォールバック用)
+ */
+function getClientAuditStatisticsLegacy() {
+  try {
+    // 簡易的に最新1000件を取得して集計
+    const response = getClientAuditLogs(1000);
+    if (!response.success) return response;
+
+    const logs = response.logs;
+    var isError = function(l) {
+      var meta = l.metadata || {};
+      if (meta.success === true) return false;
+      if (String(l.type || '').toLowerCase().indexOf('error') !== -1) return true;
+      var action = String(l.action || '').toLowerCase();
+      if (action.indexOf('error') !== -1 || action.indexOf('fail') !== -1 || action.indexOf('exception') !== -1) return true;
+      var meta = l.metadata || {};
+      if (meta.success === false || meta.error || meta.failed || meta.errorMessage || meta.errorMsg) return true;
+      if (meta.statusCode && meta.statusCode >= 400) return true;
+      return false;
+    };
+
+    const stats = {
+      totalOperations: logs.length,
+      successCount: logs.filter(l => !isError(l)).length,
+      errorCount: logs.filter(l => isError(l)).length,
+      byType: {},
+      byAction: {}
+    };
+
+    logs.forEach(l => {
+      stats.byType[l.type] = (stats.byType[l.type] || 0) + 1;
+      stats.byAction[l.action] = (stats.byAction[l.action] || 0) + 1;
+    });
+
+    return { success: true, statistics: stats };
+  } catch (e) {
+    console.error('getClientAuditStatisticsLegacy failed:', e);
+    return { success: false, message: e.message };
+  }
+}
+
+/**
+ * 古い監査ログを削除する（ローテーション）
+ * @param {number} daysRetained 保持期間（日）。デフォルトは90日。
+ */
+function purgeOldAuditLogs(daysRetained = 90) {
+  try {
+    const thresholdDate = new Date();
+    thresholdDate.setDate(thresholdDate.getDate() - daysRetained);
+    const thresholdIso = thresholdDate.toISOString();
+
+    const response = supabaseIntegration._request(`audit_logs?timestamp=lt.${encodeURIComponent(thresholdIso)}`, {
+      method: 'DELETE',
+      useServiceRole: true
+    });
+
+    if (response.success) {
+      console.log(`Purged audit logs older than ${thresholdIso}`);
+      return { success: true, message: `${daysRetained}日より前のログを削除しました` };
+    } else {
+      throw new Error(response.error);
+    }
+  } catch (e) {
+    console.error('purgeOldAuditLogs failed:', e);
+    return { success: false, error: e.message };
   }
 }
 
 /**
  * 操作ログを取得する
  */
-function getOperationLogs(limit = 100, operation = null, status = null) {
-  try {
-    return { success: true, logs: [] };
-  } catch (e) {
-    Logger.log('Failed to get logs: ' + e.message);
-    return { success: false, message: e.message };
-  }
+function getOperationLogs(limit = 100) {
+  return getClientAuditLogs(limit, 'system');
 }
 
 /**
  * ログ統計を取得する
  */
 function getLogStatistics() {
-  try {
-    return { success: true, statistics: {} };
-  } catch (e) {
-    Logger.log('Failed to get log statistics: ' + e.message);
-    return { success: false, message: e.message };
-  }
+  return getClientAuditStatistics();
 }
 
 // ===============================================================
@@ -681,21 +780,28 @@ function getDetailedCapacityAnalysisSupabase(group = null, day = null, timeslot 
     var byPerf = {};
     seats.forEach(function (s) {
       var pid = s.performance_id;
-      if (!byPerf[pid]) byPerf[pid] = { total: 0, available: 0 };
+      if (!byPerf[pid]) byPerf[pid] = { total: 0, available: 0, blocked: 0 };
       byPerf[pid].total++;
-      if (String(s.status) === 'available') byPerf[pid].available++;
+      var st = String(s.status);
+      if (st === 'available') byPerf[pid].available++;
+      else if (st === 'blocked' || st === 'unavailable') byPerf[pid].blocked++;
     });
 
     var timeslotsArr = [];
     var summary = { totalTimeslots: 0, fullCapacity: 0, warningCapacity: 0, criticalCapacity: 0, normalCapacity: 0, totalSeats: 0, totalOccupied: 0, totalEmpty: 0 };
 
     perfs.forEach(function (p) {
-      var agg = byPerf[p.id] || { total: 0, available: 0 };
+      var agg = byPerf[p.id] || { total: 0, available: 0, blocked: 0 };
       var total = agg.total;
       var empty = agg.available;
-      var occupied = total > 0 ? Math.max(0, total - empty) : 0;
+      var blocked = agg.blocked;
+      // 占有席数＝総数 − 空席 − 使用不可（ブロック）
+      var occupied = total > 0 ? Math.max(0, total - empty - blocked) : 0;
+      // 総座席数からブロックされた座席を引いたものを「有効な総座席数」とする
+      var effectiveTotal = total - blocked;
+
       var level = 'normal';
-      if (empty === 0 && total > 0) level = 'full';
+      if (empty === 0 && effectiveTotal > 0) level = 'full';
       else if (empty <= 2) level = 'critical';
       else if (empty <= 5) level = 'warning';
 
@@ -703,10 +809,10 @@ function getDetailedCapacityAnalysisSupabase(group = null, day = null, timeslot 
         group: p.group_name,
         day: String(p.day),
         timeslot: p.timeslot,
-        totalSeats: total,
+        totalSeats: effectiveTotal,
         occupiedSeats: occupied,
         emptySeats: empty,
-        isFull: (total > 0 && empty === 0),
+        isFull: (effectiveTotal > 0 && empty === 0),
         capacityLevel: level,
         lastChecked: new Date()
       };
@@ -845,16 +951,6 @@ function reportError(errorMessage) {
   return { success: true };
 }
 
-/**
- * 安全なログ記録
- */
-function safeLogOperation(operation, params, result, userAgent = 'Unknown', ipAddress = 'Unknown') {
-  try {
-    logOperation(operation, params, result, userAgent, ipAddress, true);
-  } catch (e) {
-    Logger.log('Safe log recording failed for ' + operation + ': ' + e.message);
-  }
-}
 
 // ===============================================================
 // === 危険コマンド機能（完全版） ===

@@ -1315,13 +1315,16 @@ class SupabaseAPI {
       reservedBy: seat.reserved_by
     }));
 
+    const availableSeats = seats.filter(s => s.status === 'available').length;
+    const blockedSeats = seats.filter(s => s.status === 'blocked' || s.status === 'unavailable').length;
+
     return {
       success: true,
       data: {
         seats: seats,
         performance: performanceResult.data[0],
-        totalSeats: seats.length,
-        availableSeats: seats.filter(s => s.status === 'available').length
+        totalSeats: seats.length - blockedSeats,
+        availableSeats: availableSeats
       }
     };
   }

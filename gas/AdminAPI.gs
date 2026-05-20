@@ -190,6 +190,9 @@ function adminChangeSeats(bookingId, newSeatIds) {
     // 3. メール再送（変更通知）
     adminResendEmail(bookingId);
 
+    // 4. ログ記録 (Admin)
+    safeLogOperation('adminChangeSeats', { bookingId, newSeatIds }, { success: true });
+
     return { success: true, message: '座席を変更しました' };
 
   } catch (e) {
@@ -231,6 +234,9 @@ function adminCancelReservation(bookingId) {
       supabaseIntegration.updateMultipleSeats(performanceId, updates);
     }
 
+    // ログ記録 (Admin)
+    safeLogOperation('adminCancelReservation', { bookingId }, { success: true });
+
     return { success: true, message: '予約を強制キャンセルしました' };
 
   } catch (e) {
@@ -267,6 +273,9 @@ function adminUpdateReservation(bookingId, updates) {
     if (!result.success) {
       return { success: false, error: result.error };
     }
+
+    // ログ記録 (Admin)
+    safeLogOperation('adminUpdateReservation', { bookingId, updates }, { success: true });
 
     return { success: true, message: '予約情報を更新しました', debug_updates: updates };
 
@@ -384,6 +393,9 @@ function adminResetPerformance(performanceId) {
     if (!bookingDeleteRes.success) {
       return { success: false, error: '予約データの削除に失敗しました: ' + bookingDeleteRes.error };
     }
+
+    // ログ記録 (Admin)
+    safeLogOperation('adminResetPerformance', { performanceId }, { success: true });
 
     return {
       success: true,
