@@ -197,15 +197,36 @@ function getBookingDetails(bookingId, passcode) {
  * 管理者がQRスキャンした場合は確認コードチェックをスキップするロジックも検討可能だが、
  * QRコードに確認コードを含めることでセキュリティを維持する。
  */
-function checkInReservation(bookingId, passcode) {
+function checkInReservation(bookingId, passcode, token = null) {
   try {
-    // 1. 存在確認と確認コード照合
-    const getRes = supabaseIntegration.getBookingByCredentials(bookingId, passcode);
-    if (!getRes.success) {
-      return { success: false, error: '予約が見つからないか、確認コードが間違っています' };
+    let isAuthorizedAdmin = false;
+    if (token) {
+      const session = validateSession(token);
+      if (session.success) {
+        isAuthorizedAdmin = true;
+      }
     }
 
-    const booking = getRes.data;
+    let booking;
+    if (isAuthorizedAdmin) {
+      // 管理者の場合はパスコード不要で取得
+      const getRes = supabaseIntegration.getBooking(bookingId);
+      if (!getRes.success) {
+        return { success: false, error: '予約が見つかりません' };
+      }
+      booking = getRes.data;
+    } else {
+      // 一般ユーザーの場合はパスコード必須で照合
+      if (!passcode || String(passcode).trim() === '') {
+        return { success: false, error: '確認コードが必要です' };
+      }
+      const getRes = supabaseIntegration.getBookingByCredentials(bookingId, passcode);
+      if (!getRes.success) {
+        return { success: false, error: '予約が見つからないか、確認コードが間違っています' };
+      }
+      booking = getRes.data;
+    }
+
     if (booking.status === 'checked_in') {
       return { success: true, message: '既にチェックイン済みです', data: booking };
     }

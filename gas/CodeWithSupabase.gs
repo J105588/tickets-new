@@ -40,6 +40,13 @@ function doPost(e) {
       });
     }
 
+    // セキュリティチェック: 管理者向けのアクションである場合はトークンを検証する
+    const actionOrFunc = action || params.func;
+    if (isReservedAdminAction(actionOrFunc)) {
+      const token = params.token || (e.parameter && e.parameter.token);
+      verifyAdminAccess(token);
+    }
+
     // 1. 新しいActionベースのルーティング (予約システム用)
     if (action) {
       switch (action) {
@@ -48,7 +55,7 @@ function doPost(e) {
           response = createReservation(params);
           break;
         case 'check_in':
-          response = checkInReservation(params.id, params.passcode);
+          response = checkInReservation(params.id, params.passcode, params.token || (e.parameter && e.parameter.token));
           break;
         case 'cancel_reservation':
           response = cancelReservation(params.id, params.passcode);
@@ -230,6 +237,14 @@ function doGet(e) {
 
   try {
     const action = e.parameter.action;
+    const funcName = e.parameter.func;
+    const actionOrFunc = action || funcName;
+
+    // セキュリティチェック: 管理者向けのアクションである場合はトークンを検証する
+    if (isReservedAdminAction(actionOrFunc)) {
+      const token = e.parameter.token;
+      verifyAdminAccess(token);
+    }
 
     // 1. Actionベースのルーティング
     if (action) {
@@ -329,7 +344,7 @@ function doGet(e) {
 
         case 'check_in':
           // Adminスキャン、または自己チェックイン
-          response = checkInReservation(e.parameter.id, e.parameter.passcode);
+          response = checkInReservation(e.parameter.id, e.parameter.passcode, e.parameter.token);
           break;
         case 'verify_admin_password':
           const propPass = PropertiesService.getScriptProperties().getProperty('ADMIN_PASSWORD_2');
@@ -341,7 +356,13 @@ function doGet(e) {
             const inputPassword = e.parameter.password ? e.parameter.password.trim() : '';
 
             if (inputPassword === correctPassword) {
-              response = { success: true };
+              // 管理者ログイン成功時にトークンを生成して返す
+              const loginResult = login('admin', inputPassword);
+              if (loginResult.success) {
+                response = { success: true, token: loginResult.token };
+              } else {
+                response = { success: false, error: 'セッション生成に失敗しました: ' + loginResult.error };
+              }
             } else {
               response = { success: false, error: 'パスワードが違います' };
             }
@@ -1530,3 +1551,44 @@ function validateSession(token, maxAgeMs) {
     return { success: false, error: 'server_error' };
   }
 }
+
+/**
+ * リクエストされたアクションまたは関数名が管理者向けのアクションであるかを判定する
+ */
+function isReservedAdminAction(actionOrFunc) {
+  if (!actionOrFunc) return false;
+  
+  // admin_ から始まるもの
+  if (actionOrFunc.indexOf('admin_') === 0 || actionOrFunc.indexOf('admin') === 0) {
+    if (actionOrFunc === 'validate_invite_token' || actionOrFunc === 'validateAdminToken') {
+      return false;
+    }
+    return true;
+  }
+  
+  // その他管理者専用の機能名
+  const adminFunctions = [
+    'delete_schedule', 'save_schedule', 'deleteSchedule', 'saveSchedule',
+    'execDangerCommand', 'initiateDangerCommand', 'confirmDangerCommand', 'listDangerPending', 'performDangerAction',
+    'getOperationLogs', 'getLogStatistics', 'getClientAuditLogs', 'getClientAuditStatistics',
+    'saveGlobalDeadline', 'saveGroup', 'saveEventDate', 'saveTimeSlot', 'deleteMaster',
+    'broadcastAdminNotice'
+  ];
+  
+  return adminFunctions.indexOf(actionOrFunc) !== -1;
+}
+
+/**
+ * 管理者セッションのトークンを厳格に検証する
+ */
+function verifyAdminAccess(token) {
+  if (!token) {
+    throw new Error('セッションが無効です。再度ログインしてください。(token_missing)');
+  }
+  const session = validateSession(token);
+  if (!session.success) {
+    throw new Error('セッションが無効であるか期限切れです。再度ログインしてください。(' + session.error + ')');
+  }
+  return session;
+}
+

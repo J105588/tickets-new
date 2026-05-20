@@ -1,0 +1,19 @@
+"filename", "language", "JavaScript", "HTML", "MS SQL", "comment", "blank", "total"
+"c:\dev\tickets-new\assets\js\admin-scan.js", "JavaScript", 24, 0, 0, 1, 4, 29
+"c:\dev\tickets-new\assets\js\admin-settings.js", "JavaScript", 0, 0, 0, 0, -2, -2
+"c:\dev\tickets-new\assets\js\config.js", "JavaScript", 21, 0, 0, 2, 2, 25
+"c:\dev\tickets-new\assets\js\idb-storage.js", "JavaScript", 176, 0, 0, 15, 29, 220
+"c:\dev\tickets-new\assets\js\offline-sync-v2.js", "JavaScript", 36, 0, 0, 5, 3, 44
+"c:\dev\tickets-new\assets\js\offline-sync.js", "JavaScript", -440, 0, 0, -55, -77, -572
+"c:\dev\tickets-new\assets\js\optimized-loader.js", "JavaScript", 2, 0, 0, 0, 0, 2
+"c:\dev\tickets-new\assets\js\reservation.js", "JavaScript", 67, 0, 0, 3, 15, 85
+"c:\dev\tickets-new\assets\js\seats-main.js", "JavaScript", 10, 0, 0, -1, 2, 11
+"c:\dev\tickets-new\assets\js\supabase-client.js", "JavaScript", 18, 0, 0, 2, 0, 20
+"c:\dev\tickets-new\assets\js\system-lock.js", "JavaScript", 117, 0, 0, 5, 24, 146
+"c:\dev\tickets-new\gas\CodeWithSupabase.gs", "JavaScript", 9, 0, 0, 1, 0, 10
+"c:\dev\tickets-new\gas\MissingFunctions.gs", "JavaScript", 52, 0, 0, -1, 4, 55
+"c:\dev\tickets-new\pages\admin-scan.html", "HTML", 0, 4, 0, 0, 1, 5
+"c:\dev\tickets-new\pages\reservation.html", "HTML", 0, 22, 0, 0, 2, 24
+"c:\dev\tickets-new\supabase\migrations\20260315000000_fix_s_seats_rpc_and_data.sql", "MS SQL", 0, 0, 71, 17, 5, 93
+"c:\dev\tickets-new\sw.js", "JavaScript", 6, 0, 0, 1, 0, 7
+"Total", "-", 98, 26, 71, -5, 12, 202

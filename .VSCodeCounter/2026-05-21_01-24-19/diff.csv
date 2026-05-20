@@ -1,0 +1,65 @@
+"filename", "language", "JSON", "HTML", "JavaScript", "MS SQL", "PostCSS", "comment", "blank", "total"
+"c:\dev\tickets-new\assets\css\admin-scan.css", "PostCSS", 0, 0, 0, 0, -15, 15, 0, 0
+"c:\dev\tickets-new\assets\css\admin.css", "PostCSS", 0, 0, 0, 0, -53, 70, 2, 19
+"c:\dev\tickets-new\assets\css\logs.css", "PostCSS", 0, 0, 0, 0, -23, 23, 0, 0
+"c:\dev\tickets-new\assets\css\offline-sync-v2.css", "PostCSS", 0, 0, 0, 0, -23, 23, 0, 0
+"c:\dev\tickets-new\assets\css\reservation-status.css", "PostCSS", 0, 0, 0, 0, -18, 18, 0, 0
+"c:\dev\tickets-new\assets\css\reservation.css", "PostCSS", 0, 0, 0, 0, -57, 57, 0, 0
+"c:\dev\tickets-new\assets\css\seats.css", "PostCSS", 0, 0, 0, 0, -113, 113, 0, 0
+"c:\dev\tickets-new\assets\css\styles.css", "PostCSS", 0, 0, 0, 0, 11, 5, 2, 18
+"c:\dev\tickets-new\assets\css\walkin.css", "PostCSS", 0, 0, 0, 0, -9, 9, 0, 0
+"c:\dev\tickets-new\assets\js\admin-scan.js", "JavaScript", 0, 0, -3, 0, 0, 4, 0, 1
+"c:\dev\tickets-new\assets\js\admin-settings.js", "JavaScript", 0, 0, -4, 0, 0, 4, 0, 0
+"c:\dev\tickets-new\assets\js\admin.js", "JavaScript", 0, 0, -47, 0, 0, 0, -8, -55
+"c:\dev\tickets-new\assets\js\admin\AdminAuth.js", "JavaScript", 0, 0, 61, 0, 0, 6, 15, 82
+"c:\dev\tickets-new\assets\js\admin\AdminLayout.js", "JavaScript", 0, 0, 39, 0, 0, 5, 11, 55
+"c:\dev\tickets-new\assets\js\admin\AdminMonitoring.js", "JavaScript", 0, 0, 1778, 0, 0, 110, 223, 2111
+"c:\dev\tickets-new\assets\js\admin\AdminSidebar.js", "JavaScript", 0, 0, 65, 0, 0, 0, 4, 69
+"c:\dev\tickets-new\assets\js\admin\AdminUI.js", "JavaScript", 0, 0, 36, 0, 0, 1, 4, 41
+"c:\dev\tickets-new\assets\js\api.js", "JavaScript", 0, 0, 43, 0, 0, 6, 15, 64
+"c:\dev\tickets-new\assets\js\audit-logger.js", "JavaScript", 0, 0, 9, 0, 0, 0, 1, 10
+"c:\dev\tickets-new\assets\js\custom-dialog.js", "JavaScript", 0, 0, -10, 0, 0, 10, 0, 0
+"c:\dev\tickets-new\assets\js\error-handler.js", "JavaScript", 0, 0, -34, 0, 0, 34, 0, 0
+"c:\dev\tickets-new\assets\js\error-notification.js", "JavaScript", 0, 0, 13, 0, 0, 0, -13, 0
+"c:\dev\tickets-new\assets\js\idb-storage.js", "JavaScript", 0, 0, -38, 0, 0, 38, 0, 0
+"c:\dev\tickets-new\assets\js\logs-main.js", "JavaScript", 0, 0, 68, 0, 0, 10, 14, 92
+"c:\dev\tickets-new\assets\js\maintenance-check.js", "JavaScript", 0, 0, -7, 0, 0, 9, -2, 0
+"c:\dev\tickets-new\assets\js\offline-sync-v2.js", "JavaScript", 0, 0, -123, 0, 0, 157, -34, 0
+"c:\dev\tickets-new\assets\js\performance-monitor.js", "JavaScript", 0, 0, 8, 0, 0, 0, -8, 0
+"c:\dev\tickets-new\assets\js\pwa-update.js", "JavaScript", 0, 0, 22, 0, 0, 0, -22, 0
+"c:\dev\tickets-new\assets\js\reservation-status.js", "JavaScript", 0, 0, -7, 0, 0, 7, 0, 0
+"c:\dev\tickets-new\assets\js\reservation.js", "JavaScript", 0, 0, -7, 0, 0, 7, 0, 0
+"c:\dev\tickets-new\assets\js\seats-main.js", "JavaScript", 0, 0, -2, 0, 0, 3, -1, 0
+"c:\dev\tickets-new\assets\js\supabase-api.js", "JavaScript", 0, 0, -10, 0, 0, 12, 1, 3
+"c:\dev\tickets-new\assets\js\supabase-client.js", "JavaScript", 0, 0, -8, 0, 0, 13, 0, 5
+"c:\dev\tickets-new\assets\js\timeslot-schedules.js", "JavaScript", 0, 0, -4, 0, 0, 4, 0, 0
+"c:\dev\tickets-new\assets\js\ui-optimizer.js", "JavaScript", 0, 0, 2, 0, 0, 0, -2, 0
+"c:\dev\tickets-new\assets\js\walkin-main.js", "JavaScript", 0, 0, 37, 0, 0, -13, -24, 0
+"c:\dev\tickets-new\gas\AdminAPI.gs", "JavaScript", 0, 0, -16, 0, 0, 27, 4, 15
+"c:\dev\tickets-new\gas\BackupManager.gs", "JavaScript", 0, 0, -23, 0, 0, 23, 0, 0
+"c:\dev\tickets-new\gas\CodeWithSupabase.gs", "JavaScript", 0, 0, 16, 0, 0, 80, 12, 108
+"c:\dev\tickets-new\gas\MasterDataAPI.gs", "JavaScript", 0, 0, -34, 0, 0, 34, 0, 0
+"c:\dev\tickets-new\gas\Migration.gs", "JavaScript", 0, 0, -4, 0, 0, 4, 0, 0
+"c:\dev\tickets-new\gas\MissingFunctions.gs", "JavaScript", 0, 0, -44, 0, 0, 127, 13, 96
+"c:\dev\tickets-new\gas\ReservationAPI.gs", "JavaScript", 0, 0, -3, 0, 0, 37, -7, 27
+"c:\dev\tickets-new\gas\SupabaseSettings.gs", "JavaScript", 0, 0, -22, 0, 0, 22, 0, 0
+"c:\dev\tickets-new\gas\Triggers.gs", "JavaScript", 0, 0, 25, 0, 0, 15, 7, 47
+"c:\dev\tickets-new\gas\appsscript.json", "JSON", 1, 0, 0, 0, 0, 0, 0, 1
+"c:\dev\tickets-new\gas\system-setting.gs", "JavaScript", 0, 0, -19, 0, 0, 19, 0, 0
+"c:\dev\tickets-new\index.html", "HTML", 0, -6, 0, 0, 0, 9, 0, 3
+"c:\dev\tickets-new\pages\admin-login.html", "HTML", 0, 4, 0, 0, 0, 0, 0, 4
+"c:\dev\tickets-new\pages\admin-logs.html", "HTML", 0, 638, 0, 0, 0, 16, 96, 750
+"c:\dev\tickets-new\pages\admin-scan.html", "HTML", 0, -8, 0, 0, 0, 11, 0, 3
+"c:\dev\tickets-new\pages\admin.html", "HTML", 0, -85, 0, 0, 0, 37, -3, -51
+"c:\dev\tickets-new\pages\monitoring-dashboard.html", "HTML", 0, -1825, 0, 0, 0, 12, -253, -2066
+"c:\dev\tickets-new\pages\reservation-status.html", "HTML", 0, -5, 0, 0, 0, 8, 0, 3
+"c:\dev\tickets-new\pages\reservation.html", "HTML", 0, -15, 0, 0, 0, 18, 0, 3
+"c:\dev\tickets-new\pages\seats.html", "HTML", 0, -9, 0, 0, 0, 12, 0, 3
+"c:\dev\tickets-new\pages\timeslot.html", "HTML", 0, -5, 0, 0, 0, 8, 0, 3
+"c:\dev\tickets-new\pages\walkin.html", "HTML", 0, -4, 0, 0, 0, 7, 0, 3
+"c:\dev\tickets-new\supabase\database\14_create_audit_logs.sql", "MS SQL", 0, 0, 0, 58, 0, 7, 11, 76
+"c:\dev\tickets-new\supabase\database\15_add_is_error_to_audit_logs.sql", "MS SQL", 0, 0, 0, 37, 0, 6, 8, 51
+"c:\dev\tickets-new\supabase\database\16_refine_is_error_logic.sql", "MS SQL", 0, 0, 0, 53, 0, 9, 8, 70
+"c:\dev\tickets-new\supabase\database\17_optimize_audit_logs_db.sql", "MS SQL", 0, 0, 0, 32, 0, 9, 9, 50
+"c:\dev\tickets-new\supabase\database\18_secure_admin_rpc_permissions.sql", "MS SQL", 0, 0, 0, 20, 0, 8, 6, 34
+"Total", "-", 1, -1320, 1753, 200, -300, 1325, 89, 1748

@@ -1,0 +1,159 @@
+Date : 2026-05-21 01:24:19
+Directory : c:\dev\tickets-new
+Total : 114 files,  36615 codes, 4284 comments, 6210 blanks, all 47109 lines
+
+Languages
++------------+------------+------------+------------+------------+------------+
+| language   | files      | code       | comment    | blank      | total      |
++------------+------------+------------+------------+------------+------------+
+| JavaScript |         56 |     23,140 |      3,418 |      4,016 |     30,574 |
+| PostCSS    |         10 |      5,992 |        333 |        981 |      7,306 |
+| HTML       |         11 |      4,620 |        138 |        595 |      5,353 |
+| MS SQL     |         28 |      1,849 |        395 |        332 |      2,576 |
+| Markdown   |          5 |        870 |          0 |        277 |      1,147 |
+| JSON       |          2 |        104 |          0 |          0 |        104 |
+| YAML       |          1 |         31 |          0 |          8 |         39 |
+| XML        |          1 |          9 |          0 |          1 |         10 |
++------------+------------+------------+------------+------------+------------+
+
+Directories
++------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                                     | files      | code       | comment    | blank      | total      |
++------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                        |        114 |     36,615 |      4,284 |      6,210 |     47,109 |
+| . (Files)                                                                                |          6 |      1,041 |         37 |        179 |      1,257 |
+| .github                                                                                  |          1 |         31 |          0 |          8 |         39 |
+| .github\workflows                                                                        |          1 |         31 |          0 |          8 |         39 |
+| assets                                                                                   |         54 |     25,144 |      2,827 |      4,268 |     32,239 |
+| assets\css                                                                               |         10 |      5,992 |        333 |        981 |      7,306 |
+| assets\js                                                                                |         44 |     19,152 |      2,494 |      3,287 |     24,933 |
+| assets\js (Files)                                                                        |         39 |     17,173 |      2,372 |      3,030 |     22,575 |
+| assets\js\admin                                                                          |          5 |      1,979 |        122 |        257 |      2,358 |
+| docs                                                                                     |          3 |        441 |          0 |        153 |        594 |
+| gas                                                                                      |         12 |      3,822 |        896 |        711 |      5,429 |
+| pages                                                                                    |         10 |      4,287 |        129 |        559 |      4,975 |
+| supabase                                                                                 |         28 |      1,849 |        395 |        332 |      2,576 |
+| supabase\database                                                                        |         23 |      1,657 |        350 |        303 |      2,310 |
+| supabase\migrations                                                                      |          5 |        192 |         45 |         29 |        266 |
++------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| filename                                                                                 | language   | code       | comment    | blank      | total      |
++------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| c:\dev\tickets-new\.github\workflows\deploy.yml                                          | YAML       |         31 |          0 |          8 |         39 |
+| c:\dev\tickets-new\README.md                                                             | Markdown   |        400 |          0 |        109 |        509 |
+| c:\dev\tickets-new\SECURITY.md                                                           | Markdown   |         29 |          0 |         15 |         44 |
+| c:\dev\tickets-new\assets\css\admin-scan.css                                             | PostCSS    |        354 |         15 |         56 |        425 |
+| c:\dev\tickets-new\assets\css\admin.css                                                  | PostCSS    |      1,080 |         70 |        165 |      1,315 |
+| c:\dev\tickets-new\assets\css\logs.css                                                   | PostCSS    |        512 |         23 |        100 |        635 |
+| c:\dev\tickets-new\assets\css\offline-sync-v2.css                                        | PostCSS    |        753 |         23 |        121 |        897 |
+| c:\dev\tickets-new\assets\css\reservation-status.css                                     | PostCSS    |        461 |         18 |         82 |        561 |
+| c:\dev\tickets-new\assets\css\reservation.css                                            | PostCSS    |        875 |         57 |        144 |      1,076 |
+| c:\dev\tickets-new\assets\css\seats.css                                                  | PostCSS    |      1,140 |        113 |        179 |      1,432 |
+| c:\dev\tickets-new\assets\css\sidebar.css                                                | PostCSS    |        213 |          0 |         36 |        249 |
+| c:\dev\tickets-new\assets\css\styles.css                                                 | PostCSS    |        325 |          5 |         51 |        381 |
+| c:\dev\tickets-new\assets\css\walkin.css                                                 | PostCSS    |        279 |          9 |         47 |        335 |
+| c:\dev\tickets-new\assets\js\admin-scan.js                                               | JavaScript |        541 |         56 |         97 |        694 |
+| c:\dev\tickets-new\assets\js\admin-settings.js                                           | JavaScript |        235 |         20 |         47 |        302 |
+| c:\dev\tickets-new\assets\js\admin.js                                                    | JavaScript |        995 |        111 |        204 |      1,310 |
+| c:\dev\tickets-new\assets\js\admin\AdminAuth.js                                          | JavaScript |         61 |          6 |         15 |         82 |
+| c:\dev\tickets-new\assets\js\admin\AdminLayout.js                                        | JavaScript |         39 |          5 |         11 |         55 |
+| c:\dev\tickets-new\assets\js\admin\AdminMonitoring.js                                    | JavaScript |      1,778 |        110 |        223 |      2,111 |
+| c:\dev\tickets-new\assets\js\admin\AdminSidebar.js                                       | JavaScript |         65 |          0 |          4 |         69 |
+| c:\dev\tickets-new\assets\js\admin\AdminUI.js                                            | JavaScript |         36 |          1 |          4 |         41 |
+| c:\dev\tickets-new\assets\js\api-cache.js                                                | JavaScript |        252 |         39 |         57 |        348 |
+| c:\dev\tickets-new\assets\js\api.js                                                      | JavaScript |        773 |        103 |        127 |      1,003 |
+| c:\dev\tickets-new\assets\js\audit-logger.js                                             | JavaScript |        220 |         12 |         29 |        261 |
+| c:\dev\tickets-new\assets\js\auth.js                                                     | JavaScript |        378 |         37 |         45 |        460 |
+| c:\dev\tickets-new\assets\js\config.js                                                   | JavaScript |        321 |         53 |         54 |        428 |
+| c:\dev\tickets-new\assets\js\connection-recovery.js                                      | JavaScript |        182 |         20 |         49 |        251 |
+| c:\dev\tickets-new\assets\js\custom-dialog.js                                            | JavaScript |        192 |         12 |         25 |        229 |
+| c:\dev\tickets-new\assets\js\enhanced-status-monitor.js                                  | JavaScript |        327 |         48 |         75 |        450 |
+| c:\dev\tickets-new\assets\js\error-handler.js                                            | JavaScript |        135 |         47 |         27 |        209 |
+| c:\dev\tickets-new\assets\js\error-notification.js                                       | JavaScript |        219 |         11 |         27 |        257 |
+| c:\dev\tickets-new\assets\js\fallback-manager.js                                         | JavaScript |        147 |         22 |         30 |        199 |
+| c:\dev\tickets-new\assets\js\full-capacity-monitor.js                                    | JavaScript |        197 |         28 |         44 |        269 |
+| c:\dev\tickets-new\assets\js\idb-storage.js                                              | JavaScript |        138 |         53 |         29 |        220 |
+| c:\dev\tickets-new\assets\js\index-main.js                                               | JavaScript |         63 |          9 |         16 |         88 |
+| c:\dev\tickets-new\assets\js\logs-main.js                                                | JavaScript |        759 |        120 |        146 |      1,025 |
+| c:\dev\tickets-new\assets\js\maintenance-check.js                                        | JavaScript |        243 |         30 |         29 |        302 |
+| c:\dev\tickets-new\assets\js\offline-sync-v2.js                                          | JavaScript |      2,562 |        405 |        350 |      3,317 |
+| c:\dev\tickets-new\assets\js\optimized-api.js                                            | JavaScript |        279 |         39 |         50 |        368 |
+| c:\dev\tickets-new\assets\js\optimized-loader.js                                         | JavaScript |        129 |         14 |         27 |        170 |
+| c:\dev\tickets-new\assets\js\performance-monitor.js                                      | JavaScript |        234 |         11 |         44 |        289 |
+| c:\dev\tickets-new\assets\js\pwa-install.js                                              | JavaScript |        205 |         22 |         29 |        256 |
+| c:\dev\tickets-new\assets\js\pwa-update.js                                               | JavaScript |        423 |         20 |         38 |        481 |
+| c:\dev\tickets-new\assets\js\reservation-status.js                                       | JavaScript |        241 |         40 |         53 |        334 |
+| c:\dev\tickets-new\assets\js\reservation.js                                              | JavaScript |        830 |        128 |        176 |      1,134 |
+| c:\dev\tickets-new\assets\js\seat-config.js                                              | JavaScript |        257 |         29 |         41 |        327 |
+| c:\dev\tickets-new\assets\js\seats-main.js                                               | JavaScript |      2,108 |        400 |        425 |      2,933 |
+| c:\dev\tickets-new\assets\js\sidebar.js                                                  | JavaScript |        318 |         21 |         37 |        376 |
+| c:\dev\tickets-new\assets\js\supabase-api.js                                             | JavaScript |      1,111 |        187 |        216 |      1,514 |
+| c:\dev\tickets-new\assets\js\supabase-client.js                                          | JavaScript |        632 |         53 |        104 |        789 |
+| c:\dev\tickets-new\assets\js\supabase-settings.js                                        | JavaScript |         67 |         14 |         15 |         96 |
+| c:\dev\tickets-new\assets\js\system-diagnostics.js                                       | JavaScript |        334 |         42 |         89 |        465 |
+| c:\dev\tickets-new\assets\js\system-lock.js                                              | JavaScript |        204 |         17 |         34 |        255 |
+| c:\dev\tickets-new\assets\js\timeslot-main.js                                            | JavaScript |        147 |         24 |         40 |        211 |
+| c:\dev\tickets-new\assets\js\timeslot-schedules.js                                       | JavaScript |         80 |          6 |          5 |         91 |
+| c:\dev\tickets-new\assets\js\ui-optimizer.js                                             | JavaScript |        272 |         35 |         63 |        370 |
+| c:\dev\tickets-new\assets\js\walkin-main.js                                              | JavaScript |        423 |         34 |         37 |        494 |
+| c:\dev\tickets-new\browserconfig.xml                                                     | XML        |          9 |          0 |          1 |         10 |
+| c:\dev\tickets-new\docs\CompleteMigrationSummary.md                                      | Markdown   |        110 |          0 |         28 |        138 |
+| c:\dev\tickets-new\docs\IMPLEMENTATION_README.md                                         | Markdown   |        181 |          0 |         76 |        257 |
+| c:\dev\tickets-new\docs\SUPABASE_MIGRATION_README.md                                     | Markdown   |        150 |          0 |         49 |        199 |
+| c:\dev\tickets-new\gas\AdminAPI.gs                                                       | JavaScript |        331 |        111 |         99 |        541 |
+| c:\dev\tickets-new\gas\BackupManager.gs                                                  | JavaScript |        223 |         67 |         46 |        336 |
+| c:\dev\tickets-new\gas\CodeWithSupabase.gs                                               | JavaScript |      1,160 |        236 |        199 |      1,595 |
+| c:\dev\tickets-new\gas\MasterDataAPI.gs                                                  | JavaScript |        197 |         75 |         45 |        317 |
+| c:\dev\tickets-new\gas\Migration.gs                                                      | JavaScript |         66 |         10 |         10 |         86 |
+| c:\dev\tickets-new\gas\MissingFunctions.gs                                               | JavaScript |      1,046 |        200 |        148 |      1,394 |
+| c:\dev\tickets-new\gas\ReservationAPI.gs                                                 | JavaScript |        302 |         92 |         67 |        461 |
+| c:\dev\tickets-new\gas\SupabaseIntegration.gs                                            | JavaScript |        231 |         31 |         41 |        303 |
+| c:\dev\tickets-new\gas\SupabaseSettings.gs                                               | JavaScript |        184 |         35 |         40 |        259 |
+| c:\dev\tickets-new\gas\Triggers.gs                                                       | JavaScript |         25 |         15 |          7 |         47 |
+| c:\dev\tickets-new\gas\appsscript.json                                                   | JSON       |         18 |          0 |          0 |         18 |
+| c:\dev\tickets-new\gas\system-setting.gs                                                 | JavaScript |         39 |         24 |          9 |         72 |
+| c:\dev\tickets-new\index.html                                                            | HTML       |        333 |          9 |         36 |        378 |
+| c:\dev\tickets-new\manifest.json                                                         | JSON       |         86 |          0 |          0 |         86 |
+| c:\dev\tickets-new\pages\admin-login.html                                                | HTML       |        179 |          0 |         26 |        205 |
+| c:\dev\tickets-new\pages\admin-logs.html                                                 | HTML       |        638 |         16 |         96 |        750 |
+| c:\dev\tickets-new\pages\admin-scan.html                                                 | HTML       |        132 |         11 |         20 |        163 |
+| c:\dev\tickets-new\pages\admin.html                                                      | HTML       |        986 |         37 |         94 |      1,117 |
+| c:\dev\tickets-new\pages\monitoring-dashboard.html                                       | HTML       |      1,005 |         12 |        170 |      1,187 |
+| c:\dev\tickets-new\pages\reservation-status.html                                         | HTML       |         92 |          8 |         14 |        114 |
+| c:\dev\tickets-new\pages\reservation.html                                                | HTML       |        212 |         18 |         31 |        261 |
+| c:\dev\tickets-new\pages\seats.html                                                      | HTML       |        373 |         12 |         37 |        422 |
+| c:\dev\tickets-new\pages\timeslot.html                                                   | HTML       |        311 |          8 |         34 |        353 |
+| c:\dev\tickets-new\pages\walkin.html                                                     | HTML       |        359 |          7 |         37 |        403 |
+| c:\dev\tickets-new\supabase\database\02_create_settings_table.sql                        | MS SQL     |         12 |          9 |          5 |         26 |
+| c:\dev\tickets-new\supabase\database\03_fix_settings_policy.sql                          | MS SQL     |          9 |          6 |          4 |         19 |
+| c:\dev\tickets-new\supabase\database\04_get_server_time.sql                              | MS SQL     |          6 |          2 |          2 |         10 |
+| c:\dev\tickets-new\supabase\database\04_get_server_time_jst.sql                          | MS SQL     |          6 |          2 |          2 |         10 |
+| c:\dev\tickets-new\supabase\database\05_update_rpc_admin_booking.sql                     | MS SQL     |         47 |         11 |          7 |         65 |
+| c:\dev\tickets-new\supabase\database\06_secure_rpc.sql                                   | MS SQL     |         37 |         15 |          7 |         59 |
+| c:\dev\tickets-new\supabase\database\07_fix_ambiguous_rpc.sql                            | MS SQL     |          1 |          9 |          3 |         13 |
+| c:\dev\tickets-new\supabase\database\07_secure_settings_rls.sql                          | MS SQL     |          2 |          9 |          5 |         16 |
+| c:\dev\tickets-new\supabase\database\08_create_reservation_rpc.sql                       | MS SQL     |         73 |          9 |         10 |         92 |
+| c:\dev\tickets-new\supabase\database\08_optimize_indices.sql                             | MS SQL     |          2 |          5 |          3 |         10 |
+| c:\dev\tickets-new\supabase\database\09_add_bypass_token.sql                             | MS SQL     |          8 |          1 |          1 |         10 |
+| c:\dev\tickets-new\supabase\database\11_create_booking_events.sql                        | MS SQL     |         63 |         22 |         18 |        103 |
+| c:\dev\tickets-new\supabase\database\12_secure_settings.sql                              | MS SQL     |         11 |         12 |          5 |         28 |
+| c:\dev\tickets-new\supabase\database\13_cleanup_schema.sql                               | MS SQL     |          4 |          7 |          4 |         15 |
+| c:\dev\tickets-new\supabase\database\14_create_audit_logs.sql                            | MS SQL     |         58 |          7 |         11 |         76 |
+| c:\dev\tickets-new\supabase\database\15_add_is_error_to_audit_logs.sql                   | MS SQL     |         37 |          6 |          8 |         51 |
+| c:\dev\tickets-new\supabase\database\16_refine_is_error_logic.sql                        | MS SQL     |         53 |          9 |          8 |         70 |
+| c:\dev\tickets-new\supabase\database\17_optimize_audit_logs_db.sql                       | MS SQL     |         32 |          9 |          9 |         50 |
+| c:\dev\tickets-new\supabase\database\18_secure_admin_rpc_permissions.sql                 | MS SQL     |         20 |          8 |          6 |         34 |
+| c:\dev\tickets-new\supabase\database\nazuna-kunieda.sql                                  | MS SQL     |        410 |         57 |         60 |        527 |
+| c:\dev\tickets-new\supabase\database\refactor-master-data.sql                            | MS SQL     |         51 |         14 |         10 |         75 |
+| c:\dev\tickets-new\supabase\database\reservation-feature.sql                             | MS SQL     |        305 |         64 |         55 |        424 |
+| c:\dev\tickets-new\supabase\database\supabase-schema.sql                                 | MS SQL     |        410 |         57 |         60 |        527 |
+| c:\dev\tickets-new\supabase\migrations\20260228000000_delete_s14_s25_seats.sql           | MS SQL     |         34 |          8 |          5 |         47 |
+| c:\dev\tickets-new\supabase\migrations\20260228004340_add_realtime_publication.sql       | MS SQL     |          7 |          0 |          2 |          9 |
+| c:\dev\tickets-new\supabase\migrations\20260228073917_fix_reservation_race_condition.sql | MS SQL     |         73 |          9 |         10 |         92 |
+| c:\dev\tickets-new\supabase\migrations\20260301000000_cleanup_orphaned_seats.sql         | MS SQL     |          7 |         11 |          7 |         25 |
+| c:\dev\tickets-new\supabase\migrations\20260315000000_fix_s_seats_rpc_and_data.sql       | MS SQL     |         71 |         17 |          5 |         93 |
+| c:\dev\tickets-new\sw.js                                                                 | JavaScript |        184 |         28 |         18 |        230 |
+| Total                                                                                    |            |     36,615 |      4,284 |      6,210 |     47,109 |
++------------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+

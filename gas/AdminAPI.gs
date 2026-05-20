@@ -411,7 +411,10 @@ function adminResetPerformance(performanceId) {
 // 期限切れ回避用トークン (Admin Invite Token)
 // ==========================================
 
-const ADMIN_TOKEN_SECRET = 'SECRET_SALT_CHANGE_THIS_IN_PROD'; // 簡易署名用
+const ADMIN_TOKEN_SECRET = (function() {
+  const secret = PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN_SECRET');
+  return secret || 'SECRET_SALT_CHANGE_THIS_IN_PROD';
+})(); // 簡易署名用
 
 /**
  * 招待リンク用トークン生成

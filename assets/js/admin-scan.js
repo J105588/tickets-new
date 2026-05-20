@@ -178,6 +178,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     hideLoader();
                     if (res && res.success) {
                         sessionStorage.setItem('admin_session', 'active');
+                        sessionStorage.setItem('admin_token', res.token);
                         sessionStorage.setItem('admin_verified_at', new Date().toISOString());
                         sessionStorage.setItem('admin_last_active', new Date().getTime().toString());
                         btn.innerText = 'ログイン成功';
