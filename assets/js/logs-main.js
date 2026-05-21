@@ -104,10 +104,12 @@ function setupEventListeners() {
   // フィルター変更時のイベント（null安全）
   const opFilter = document.getElementById('operation-filter');
   const stFilter = document.getElementById('status-filter');
+  const successFilter = document.getElementById('success-filter');
   const limFilter = document.getElementById('limit-filter');
   if (opFilter) opFilter.addEventListener('change', applyFilters);
   if (stFilter) stFilter.addEventListener('change', applyFilters);
-  if (limFilter) limFilter.addEventListener('change', applyFilters);
+  if (successFilter) successFilter.addEventListener('change', () => updateLogsTable());
+  if (limFilter) limFilter.addEventListener('change', () => updateLogsTable());
   const textFilter = document.getElementById('text-filter');
   if (textFilter) textFilter.addEventListener('input', () => updateLogsTable());
   const dateStart = document.getElementById('date-start');
@@ -333,10 +335,10 @@ async function loadLogs() {
   try {
     showLoading(true);
 
-    const limit = parseInt(document.getElementById('limit-filter').value) || 100;
     const type = document.getElementById('operation-filter').value || null;
     const status = document.getElementById('status-filter').value || null;
-    const response = await GasAPI._callApi('getClientAuditLogs', [limit, type, status]);
+    // 常に最大件数（10000件）を取得し、表示制限はフロントエンドで行う
+    const response = await GasAPI._callApi('getClientAuditLogs', [10000, type, status]);
 
     if (response.success) {
       currentLogs = response.logs || [];
@@ -393,9 +395,13 @@ function updateLogsTable() {
     return;
   }
 
+  // 表示件数制限の適用
+  const limitVal = document.getElementById('limit-filter')?.value || '100';
+  const displayLogs = limitVal === 'all' ? filtered : filtered.slice(0, parseInt(limitVal) || 100);
+
   const isHighlightEnabled = (() => { try { return document.getElementById('error-highlight-toggle')?.checked !== false; } catch (_) { return true; } })();
 
-  tbody.innerHTML = filtered.map(log => {
+  tbody.innerHTML = displayLogs.map(log => {
     const timestamp = new Date(log.timestamp).toLocaleString('ja-JP');
     const shortMeta = truncateJson(log.metadata, 80);
 
@@ -454,17 +460,24 @@ function updateLogsTable() {
   updateLogsCount();
 }
 
-// フィルタリング処理（テキスト/日付）
 function getFilteredLogs() {
   const text = (document.getElementById('text-filter')?.value || '').trim().toLowerCase();
   const startStr = document.getElementById('date-start')?.value || '';
   const endStr = document.getElementById('date-end')?.value || '';
+  const successVal = document.getElementById('success-filter')?.value || '';
   let startTs = null;
   let endTs = null;
   try { if (startStr) { startTs = new Date(startStr + 'T00:00:00').getTime(); } } catch (_) { }
   try { if (endStr) { endTs = new Date(endStr + 'T23:59:59.999').getTime(); } } catch (_) { }
 
   return currentLogs.filter(log => {
+    // ステータス（成功・エラー）フィルター
+    if (successVal) {
+      const isError = isErrorLog(log);
+      if (successVal === 'success' && isError) return false;
+      if (successVal === 'error' && !isError) return false;
+    }
+
     // 日付範囲
     try {
       const ts = new Date(log.timestamp).getTime();
@@ -493,6 +506,7 @@ function getFilteredLogs() {
 function clearFilters() {
   try { document.getElementById('operation-filter').value = ''; } catch (_) { }
   try { document.getElementById('status-filter').value = ''; } catch (_) { }
+  try { document.getElementById('success-filter').value = ''; } catch (_) { }
   try { document.getElementById('text-filter').value = ''; } catch (_) { }
   try { document.getElementById('date-start').value = ''; } catch (_) { }
   try { document.getElementById('date-end').value = ''; } catch (_) { }
