@@ -20,7 +20,7 @@ async function customConfirm(msg) {
 // グローバル変数
 let currentLogs = [];
 let autoRefreshInterval = null;
-let isAutoRefreshEnabled = false;
+let isAutoRefreshEnabled = true;
 let lastFullKeySet = new Set();
 
 // Utils
@@ -63,6 +63,9 @@ window.onload = async () => {
 
     // イベントリスナー設定
     setupEventListeners();
+
+    // デフォルトで自動更新をオンにする
+    toggleAutoRefresh(true);
 
     console.log('ログ表示システム初期化完了');
 

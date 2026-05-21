@@ -36,12 +36,6 @@ const SUPABASE_CONFIG = {
   anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzbW5xcGNpem11ZGZrZml0cmZnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg5ODc3OTksImV4cCI6MjA3NDU2Mzc5OX0.0BBCmyV_IrZBch-hvPgW5HuG6-zgE7T1Hdvl7a-aB7g" // 公開可能な匿名キー
 };
 
-// ログ記録用スプレッドシートID
-const LOG_SPREADSHEET_ID = '1ZGQ5BTNW_pTDuMvbZgla2B_soisdvtCM2UrnVi_L-5c';
-
-// ログ記録用シート名
-const LOG_SHEET_NAME = 'OPERATION_LOGS'; // ログを記録するシート名
-
 // 満席通知用メールアドレス（ハードコーディング）
 const FULL_CAPACITY_NOTIFICATION_EMAILS = [
   'jxjin2010@gmail.com',
