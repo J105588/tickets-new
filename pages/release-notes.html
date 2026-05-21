@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Nチケ - リリースノート</title>
+  <meta name="description" content="Nチケのシステム更新履歴、新機能、不具合修正をまとめたリリースノート。">
+  <meta name="theme-color" content="#090d16">
+  <link rel="icon" href="https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg">
+  <link rel="manifest" href="../manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="リリースノート">
+  <link rel="apple-touch-icon" href="https://www.ichigaku.ac.jp/html/top/images/img_topics04.jpg">
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="../assets/css/styles.css">
+  <link rel="stylesheet" href="../assets/css/sidebar.css">
+  <link rel="stylesheet" href="../assets/css/offline-sync-v2.css">
+  <link rel="stylesheet" href="../assets/css/release-notes.css">
+
+  <script src="../assets/js/custom-dialog.js"></script>
+</head>
+
+<body class="release-notes-page">
+
+  <div id="sidebar-container"></div>
+
+  <!-- オフライン状態インジケーター -->
+  <div id="offline-indicator" class="offline-indicator" style="display: none;">オフライン</div>
+
+  <!-- 同期進行状況バー -->
+  <div id="sync-progress-bar" class="sync-progress-bar" style="display: none;">
+    <div class="progress"></div>
+  </div>
+
+  <div id="main-content">
+    <header class="page-header">
+      <button class="menu-btn" onclick="toggleSidebar()" aria-label="メニューを開く">&#9776;</button>
+      <h1>リリースノート</h1>
+    </header>
+
+    <main class="release-notes-container">
+
+      <!-- Control Panel: Search & Category Filters -->
+      <section class="control-panel">
+
+        <!-- Keyword Search -->
+        <div class="search-wrapper">
+          <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="search-input" class="search-input" placeholder="コミットメッセージ、ハッシュ、作成者で検索..."
+            aria-label="検索">
+        </div>
+
+        <!-- Category Tabs -->
+        <div id="filter-tabs" class="filter-tabs">
+          <!-- JS Populated -->
+        </div>
+
+        <!-- Status Panel -->
+        <div class="status-panel">
+          <div class="status-indicator">
+            <div id="status-dot" class="status-dot"></div>
+            <span id="status-text">ステータス確認中</span>
+            <span style="opacity: 0.3; margin: 0 4px;">|</span>
+            <span>取得日時: <span id="last-fetched-time">未取得</span></span>
+          </div>
+
+          <button id="refresh-btn" class="refresh-btn" aria-label="手動更新">
+            <svg class="refresh-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+            </svg>
+            <span>最新に更新</span>
+          </button>
+        </div>
+
+      </section>
+
+      <!-- Connection / API Error Panel -->
+      <section id="error-container" style="display: none;"></section>
+
+      <!-- Dynamic Timeline -->
+      <section id="timeline-container">
+        <div class="loading">
+          <div class="spinner"></div>
+          <p>リリースノートを取得中...</p>
+        </div>
+      </section>
+
+      <footer class="copyright-footer">
+        &copy; 2026 Junxiang Jin. All Rights Reserved.
+      </footer>
+    </main>
+  </div>
+
+  <!-- 同期中モーダル -->
+  <div id="sync-modal" class="modal">
+    <div class="modal-content" style="text-align: center; max-width: 400px;">
+      <div class="spinner"></div>
+      <h3>オフライン操作を同期中...</h3>
+      <p>しばらくお待ちください。操作はできません。</p>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script type="module" src="../assets/js/optimized-loader.js"></script>
+  <script type="module" src="../assets/js/sidebar.js"></script>
+  <script type="module" src="../assets/js/release-notes.js"></script>
+  <script type="module" src="../assets/js/pwa-install.js"></script>
+  <script type="module" src="../assets/js/pwa-update.js"></script>
+  <script type="module" src="../assets/js/system-lock.js"></script>
+  <script type="module" src="../assets/js/maintenance-check.js"></script>
+
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('../sw.js')
+          .then((registration) => {
+            console.log('SW registered: ', registration);
+            registration.addEventListener('updatefound', () => {
+              const newWorker = registration.installing;
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  // Apply update automatically on wait state bypass
+                  console.log('New update available.');
+                }
+              });
+            });
+          })
+          .catch((err) => {
+            console.log('SW registration failed: ', err);
+          });
+      });
+    }
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'RELOAD') {
+          window.location.reload();
+        }
+      });
+    }
+  </script>
+</body>
+
+</html>
