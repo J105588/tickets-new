@@ -186,9 +186,9 @@ function performDangerAction(action, payload) {
 /**
  * 失敗しても処理を止めないログ記録
  */
-function safeLogOperation(operation, params, result, userAgent = 'Unknown', ipAddress = 'Unknown', isError = undefined) {
+function safeLogOperation(operation, params, result, userAgent = 'Unknown', ipAddress = 'Unknown', isError = undefined, sessionId = '') {
   try {
-    logOperation(operation, params, result, userAgent, ipAddress, isError);
+    logOperation(operation, params, result, userAgent, ipAddress, isError, sessionId);
   } catch (e) {
     console.error('Safe log recording failed for ' + operation + ': ' + e.message);
   }
@@ -197,7 +197,7 @@ function safeLogOperation(operation, params, result, userAgent = 'Unknown', ipAd
 /**
  * 操作ログを記録する
  */
-function logOperation(operation, params, result, userAgent, ipAddress, isErrorInput) {
+function logOperation(operation, params, result, userAgent, ipAddress, isErrorInput, sessionId) {
   try {
     const isError = isErrorInput !== undefined ? isErrorInput : (result && result.success === false);
     const logData = {
@@ -210,7 +210,8 @@ function logOperation(operation, params, result, userAgent, ipAddress, isErrorIn
         error: isError ? (result && (result.error || result.message) || 'Error') : ''
       },
       user_agent: userAgent || 'Unknown',
-      ip_address: ipAddress || 'Unknown'
+      ip_address: ipAddress || 'Unknown',
+      session_id: sessionId || ''
     };
 
     return supabaseIntegration._request('audit_logs', {

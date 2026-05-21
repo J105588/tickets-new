@@ -204,8 +204,9 @@ function doPost(e) {
         e.parameter, // パラメータ全体
         response,
         e.parameter.userAgent || 'Unknown',
-        '',
-        isError
+        e.parameter.ip || e.parameter.ipAddress || 'Unknown',
+        isError,
+        e.parameter.sessionId || ''
       );
     }
   } catch (logErr) {
@@ -577,8 +578,9 @@ function doGet(e) {
         e.parameter, 
         response, 
         e.parameter.userAgent || 'Unknown', 
-        '', // IPは必要に応じて補完
-        isError
+        e.parameter.ip || e.parameter.ipAddress || 'Unknown',
+        isError,
+        e.parameter.sessionId || ''
       );
     }
   } catch (logErr) {

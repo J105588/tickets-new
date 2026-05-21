@@ -389,6 +389,7 @@ function updateLogsTable() {
 
   if (filtered.length === 0) {
     tbody.innerHTML = '<tr><td colspan="4" class="no-data">ログがありません</td></tr>';
+    updateLogsCount();
     return;
   }
 
@@ -449,6 +450,8 @@ function updateLogsTable() {
       </tr>
     `;
   }).join('');
+
+  updateLogsCount();
 }
 
 // フィルタリング処理（テキスト/日付）
@@ -719,7 +722,20 @@ function truncateJson(jsonStr, maxLength) {
 // ログ件数を更新
 function updateLogsCount() {
   const el = document.getElementById('logs-count');
-  if (el) el.textContent = `${currentLogs.length}件`;
+  const filtered = getFilteredLogs();
+  const total = filtered.length;
+
+  if (el) el.textContent = `${total}件`;
+
+  // フィルタリングされたログから統計を計算して更新
+  const errorCount = filtered.filter(isErrorLog).length;
+  const successCount = total - errorCount;
+
+  updateStatistics({
+    totalOperations: total,
+    successCount: successCount,
+    errorCount: errorCount
+  });
 }
 
 // ログ詳細を表示
@@ -747,6 +763,7 @@ function showLogDetail(timestamp) {
   if (isError) {
     const description = getErrorDescription(log);
     descElement.textContent = description;
+    descElement.style.whiteSpace = 'pre-wrap';
     descElement.style.display = 'block';
   } else {
     descElement.style.display = 'none';
@@ -788,36 +805,99 @@ function showLogDetail(timestamp) {
 // エラー内容に基づいた日本語解説を取得
 function getErrorDescription(log) {
     const action = (log.action || '').toLowerCase();
-    const metaStr = (typeof log.metadata === 'string' ? log.metadata : JSON.stringify(log.metadata || {})).toLowerCase();
+    const type = (log.type || '').toLowerCase();
     
-    if (action.includes('fetch') || metaStr.includes('network') || metaStr.includes('failed to fetch')) {
-        return 'ネットワークエラー: サーバーとの通信に失敗しました。インターネット接続やSupabaseの稼働状態を確認してください。';
+    // メタデータからエラー文字列を抽出
+    let errorMsg = '';
+    try {
+        const meta = typeof log.metadata === 'string' ? JSON.parse(log.metadata) : log.metadata;
+        if (meta) {
+            errorMsg = meta.message || meta.error || meta.errorMessage || meta.errorMsg || meta.reason || '';
+            if (typeof errorMsg === 'object') {
+                errorMsg = JSON.stringify(errorMsg);
+            }
+        }
+    } catch (e) {
+        errorMsg = String(log.metadata || '');
     }
-    if (action.includes('timeout') || metaStr.includes('timeout')) {
-        return 'タイムアウト: 処理に時間がかかりすぎたため中断されました。データ量が多すぎるか、サーバーの応答が遅延しています。';
+    
+    const metaStr = (typeof log.metadata === 'string' ? log.metadata : JSON.stringify(log.metadata || {})).toLowerCase();
+    const searchStr = `${action} ${type} ${errorMsg.toLowerCase()} ${metaStr}`;
+
+    let category = 'システムエラー';
+    let detail = '予期しないエラーが発生しました。システム管理者にメタデータとエラー内容を添えて報告してください。';
+    let actionTip = 'しばらく時間をおいて再度お試しいただくか、解決しない場合はシステム管理者にお問い合わせください。';
+
+    // 1. ネットワークエラー
+    if (action.includes('fetch') || searchStr.includes('network') || searchStr.includes('failed to fetch') || searchStr.includes('cors')) {
+        category = 'ネットワーク通信エラー';
+        detail = 'サーバーとの通信に失敗しました。インターネット接続が不安定か、オフライン状態である可能性があります。また、一時的なサーバーの稼働停止やCORSポリシー違反も考えられます。';
+        actionTip = '接続状況を確認のうえ、ブラウザをリロード（F5）して再度お試しください。';
     }
-    if (metaStr.includes('permission') || metaStr.includes('denied') || metaStr.includes('authorized')) {
-        return '権限エラー: この操作を実行する権限がありません。管理者権限の設定を確認してください。';
+    // 2. タイムアウト
+    else if (action.includes('timeout') || searchStr.includes('timeout') || searchStr.includes('deadline')) {
+        category = '処理タイムアウト';
+        detail = 'サーバーからの応答が制限時間内に返ってきませんでした。データ処理量が多すぎるか、サーバー負荷が一時的に高まっています。';
+        actionTip = 'しばらく待ってから再度実行してください。処理対象の範囲（件数や期間など）を狭めてお試しいただくと解決する場合があります。';
     }
-    if (metaStr.includes('not found') || metaStr.includes('404')) {
-        return 'データ未検出: 指定されたリソースが見つかりませんでした。IDが正しいか確認してください。';
+    // 3. 認証・認可エラー
+    else if (searchStr.includes('token') || searchStr.includes('auth') || searchStr.includes('jwt') || searchStr.includes('expired') || searchStr.includes('unauthorized') || searchStr.includes('permission') || searchStr.includes('denied')) {
+        category = '認証・権限エラー';
+        detail = 'セッションの有効期限が切れたか、この操作を実行する権限がありません。ログイン状態が無効になっている可能性があります。';
+        actionTip = '一度ログアウトし、再度ログインし直してから実行してください。それでも解決しない場合は、管理者アカウントの権限設定を確認してください。';
     }
-    if (metaStr.includes('validation') || metaStr.includes('invalid')) {
-        return '入力エラー: 送信されたパラメータの形式が正しくありません。入力内容を見直してください。';
+    // 4. 重複エラー / ユニーク制約
+    else if (searchStr.includes('duplicate') || searchStr.includes('already exists') || searchStr.includes('unique constraint') || searchStr.includes('pkey') || searchStr.includes('primary key')) {
+        category = 'データ重複エラー';
+        detail = '既にデータベース内に登録されているデータと競合が発生しました。チケットの重複予約や、同じ識別子（IDなど）での二重登録が疑われます。';
+        actionTip = '送信したデータ内容（予約時間、ID等）が既存のものと重複していないか確認してください。画面の表示を更新して最新の状態を確認することをおすすめします。';
     }
-    if (metaStr.includes('quota') || metaStr.includes('limit')) {
-        return '制限超過: APIの実行制限や容量制限に達しました。しばらく待ってから再試行してください。';
+    // 5. 行レベルセキュリティ（RLS）違反
+    else if (searchStr.includes('rls') || searchStr.includes('row-level security') || searchStr.includes('policy')) {
+        category = 'データベースポリシー違反';
+        detail = 'Supabase データベースのセキュリティ制御（Row-Level Security Policy）により、該当レコードへの書き込みまたは読み込み操作が拒否されました。';
+        actionTip = '現在ログインしているユーザーのロール（管理者、一般ユーザー等）に対して、該当テーブルへの操作ポリシーが正しく設定されているか確認してください。';
+    }
+    // 6. 満席 / 在庫不足 / キャパシティ超過
+    else if (searchStr.includes('full') || searchStr.includes('capacity') || searchStr.includes('sold out') || searchStr.includes('no vacancy') || searchStr.includes('exceeds limit')) {
+        category = '予約枠上限超過 (満席)';
+        detail = '選択された時間帯またはチケットの予約枠が既に上限（満席）に達しているため、新規の予約・追加登録を行うことができません。';
+        actionTip = '予約状況を確認し、他の空いている時間帯を選択するか、管理者画面から該当時間帯の予約上限数（キャパシティ）の枠を広げてください。';
+    }
+    // 7. 入力値の検証エラー（バリデーション）
+    else if (searchStr.includes('validation') || searchStr.includes('invalid') || searchStr.includes('bad request') || searchStr.includes('required') || searchStr.includes('null value') || searchStr.includes('violates not-null')) {
+        category = '入力バリデーションエラー';
+        detail = '送信されたパラメータの形式が正しくないか、必須項目が入力されていません。データベースの制約（NOT NULL制約など）に違反している可能性があります。';
+        actionTip = 'フォームの入力漏れがないか、または日付や数値のフォーマットが適切であるかを確認して再度送信してください。';
+    }
+    // 8. データベース内リソース未検出（404）
+    else if (searchStr.includes('not found') || searchStr.includes('404') || searchStr.includes('no rows')) {
+        category = 'データ未検出';
+        detail = '操作対象のデータレコードまたはAPIエンドポイントが見つかりませんでした。該当データが既に別の管理者に削除されたか、IDの不整合が考えられます。';
+        actionTip = '画面をリフレッシュし、対象のデータがまだ存在しているか確認してください。';
+    }
+    // 9. GAS側エラー
+    else if (searchStr.includes('script error') || searchStr.includes('gas error') || searchStr.includes('google apps script') || type.includes('gas')) {
+        category = 'Google Apps Script (GAS) 連携エラー';
+        detail = '連携している Google Apps Script バックエンドの実行中にエラーが発生しました。GASの実行数制限（Quota）や、トリガーエラー、スクリプト内の例外処理が考えられます。';
+        actionTip = 'Google Apps Script エディタを開き、「実行数」ログから該当するエラーの詳細（スタックトレース等）を確認してください。';
+    }
+    // 10. フロントエンド例外処理
+    else if (action === 'window_error' || type.includes('window') || action === 'promise_rejection') {
+        category = 'ブラウザ実行時例外';
+        detail = 'ブラウザ上の JavaScript の処理中に、キャッチされなかった例外（バグや互換性問題）が発生しました。';
+        actionTip = 'ブラウザのキャッシュをクリアし、ページを再読み込み（Ctrl + F5 / Cmd + Shift + R）してお試しください。解決しない場合は開発コンソール（F12）のログを確認してください。';
     }
 
-    // ブラウザエラーの個別ハンドリング
-    if (action === 'window_error') {
-        return 'ブラウザ・スクリプトエラー: 実行中に予期しない例外が発生しました。ブラウザの互換性またはバグの可能性があります。';
-    }
-    if (action === 'promise_rejection') {
-        return '非同期処理エラー: Promiseが拒否されましたが、キャッチされませんでした。通信エラーまたは内部ロジックの不具合が疑われます。';
+    // エラー解説文の構築
+    let resultText = `【解説】${category}\n■ 原因：\n${detail}\n\n■ 対処法：\n${actionTip}`;
+    
+    // 生のエラーメッセージが存在する場合は見やすく追加する
+    if (errorMsg) {
+        resultText += `\n\n----------------------------------------\n[生のエラー情報]\n${errorMsg}`;
     }
     
-    return 'システムエラー: 予期しないエラーが発生しました。エンジニアにメタデータの内容を添えて報告してください。';
+    return resultText;
 }
 
 // 満席通知のバナー表示

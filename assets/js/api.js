@@ -4,6 +4,51 @@ import audit from './audit-logger.js';
 import { SupabaseAPI } from './supabase-api.js';
 import errorNotification from './error-notification.js';
 
+// クライアントの IP アドレスとセッション ID の追跡
+let clientIp = 'Unknown';
+let ipFetchPromise = null;
+
+function fetchClientIp() {
+  if (ipFetchPromise) return ipFetchPromise;
+  
+  ipFetchPromise = (async () => {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      
+      const response = await fetch('https://api.ipify.org?format=json', { signal: controller.signal });
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        const data = await response.json();
+        clientIp = data.ip || 'Unknown';
+      }
+    } catch (e) {
+      console.warn('[GasAPI] Failed to fetch client IP:', e);
+      clientIp = 'Unknown';
+    }
+    return clientIp;
+  })();
+  
+  return ipFetchPromise;
+}
+
+function getClientSessionId() {
+  try {
+    if (typeof window !== 'undefined' && window.AuditLogger && window.AuditLogger.sessionId) {
+      return window.AuditLogger.sessionId;
+    }
+    return localStorage.getItem('audit.sessionId') || 'nosession';
+  } catch (_) {
+    return 'nosession';
+  }
+}
+
+// 初期化時に非同期で取得開始
+if (typeof window !== 'undefined') {
+  fetchClientIp();
+}
+
 class GasAPI {
   // Supabase API インスタンス
   static supabaseAPI = new SupabaseAPI();
@@ -163,7 +208,12 @@ class GasAPI {
         const currentUrl = apiUrlManager.getCurrentUrl();
         const candidates = urls.length ? [currentUrl, ...urls.filter(u => u !== currentUrl)] : [currentUrl];
 
-        const formParams = `func=${encodeURIComponent(functionName)}&params=${encodeURIComponent(JSON.stringify(params))}`;
+        // sessionStorageからadmin_tokenを取得して付与
+        const adminToken = (typeof sessionStorage !== 'undefined') ? sessionStorage.getItem('admin_token') : null;
+        const tokenPart = adminToken ? `&token=${encodeURIComponent(adminToken)}` : '';
+        const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+
+        const formParams = `func=${encodeURIComponent(functionName)}&params=${encodeURIComponent(JSON.stringify(params))}&ip=${encodeURIComponent(clientIp)}&sessionId=${encodeURIComponent(getClientSessionId())}&userAgent=${encodeURIComponent(userAgent)}${tokenPart}`;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 20000);
 
@@ -257,6 +307,8 @@ class GasAPI {
         const encodedParams = encodeURIComponent(JSON.stringify(params));
         const encodedFuncName = encodeURIComponent(functionName);
         const uaParam = (() => { try { return encodeURIComponent(navigator.userAgent || ''); } catch (_) { return ''; } })();
+        const ipParam = `&ip=${encodeURIComponent(clientIp)}`;
+        const sessionParam = `&sessionId=${encodeURIComponent(getClientSessionId())}`;
 
         // sessionStorageからadmin_tokenを取得して付与
         const adminToken = (typeof sessionStorage !== 'undefined') ? sessionStorage.getItem('admin_token') : null;
@@ -299,7 +351,7 @@ class GasAPI {
           currentUrlIndex = 0; // フォールバック
         }
 
-        let fullUrl = `${currentUrl}?callback=${callbackName}&${formData}&userAgent=${uaParam}${tokenParam}&${cacheBuster}`;
+        let fullUrl = `${currentUrl}?callback=${callbackName}&${formData}&userAgent=${uaParam}${tokenParam}${ipParam}${sessionParam}&${cacheBuster}`;
 
         const script = document.createElement('script');
         script.src = fullUrl;
@@ -347,7 +399,7 @@ class GasAPI {
                 nextUrlIndex = Math.floor(Math.random() * urls.length);
               } while (nextUrlIndex === currentUrlIndexInArray && urls.length > 1);
 
-              const nextUrl = `${urls[nextUrlIndex]}?callback=${callbackName}&${formData}&userAgent=${uaParam}${tokenParam}&${cacheBuster}`;
+              const nextUrl = `${urls[nextUrlIndex]}?callback=${callbackName}&${formData}&userAgent=${uaParam}${tokenParam}${ipParam}${sessionParam}&${cacheBuster}`;
               console.warn('Failing over to different GAS url:', nextUrl);
               script.src = nextUrl;
               return; // タイムアウトは継続
@@ -581,6 +633,8 @@ class GasAPI {
         const adminToken = (typeof sessionStorage !== 'undefined') ? sessionStorage.getItem('admin_token') : null;
         const finalParams = {
           ...queryParams,
+          ip: clientIp,
+          sessionId: getClientSessionId(),
           ...(adminToken ? { token: adminToken } : {})
         };
 
