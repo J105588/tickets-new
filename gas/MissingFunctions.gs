@@ -1391,3 +1391,76 @@ function broadcastAdminNotice(message, details) {
     return { success: false, error: e.message };
   }
 }
+
+/**
+ * 管理者向け通知を取得する (ポーリング用)
+ * @param {any} sinceTimestamp - タイムスタンプ (ミリ秒エポックタイム、日付文字列、または 0/falsy)
+ * @returns {object} { success: boolean, notices: Array }
+ */
+function fetchAdminNotices(sinceTimestamp) {
+  try {
+    if (Array.isArray(sinceTimestamp) && sinceTimestamp.length > 0) {
+      sinceTimestamp = sinceTimestamp[0];
+    }
+    
+    let sinceDate = null;
+    
+    if (sinceTimestamp) {
+      if (typeof sinceTimestamp === 'number') {
+        sinceDate = new Date(sinceTimestamp);
+      } else if (typeof sinceTimestamp === 'string') {
+        // 数値のみの文字列（例: "1779369764066"）か、日付文字列かを判別
+        if (/^\d+$/.test(sinceTimestamp)) {
+          sinceDate = new Date(parseInt(sinceTimestamp, 10));
+        } else {
+          sinceDate = new Date(sinceTimestamp);
+        }
+      } else if (sinceTimestamp instanceof Date) {
+        sinceDate = sinceTimestamp;
+      }
+    }
+    
+    // 解析に失敗した場合や、Dateオブジェクトが無効な場合は1970年基準 (falsy扱い) とする
+    if (!sinceDate || isNaN(sinceDate.getTime())) {
+      sinceDate = new Date(0);
+    }
+    
+    const sinceIso = sinceDate.toISOString();
+    
+    // Supabase から type='admin_notice' かつ timestamp が sinceIso より後のレコードを取得
+    let endpoint = `audit_logs?select=*&type=eq.admin_notice&order=timestamp.asc`;
+    endpoint += `&timestamp=gt.${encodeURIComponent(sinceIso)}`;
+    
+    const response = supabaseIntegration._request(endpoint, { useServiceRole: true });
+    if (!response.success) {
+      return { success: false, error: response.error || response.message || 'Failed to fetch audit logs' };
+    }
+    
+    const notices = (response.data || []).map(d => {
+      let meta = {};
+      if (d.metadata) {
+        if (typeof d.metadata === 'string') {
+          try {
+            meta = JSON.parse(d.metadata);
+          } catch (_) {
+            meta = { raw: d.metadata };
+          }
+        } else if (typeof d.metadata === 'object') {
+          meta = d.metadata;
+        }
+      }
+      
+      return {
+        timestamp: d.timestamp ? Date.parse(d.timestamp) : Date.now(),
+        message: meta.message || (typeof meta.raw === 'string' ? meta.raw : ''),
+        details: meta.details || {}
+      };
+    });
+    
+    return { success: true, notices: notices };
+  } catch (e) {
+    Logger.log('fetchAdminNotices Error: ' + e.message);
+    return { success: false, error: e.message };
+  }
+}
+
