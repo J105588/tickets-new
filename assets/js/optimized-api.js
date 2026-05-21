@@ -40,6 +40,8 @@ class OptimizedGasAPI {
         const encodedParams = encodeURIComponent(JSON.stringify(params));
         const encodedFuncName = encodeURIComponent(functionName);
         const uaParam = (() => { try { return encodeURIComponent(navigator.userAgent || ''); } catch (_) { return ''; } })();
+        const ipParam = (() => { try { return encodeURIComponent(audit.clientIp || 'Unknown'); } catch (_) { return 'Unknown'; } })();
+        const sessionIdParam = (() => { try { return encodeURIComponent(audit.sessionId || ''); } catch (_) { return ''; } })();
 
         window[callbackName] = (data) => {
           debugLog(`Optimized API Response: ${functionName}`, data);
@@ -73,7 +75,7 @@ class OptimizedGasAPI {
           currentUrlIndex = 0;
         }
 
-        let fullUrl = `${currentUrl}?callback=${callbackName}&${formData}&userAgent=${uaParam}&${cacheBuster}`;
+        let fullUrl = `${currentUrl}?callback=${callbackName}&${formData}&userAgent=${uaParam}&ip=${ipParam}&sessionId=${sessionIdParam}&${cacheBuster}`;
 
         const script = document.createElement('script');
         script.src = fullUrl;
@@ -109,7 +111,7 @@ class OptimizedGasAPI {
                 nextUrlIndex = Math.floor(Math.random() * urls.length);
               } while (nextUrlIndex === currentUrlIndexInArray && urls.length > 1);
 
-              const nextUrl = `${urls[nextUrlIndex]}?callback=${callbackName}&${formData}&userAgent=${uaParam}&${cacheBuster}`;
+              const nextUrl = `${urls[nextUrlIndex]}?callback=${callbackName}&${formData}&userAgent=${uaParam}&ip=${ipParam}&sessionId=${sessionIdParam}&${cacheBuster}`;
               console.warn('Failing over to different GAS url:', nextUrl);
               script.src = nextUrl;
               return;

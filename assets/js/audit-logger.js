@@ -10,9 +10,11 @@ class AuditLogger {
     this.maxBatchSize = 10;
     this.maxQueueSize = 1000;
     this.sessionId = this._ensureSessionId();
+    this.clientIp = 'Unknown';
     this.timer = null;
     this.started = false;
     this.boundHandlers = [];
+    this._fetchClientIp();
   }
 
   start() {
@@ -33,6 +35,26 @@ class AuditLogger {
     this.boundHandlers = [];
   }
 
+  async _fetchClientIp() {
+    try {
+      if (typeof window !== 'undefined') {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        
+        const response = await fetch('https://api.ipify.org?format=json', { signal: controller.signal });
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          const data = await response.json();
+          this.clientIp = data.ip || 'Unknown';
+        }
+      }
+    } catch (e) {
+      console.warn('[AuditLogger] Failed to fetch client IP:', e);
+      this.clientIp = 'Unknown';
+    }
+  }
+
   log(eventType, action, meta = {}, isError = false) {
     try {
       const entry = {
@@ -44,7 +66,7 @@ class AuditLogger {
         sessionId: this.sessionId,
         userId: meta && meta.userId ? meta.userId : '',
         ua: typeof navigator !== 'undefined' && navigator ? navigator.userAgent : 'Unknown',
-        ip: '' // サーバーで補完不可のため空。必要ならリバースプロキシで付与
+        ip: this.clientIp || 'Unknown'
       };
       this.queue.push(entry);
       if (this.queue.length > this.maxQueueSize) {
@@ -193,6 +215,9 @@ class AuditLogger {
       body.set('func', 'recordClientAudit');
       body.set('params', JSON.stringify([entries]));
       body.set('callback', callback);
+      body.set('ip', this.clientIp || 'Unknown');
+      body.set('sessionId', this.sessionId);
+      body.set('userAgent', typeof navigator !== 'undefined' && navigator ? navigator.userAgent : 'Unknown');
 
       const resp = await fetch(url, {
         method: 'POST',

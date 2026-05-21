@@ -4,7 +4,7 @@
  */
 
 import { apiUrlManager } from './config.js';
-import { fetchMasterDataFromSupabase, checkInReservation, getBookingForScan, toDisplaySeatId } from './supabase-client.js';
+import { fetchMasterDataFromSupabase, checkInReservation, getBookingForScan, toDisplaySeatId, getClientIp, getClientSessionId } from './supabase-client.js';
 
 // カスタムダイアログ用ヘルパー
 async function customAlert(msg) {
@@ -219,7 +219,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             callback(data);
         };
         const script = document.createElement('script');
-        const queryString = Object.keys(params).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&');
+        const mergedParams = {
+            ip: getClientIp(),
+            sessionId: getClientSessionId(),
+            userAgent: navigator.userAgent,
+            ...params
+        };
+        const queryString = Object.keys(mergedParams).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(mergedParams[k])).join('&');
         script.src = `${url}?${queryString}&callback=${callbackName}`;
         script.id = callbackName;
         script.onerror = () => {
@@ -671,7 +677,13 @@ function fetchJsonp(url, params, callback, timeout = 10000) {
         callback(data);
     };
     const script = document.createElement('script');
-    const queryString = Object.keys(params).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&');
+    const mergedParams = {
+        ip: getClientIp(),
+        sessionId: getClientSessionId(),
+        userAgent: navigator.userAgent,
+        ...params
+    };
+    const queryString = Object.keys(mergedParams).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(mergedParams[k])).join('&');
     script.src = `${url}?${queryString}&callback=${callbackName}`;
     script.id = callbackName;
     script.onerror = () => {

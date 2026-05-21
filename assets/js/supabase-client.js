@@ -524,7 +524,7 @@ function fetchClientIp() {
     return ipFetchPromise;
 }
 
-function getClientSessionId() {
+export function getClientSessionId() {
     try {
         if (typeof window !== 'undefined' && window.AuditLogger && window.AuditLogger.sessionId) {
             return window.AuditLogger.sessionId;
@@ -533,6 +533,10 @@ function getClientSessionId() {
     } catch (_) {
         return 'nosession';
     }
+}
+
+export function getClientIp() {
+    return clientIp;
 }
 
 // Start IP fetch if in browser

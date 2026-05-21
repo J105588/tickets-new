@@ -89,6 +89,40 @@
     <script type="module">
         import { apiUrlManager } from '../assets/js/config.js';
 
+        let clientIp = 'Unknown';
+
+        async function fetchIp() {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 3000);
+                const response = await fetch('https://api.ipify.org?format=json', { signal: controller.signal });
+                clearTimeout(timeoutId);
+                if (response.ok) {
+                    const data = await response.json();
+                    clientIp = data.ip || 'Unknown';
+                }
+            } catch (e) {
+                console.warn('Failed to fetch client IP:', e);
+            }
+        }
+
+        function getSessionId() {
+            try {
+                const key = 'audit.sessionId';
+                let id = localStorage.getItem(key);
+                if (!id) {
+                    id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+                    localStorage.setItem(key, id);
+                }
+                return id;
+            } catch (_) {
+                return 'nosession';
+            }
+        }
+
+        // Start IP fetch immediately
+        fetchIp();
+
         // Robust JSONP Helper
         function fetchJsonp(url, params, callback, timeout = 10000) {
             const callbackName = 'jsonp_login_' + Math.round(100000 * Math.random());
@@ -162,7 +196,14 @@
                 const apiUrl = apiUrlManager.getCurrentUrl();
                 console.log('Login attempting against:', apiUrl);
 
-                fetchJsonp(apiUrl, { action: 'verify_admin_password', password: password }, (res) => {
+                const sessionId = getSessionId();
+                fetchJsonp(apiUrl, { 
+                    action: 'verify_admin_password', 
+                    password: password,
+                    ip: clientIp,
+                    sessionId: sessionId,
+                    userAgent: navigator.userAgent
+                }, (res) => {
                     console.log('Login Response:', res);
                     if (res && res.success) {
                         // Success
