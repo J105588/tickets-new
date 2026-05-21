@@ -1,0 +1,44 @@
+Date : 2026-05-22 02:39:21
+Directory : c:\dev\tickets-new
+Total : 13 files,  1698 codes, 24 comments, 29 blanks, all 1751 lines
+
+Languages
++------------+------------+------------+------------+------------+------------+
+| language   | files      | code       | comment    | blank      | total      |
++------------+------------+------------+------------+------------+------------+
+| CSV        |          4 |      1,447 |          0 |          0 |      1,447 |
+| JavaScript |          7 |        238 |         24 |         30 |        292 |
+| HTML       |          2 |         13 |          0 |         -1 |         12 |
++------------+------------+------------+------------+------------+------------+
+
+Directories
++----------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                 | files      | code       | comment    | blank      | total      |
++----------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                    |         13 |      1,698 |         24 |         29 |      1,751 |
+| assets                                                               |          5 |        150 |         16 |         19 |        185 |
+| assets\js                                                            |          5 |        150 |         16 |         19 |        185 |
+| gas                                                                  |          2 |         88 |          8 |         11 |        107 |
+| pages                                                                |          2 |         13 |          0 |         -1 |         12 |
+| test-audit-csv                                                       |          4 |      1,447 |          0 |          0 |      1,447 |
++----------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++----------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| filename                                                             | language   | code       | comment    | blank      | total      |
++----------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| c:\dev\tickets-new\assets\js\admin.js                                | JavaScript |         22 |          1 |          2 |         25 |
+| c:\dev\tickets-new\assets\js\api.js                                  | JavaScript |         10 |         -1 |         -2 |          7 |
+| c:\dev\tickets-new\assets\js\config.js                               | JavaScript |         -2 |         -2 |         -2 |         -6 |
+| c:\dev\tickets-new\assets\js\logs-main.js                            | JavaScript |         70 |         16 |         11 |         97 |
+| c:\dev\tickets-new\assets\js\supabase-client.js                      | JavaScript |         50 |          2 |         10 |         62 |
+| c:\dev\tickets-new\gas\CodeWithSupabase.gs                           | JavaScript |         33 |          0 |          0 |         33 |
+| c:\dev\tickets-new\gas\MissingFunctions.gs                           | JavaScript |         55 |          8 |         11 |         74 |
+| c:\dev\tickets-new\pages\admin-logs.html                             | HTML       |         12 |          0 |         -1 |         11 |
+| c:\dev\tickets-new\pages\admin.html                                  | HTML       |          1 |          0 |          0 |          1 |
+| c:\dev\tickets-new\test-audit-csv\audit_logs_2026-05-21T13-29-09.csv | CSV        |        101 |          0 |          0 |        101 |
+| c:\dev\tickets-new\test-audit-csv\audit_logs_2026-05-21T13-35-16.csv | CSV        |        101 |          0 |          0 |        101 |
+| c:\dev\tickets-new\test-audit-csv\audit_logs_2026-05-21T13-39-59.csv | CSV        |        101 |          0 |          0 |        101 |
+| c:\dev\tickets-new\test-audit-csv\audit_logs_2026-05-21T17-30-12.csv | CSV        |      1,144 |          0 |          0 |      1,144 |
+| Total                                                                |            |      1,698 |         24 |         29 |      1,751 |
++----------------------------------------------------------------------+------------+------------+------------+------------+------------+

@@ -1,0 +1,15 @@
+"filename", "language", "CSV", "HTML", "JavaScript", "comment", "blank", "total"
+"c:\dev\tickets-new\assets\js\admin.js", "JavaScript", 0, 0, 22, 1, 2, 25
+"c:\dev\tickets-new\assets\js\api.js", "JavaScript", 0, 0, 10, -1, -2, 7
+"c:\dev\tickets-new\assets\js\config.js", "JavaScript", 0, 0, -2, -2, -2, -6
+"c:\dev\tickets-new\assets\js\logs-main.js", "JavaScript", 0, 0, 70, 16, 11, 97
+"c:\dev\tickets-new\assets\js\supabase-client.js", "JavaScript", 0, 0, 50, 2, 10, 62
+"c:\dev\tickets-new\gas\CodeWithSupabase.gs", "JavaScript", 0, 0, 33, 0, 0, 33
+"c:\dev\tickets-new\gas\MissingFunctions.gs", "JavaScript", 0, 0, 55, 8, 11, 74
+"c:\dev\tickets-new\pages\admin-logs.html", "HTML", 0, 12, 0, 0, -1, 11
+"c:\dev\tickets-new\pages\admin.html", "HTML", 0, 1, 0, 0, 0, 1
+"c:\dev\tickets-new\test-audit-csv\audit_logs_2026-05-21T13-29-09.csv", "CSV", 101, 0, 0, 0, 0, 101
+"c:\dev\tickets-new\test-audit-csv\audit_logs_2026-05-21T13-35-16.csv", "CSV", 101, 0, 0, 0, 0, 101
+"c:\dev\tickets-new\test-audit-csv\audit_logs_2026-05-21T13-39-59.csv", "CSV", 101, 0, 0, 0, 0, 101
+"c:\dev\tickets-new\test-audit-csv\audit_logs_2026-05-21T17-30-12.csv", "CSV", 1144, 0, 0, 0, 0, 1144
+"Total", "-", 1447, 13, 238, 24, 29, 1751
