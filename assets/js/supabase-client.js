@@ -496,6 +496,50 @@ export async function adminSendSummaryEmails(payload, endpointUrl = null) {
 // GAS API Wrapper for Schedule Management (Since complex join updates/saves are better handled in GAS for now)
 // Note: config.js exports GAS_API_URLS. supabase-client.js imports SUPABASE_CONFIG. Let's add GAS_API_URLS to imports.
 
+let clientIp = 'Unknown';
+let ipFetchPromise = null;
+
+function fetchClientIp() {
+    if (ipFetchPromise) return ipFetchPromise;
+    
+    ipFetchPromise = (async () => {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000);
+            
+            const response = await fetch('https://api.ipify.org?format=json', { signal: controller.signal });
+            clearTimeout(timeoutId);
+            
+            if (response.ok) {
+                const data = await response.json();
+                clientIp = data.ip || 'Unknown';
+            }
+        } catch (e) {
+            console.warn('[SupabaseClient] Failed to fetch client IP:', e);
+            clientIp = 'Unknown';
+        }
+        return clientIp;
+    })();
+    
+    return ipFetchPromise;
+}
+
+function getClientSessionId() {
+    try {
+        if (typeof window !== 'undefined' && window.AuditLogger && window.AuditLogger.sessionId) {
+            return window.AuditLogger.sessionId;
+        }
+        return localStorage.getItem('audit.sessionId') || 'nosession';
+    } catch (_) {
+        return 'nosession';
+    }
+}
+
+// Start IP fetch if in browser
+if (typeof window !== 'undefined') {
+    fetchClientIp();
+}
+
 /**
  * JSONP Helper
  * @param {string} url Base URL
@@ -521,6 +565,24 @@ function jsonpRequest(url, params = {}) {
 
         // Construct query string
         const queryParams = new URLSearchParams(params);
+
+        // Auto append token, ip, sessionId, userAgent
+        if (!queryParams.has('token')) {
+            const adminToken = (typeof sessionStorage !== 'undefined') ? sessionStorage.getItem('admin_token') : null;
+            if (adminToken) {
+                queryParams.set('token', adminToken);
+            }
+        }
+        if (!queryParams.has('ip') && !queryParams.has('ipAddress')) {
+            queryParams.set('ip', clientIp);
+        }
+        if (!queryParams.has('sessionId')) {
+            queryParams.set('sessionId', getClientSessionId());
+        }
+        if (!queryParams.has('userAgent') && typeof navigator !== 'undefined') {
+            queryParams.set('userAgent', navigator.userAgent);
+        }
+
         queryParams.set('callback', callbackName);
         queryParams.set('t', Date.now()); // Cache buster
 

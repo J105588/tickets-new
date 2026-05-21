@@ -402,7 +402,7 @@ function updateLogsTable() {
   const isHighlightEnabled = (() => { try { return document.getElementById('error-highlight-toggle')?.checked !== false; } catch (_) { return true; } })();
 
   tbody.innerHTML = displayLogs.map(log => {
-    const timestamp = new Date(log.timestamp).toLocaleString('ja-JP');
+    const timestamp = new Date(log.timestamp).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
     const shortMeta = truncateJson(log.metadata, 80);
 
     // エラーログかどうかを判定
@@ -761,7 +761,7 @@ function showLogDetail(timestamp) {
   const isError = isErrorLog(log);
 
   // モーダルにデータを設定
-  document.getElementById('detail-timestamp').textContent = new Date(log.timestamp).toLocaleString('ja-JP');
+  document.getElementById('detail-timestamp').textContent = new Date(log.timestamp).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
   document.getElementById('detail-operation').textContent = `${log.type} / ${log.action}`;
 
   // ステータス表示

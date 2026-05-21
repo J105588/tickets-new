@@ -64,6 +64,25 @@ function escapeHTML(str) {
         .replace(/'/g, '&#39;');
 }
 
+function formatJSTDate(isoString) {
+    if (!isoString) return '-';
+    try {
+        const date = new Date(isoString);
+        return date.toLocaleString('ja-JP', {
+            timeZone: 'Asia/Tokyo',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    } catch (e) {
+        console.error('Date formatting error:', e);
+        return isoString;
+    }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     // 0. Initialize Layout and Auth
     if (!AdminLayout.init('dashboard')) return;
@@ -294,7 +313,7 @@ function renderReservationTable(data) {
     tbody.innerHTML = '';
 
     if (data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:2rem;">該当する予約はありません</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:2rem;">該当する予約はありません</td></tr>';
         return;
     }
 
@@ -370,7 +389,13 @@ function renderReservationTable(data) {
         tdStatus.appendChild(spanStatus);
         tr.appendChild(tdStatus);
 
-        // Col 7: Action
+        // Col 7: Created At (予約日時)
+        const tdCreatedAt = document.createElement('td');
+        tdCreatedAt.setAttribute('data-label', '予約日時');
+        tdCreatedAt.textContent = formatJSTDate(r.created_at);
+        tr.appendChild(tdCreatedAt);
+
+        // Col 8: Action
         const tdAction = document.createElement('td');
         tdAction.setAttribute('data-label', '操作');
         const btn = document.createElement('button');
