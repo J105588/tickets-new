@@ -502,6 +502,195 @@ CREATE POLICY "Deny Public Write"
 *※注意: フロントエンドから送信されるデータは、`jsonp`パラダイムによりGETリクエストのクエリパラメータとして転送され、最終的にGASが `ContentService.createTextOutput(callback + '(' + json + ')').setMimeType(ContentService.MimeType.JAVASCRIPT)` にて応答するアーキテクチャである。*
 
 ---
+
+## 6. 関数間相互関係・依存性マップ (Function Interaction & Dependency Map)
+
+本システムは、フロントエンド（PWA / SPA）、APIゲートウェイ（GAS）、データ永続化層（Supabase PostgreSQL）の3層間で複雑なデータ連携を行っている。以下に、主要機能における関数呼び出しの依存関係、インプット/アウトプット、および保存・同期処理のフローを示す。
+
+### 6.1 主要サブシステム・シーケンス図
+
+#### 6.1.1 予約確定フロー (Reservation Confirmation Flow)
+一般ユーザーが座席を選択し、予約を確定するまでの関数コールおよびデータ永続化の流れ。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as 一般ユーザー
+    participant Page as reservation.js (Client)
+    participant Client as supabase-client.js (Client)
+    participant GAS as CodeWithSupabase.gs (GAS Gateway)
+    participant ResAPI as ReservationAPI.gs (GAS Logic)
+    participant DB as Supabase (PostgreSQL)
+    participant Mail as Google MailApp (SMTP)
+
+    User->>Page: 予約者情報入力＆座席選択
+    User->>Page: 予約確定ボタンをクリック
+    Page->>Page: getGradeClassValue() で学年・クラス文字列を正規化
+    Page->>Page: inputs.name, inputs.email, inputs.seats 等の必須チェック
+    Page->>Page: fetchJsonp(apiUrl, params) を実行\n(action: "create_reservation", seats: CSV, token: adminToken)
+    
+    GAS->>GAS: doGet() / doPost() でリクエスト受信
+    GAS->>ResAPI: createReservation(params) を呼び出し
+    
+    critical 予約処理トランザクション (GAS / Supabase)
+        ResAPI->>GAS: getOrCreatePerformance(group, day, timeslot)
+        GAS-->>ResAPI: performanceId を取得
+        ResAPI->>ResAPI: checkReservationDeadline(performanceId) で受付期限判定
+        
+        ResAPI->>DB: supabaseIntegration.getSeats(performanceId)
+        DB-->>ResAPI: 座席リストの取得
+        ResAPI->>ResAPI: 対象座席が available (空席) か検証
+        
+        ResAPI->>ResAPI: 6桁の重複しない予約ID (p_id) をランダム生成
+        ResAPI->>DB: supabaseIntegration.rpc("create_reservation", payload)
+        Note over DB: Supabase PostgreSQL RPC (DB Transaction)\n1. bookingsテーブルに新規挿入 (ID: p_id, 状態: confirmed)\n2. seatsテーブルの対象座席を更新 (booking_id: p_id, 状態: reserved, reserved_by: p_name)\n3. ランダムな passcode (確認コード) を生成・返却
+        DB-->>ResAPI: { success: true, data: { booking_id, passcode } }
+    end
+
+    ResAPI->>Mail: sendReservationEmail(email, { bookingId, passcode, ... })
+    Note over Mail: MailApp.sendEmail() により\n入場用確認ページURL付のメールを送信
+
+    ResAPI->>GAS: safeLogOperation("createReservation", ...) で操作ログ書き込み
+    GAS-->>Page: JSONP コールバック応答 { success: true, data: { bookingId, passcode } }
+    
+    Page->>Page: showStep(5) で予約完了画面を描画 (予約IDと確認コードを表示)
+```
+
+#### 6.1.2 チケット入場スキャンフロー (Ticket Scan & Check-in Flow)
+受付で管理者がQRコードをスキャン、またはIDを入力してチェックインを行う関数フロー。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Staff as 受付管理者
+    participant ScanPage as admin-scan.js (Client)
+    participant Client as supabase-client.js (Client)
+    participant GAS as CodeWithSupabase.gs (GAS Gateway)
+    participant ResAPI as ReservationAPI.gs (GAS Logic)
+    participant DB as Supabase (PostgreSQL)
+
+    Staff->>ScanPage: QRコードスキャン / 予約ID手動入力
+    ScanPage->>Client: getBookingForScan(id, passcode) を呼び出し
+    
+    alt オンライン時 (Direct Supabase Fetch)
+        Client->>DB: Supabase RPC "get_booking_for_scan" 呼び出し
+        Note over DB: RLSポリシーをバイパスし、予約者情報・座席・チェックイン状態を取得
+        DB-->>Client: 予約詳細データを返却
+    else オフライン時 (IndexedDB Fallback)
+        Client->>ScanPage: (オフラインエラー検知)
+        ScanPage->>Client: OfflineSyncV2.getLocalBookingData(id, passcode)
+        Note over Client: IndexedDB (idb-storage.js) から\n事前キャッシュされた予約データを検索
+        Client-->>ScanPage: ローカルキャッシュデータを返却
+    end
+    
+    ScanPage->>Staff: 画面上にチケット情報とチェックインボタンを表示
+    
+    Staff->>ScanPage: 「チェックイン確定」をクリック
+    ScanPage->>Client: checkInReservation(id, passcode, adminToken)
+    
+    alt Direct DB RPC (Online)
+        Client->>DB: Supabase RPC "check_in_reservation"
+        Note over DB: bookings のステータスを checked_in に更新し、\nbooking_events にログを記録
+        DB-->>Client: { success: true, data: ... }
+        Client-->>ScanPage: 完了表示
+    else GAS API Fallback / Intercept
+        Client->>GAS: jsonpRequest (action: "check_in", id, passcode, token)
+        GAS->>ResAPI: checkInReservation(bookingId, passcode, token)
+        ResAPI->>ResAPI: validateSession(token) で管理者セッションを確認
+        ResAPI->>DB: supabaseIntegration.updateBookingStatus(bookingId, "checked_in")
+        DB-->>ResAPI: 更新結果
+        ResAPI-->>GAS: レスポンス
+        GAS-->>ScanPage: コールバック { success: true, data: ... }
+    end
+    
+    ScanPage->>ScanPage: UI上で「チェックイン完了」を表示
+```
+
+#### 6.1.3 オフライン同期＆キャッシュエンジンフロー (Offline Sync & Cache Engine Flow)
+ネットワーク切断時にオフライン同期エンジンがリクエストをインターセプトし、IndexedDBへの保存とバックグラウンドでの自動フラッシュを行うフロー。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as 管理者 / オペレーター
+    participant Page as seats-main.js / walkin-main.js (Client)
+    participant OptAPI as optimized-api.js (Client)
+    participant Sync as offline-sync-v2.js (Client Manager)
+    participant IDB as idb-storage.js (IndexedDB)
+    participant GAS as GAS API (Server Gateway)
+    participant DB as Supabase DB
+
+    User->>Page: 当日券発行 / 座席の手動更新
+    Page->>OptAPI: GasAPI.updateSeatData(...) 呼び出し
+    
+    alt オフライン時 (navigator.onLine === false またはタイムアウト)
+        OptAPI-->>Page: { success: false, error: "offline_delegate", offline: true }
+        Page->>Sync: OfflineSyncV2.addOperation({ type: "updateSeatData", args: [...] })
+        
+        Sync->>IDB: idbStorage.enqueueOperation(type, payload, transaction_id)
+        Note over IDB: 操作キュー(OfflineQueue)に保存 (status: 'pending')
+        
+        Sync->>Sync: writeCache() でローカルキャッシュの座席マップを書き換え (Optimistic Update)
+        Sync-->>Page: 処理継続用 IDB トランザクションIDを返却
+        Page->>Page: UIを即座に「更新完了」状態に変更 (楽観的UI更新)
+        Sync->>Sync: BroadcastChannel("offline-sync-v2") で他タブに "queue-updated" を送信
+    end
+
+    Note over Sync: ネットワークがオンラインに復帰、または 15秒間隔タイマー起動
+    Sync->>Sync: handleOnline() / performSync() 起動
+    
+    Sync->>Sync: tryAcquireLock() (他タブとの多重同期を防ぐロック取得)
+    Note over Sync: ロック取得成功 (同期リーダーに昇格)
+    
+    Sync->>IDB: readOperationQueue() で未同期キューを読み出し
+    IDB-->>Sync: ペンディング操作リスト
+    
+    loop 各ペンディング操作について
+        Sync->>Sync: validatePrecondition(operation) で前提条件検証
+        Note over Sync: 操作時のキャッシュバージョンと、現在の最新キャッシュが一致するか検証
+        alt 検証成功 (競合なし)
+            Sync->>GAS: executeOperation(operation) \n(APIリクエスト実行 + transaction_id を付与)
+            GAS->>DB: Supabaseへの更新クエリ実行
+            DB-->>GAS: 実行結果 (Success)
+            GAS-->>Sync: { success: true }
+            Sync->>IDB: dequeueOperation(id) (キューから削除)
+            Sync->>IDB: markTransactionProcessed(transaction_id)
+        else 検証失敗 (競合発生)
+            Sync->>Sync: resolveConflicts(conflicts) で自動解決
+            Note over Sync: 最新データとマージまたは管理者に競合通知
+        end
+    end
+    
+    Sync->>Sync: refreshCache() で最新データを再取得し、ローカルキャッシュを完全同期
+    Sync->>Sync: releaseLock() (同期ロックを解放)
+    Sync->>Page: showSuccessNotification() で同期完了 of 通知を表示
+```
+
+### 6.2 各モジュールの主要関数定義と依存関係
+
+| ファイル名 | 主要関数名 | 依存する関数/モジュール | 戻り値 (型/構造) | 保存・永続化処理 |
+| :--- | :--- | :--- | :--- | :--- |
+| **`reservation.js`** | `initializeMasterData` | `fetchMasterDataFromSupabase`, `adminDeadlineSettings` | `Promise<void>` | なし |
+| | `fetchPerformances` | `fetchPerformancesFromSupabase` | `Promise<void>` | なし |
+| | `loadSeatMap` | `fetchSeatsFromSupabase`, `subscribeToPerformanceSeats` | `Promise<void>` | なし (座席マップをDOMに描画、WebSocket購読開始) |
+| | `btn-submit (click)` | `fetchJsonp` (action: `create_reservation`) | `void` | GASを経由してDBへ書き込み要請 |
+| **`admin-scan.js`** | `processScan` | `getBookingForScan`, `OfflineSyncV2.getLocalBookingData` | `Promise<void>` | なし (チェックイン対象チケット情報取得) |
+| | `confirmCheckIn` | `checkInReservation` | `Promise<void>` | `bookings.status` を `checked_in` に更新 |
+| **`admin.js`** | `saveDeadlineSettings` | `GasAPI.adminDeadlineSettings` | `Promise<void>` | Supabase `settings` の `RESERVATION_DEADLINE` キーを更新 |
+| | `createBackupForUI` | `adminBackupDatabase` | `Promise<void>` | Supabase SQLダンプファイルをバックアップ先へ保存 |
+| | `restoreBackupForUI` | `adminRestoreDatabase` | `Promise<void>` | データベース全体を指定されたSQLから再構築 |
+| | `saveMaintenanceSchedule` | `adminSetMaintenanceSchedule` | `Promise<void>` | メンテナンス期間設定の保存 |
+| **`offline-sync-v2.js`**| `addOperation` | `idbStorage.enqueueOperation` | `Promise<string>` (Transaction ID) | IndexedDB の `OfflineQueue` にJSONシリアライズして保存 |
+| | `performSync` | `readOperationQueue`, `executeOperation`, `refreshCache` | `Promise<void>` | 処理成功したキューをIndexedDBから削除 |
+| | `executeOperation` | `GasAPI[type]` (動的呼び出し) | `Promise<Object>` | なし (GAS APIへの物理HTTP/JSONP送信) |
+| **`CodeWithSupabase.gs`**| `doGet` / `doPost` | `createReservation`, `checkInReservation`, `cancelReservation`, `getSeatDataSupabase` など | `TextOutput` (JSONP/JSON) | 各個別APIのアクション呼び出しとログ記録 (`safeLogOperation`) |
+| **`ReservationAPI.gs`** | `createReservation` | `getOrCreatePerformance`, `checkReservationDeadline`, `supabaseIntegration.rpc` | `{success: boolean, data?: {bookingId, passcode}, error?: string}` | 1. Supabase PostgreSQL `bookings`テーブルへの新規登録<br/>2. `seats`テーブルの `booking_id` を割り当て更新 |
+| | `checkInReservation` | `validateSession`, `supabaseIntegration.updateBookingStatus` | `{success: boolean, data?: Object, error?: string}` | `bookings.status` を `'checked_in'` に更新 |
+| | `cancelReservation` | `supabaseIntegration.getBookingByCredentials`, `supabaseIntegration.updateBookingStatus`, `supabaseIntegration.updateMultipleSeats` | `{success: boolean, message?: string, error?: string}` | 1. `bookings.status` を `'cancelled'` に更新<br/>2. 対象座席の `booking_id` と `reserved_by` を `NULL` にクリアし開放 |
+| **`AdminAPI.gs`** | `adminChangeSeats` | `supabaseIntegration.updateMultipleSeats` | `{success: boolean, message?: string, error?: string}` | 変更前の座席の `booking_id` を解除、新しい座席に `booking_id` をバインド |
+| | `adminResetPerformance` | `supabaseIntegration.rpc` | `{success: boolean, message?: string, error?: string}` | 指定された公演に紐づく全予約データをDBから物理削除し、全座席を空席に初期化 |
+
+---
 市川学園 座席管理システム (Nチケ) v32.0.5
 
 Copyright (c) 2025 Junxiang Jin. All rights reserved.
