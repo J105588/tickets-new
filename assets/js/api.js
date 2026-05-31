@@ -476,6 +476,12 @@ class GasAPI {
     return await this._callAction('admin_deadline_settings', { op: op, value: val });
   }
 
+  static async adminBackupSettings(value) {
+    const op = (value === 'get') ? 'get' : 'save';
+    const val = (value === 'get') ? null : value;
+    return await this._callAction('admin_backup_settings', { op: op, value: val });
+  }
+
   static _reportError(errorMessage) {
     // オフライン時は報告しない（通信しない）
     try { if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) { return; } } catch (_) { }

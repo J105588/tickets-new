@@ -538,3 +538,50 @@ function saveGlobalDeadline(datetimeStr) {
     return { success: false, error: e.message };
   }
 }
+
+// ==========================================
+// 自動バックアップ設定 (Backup Enabled Settings)
+// ==========================================
+
+const PROP_BACKUP_AUTO_ENABLED = 'BACKUP_AUTO_ENABLED';
+
+/**
+ * 自動定期バックアップ設定を取得
+ */
+function getBackupEnabled() {
+  try {
+    const res = supabaseIntegration._request(`settings?key=eq.${PROP_BACKUP_AUTO_ENABLED}&select=value`);
+    if (res.success && res.data && res.data.length > 0) {
+      return { success: true, enabled: res.data[0].value === 'true' };
+    }
+    // デフォルトは有効
+    return { success: true, enabled: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * 自動定期バックアップ設定を保存
+ * @param {boolean} enabled
+ */
+function saveBackupEnabled(enabled) {
+  try {
+    const payload = {
+      key: PROP_BACKUP_AUTO_ENABLED,
+      value: enabled ? 'true' : 'false',
+      updated_at: new Date().toISOString()
+    };
+
+    const res = supabaseIntegration._request('settings', {
+      method: 'POST',
+      headers: { 'Prefer': 'resolution=merge-duplicates' },
+      body: payload,
+      useServiceRole: true
+    });
+
+    return res.success ? { success: true } : { success: false, error: res.error };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}

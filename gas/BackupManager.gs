@@ -169,11 +169,31 @@ function getBackupsList() {
 }
 
 /**
+ * 自動バックアップが有効かどうかを判定する
+ * @return {boolean}
+ */
+function isBackupEnabled() {
+  try {
+    const response = supabaseIntegration._request('settings?key=eq.BACKUP_AUTO_ENABLED&select=value', { useServiceRole: true });
+    if (response.success && response.data && response.data.length > 0) {
+      return response.data[0].value !== 'false';
+    }
+  } catch (e) {
+    console.error('Failed to fetch backup status, defaulting to true: ' + e.message);
+  }
+  return true;
+}
+
+/**
  * 自動バックアップ実行用関数 (Time-driven triggerから呼ぶ)
  * バックアップを作成し、古いバックアップを削除する（ローテーション）
  */
 function runPeriodicBackup() {
   console.log("Starting periodic backup...");
+  if (!isBackupEnabled()) {
+    console.log("Periodic backup is disabled. Skipping.");
+    return;
+  }
   const result = backupDatabase();
   if (result.success) {
     console.log(`Periodic backup created: ${result.name}`);

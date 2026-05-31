@@ -739,6 +739,37 @@ export async function adminDeadlineSettings(op, value = null) {
     }
 }
 
+export async function adminBackupSettings(op, value = null) {
+    const sb = getSupabase();
+    if (!sb) return { success: false, error: 'Supabase client not initialized' };
+
+    try {
+        if (op === 'get') {
+            const { data, error } = await sb
+                .from('settings')
+                .select('value')
+                .eq('key', 'BACKUP_AUTO_ENABLED')
+                .maybeSingle();
+
+            if (error) throw error;
+            return { success: true, enabled: data ? data.value === 'true' : true };
+        }
+        else if (op === 'save') {
+            const { error } = await sb
+                .from('settings')
+                .upsert({
+                    key: 'BACKUP_AUTO_ENABLED',
+                    value: value ? 'true' : 'false',
+                    updated_at: new Date().toISOString()
+                });
+            if (error) throw error;
+            return { success: true };
+        }
+    } catch (e) {
+        return { success: false, error: e.message };
+    }
+}
+
 // 時間同期 (Server Time Sync)
 export async function getServerTime() {
     const sb = getSupabase();
@@ -794,6 +825,7 @@ if (typeof window !== 'undefined') {
     window.adminResetPerformance = adminResetPerformance;
     window.adminGenerateInviteToken = adminGenerateInviteToken;
     window.adminDeadlineSettings = adminDeadlineSettings;
+    window.adminBackupSettings = adminBackupSettings;
 }
 
 // Seat Number Translation (UI Only)

@@ -1120,7 +1120,27 @@ async function loadBackupsForUI() {
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;"><i class="fas fa-spinner fa-spin"></i> 読み込み中...</td></tr>';
 
-    const res = await adminGetBackups();
+    // Fetch backups list and auto-backup setting status in parallel
+    const [res, backupStatusRes] = await Promise.all([
+        adminGetBackups(),
+        (window.GasAPI && window.GasAPI.adminBackupSettings) ? window.GasAPI.adminBackupSettings('get') : Promise.resolve(null)
+    ]);
+
+    // Update backup enabled toggle
+    const toggle = document.getElementById('backup-auto-toggle');
+    const statusText = document.getElementById('backup-status-text');
+    if (toggle && statusText) {
+        if (backupStatusRes && backupStatusRes.success) {
+            const enabled = backupStatusRes.enabled !== false; // Default to true if not explicitly false
+            toggle.checked = enabled;
+            statusText.textContent = enabled ? 'オン' : 'オフ';
+            statusText.style.color = enabled ? 'var(--success)' : 'var(--text-muted)';
+        } else {
+            statusText.textContent = '取得失敗';
+            statusText.style.color = 'var(--danger)';
+        }
+    }
+
     tbody.innerHTML = '';
 
     if (!res.success) {
@@ -1204,9 +1224,53 @@ async function restoreBackupForUI(backupId) {
     }
 }
 
+async function toggleAutoBackup(checked) {
+    const statusText = document.getElementById('backup-status-text');
+    const toggle = document.getElementById('backup-auto-toggle');
+    if (!statusText || !toggle) return;
+
+    const originalChecked = !checked;
+    
+    // UI feedback
+    statusText.textContent = '保存中...';
+    statusText.style.color = 'var(--text-muted)';
+    toggle.disabled = true;
+
+    try {
+        let res;
+        if (window.GasAPI && window.GasAPI.adminBackupSettings) {
+            res = await window.GasAPI.adminBackupSettings(checked ? 'true' : 'false');
+        } else {
+            res = { success: false, error: 'API wrapper not loaded' };
+        }
+
+        if (res && res.success) {
+            statusText.textContent = checked ? 'オン' : 'オフ';
+            statusText.style.color = checked ? 'var(--success)' : 'var(--text-muted)';
+            
+            if (window.ErrorNotification) {
+                window.ErrorNotification.show(
+                    `自動定期バックアップを${checked ? '有効' : '無効'}にしました`,
+                    { title: '設定を更新しました', type: 'success', icon: '', duration: 3000 }
+                );
+            }
+        } else {
+            throw new Error(res ? res.error : 'Unknown error');
+        }
+    } catch (e) {
+        toggle.checked = originalChecked;
+        statusText.textContent = originalChecked ? 'オン' : 'オフ';
+        statusText.style.color = originalChecked ? 'var(--success)' : 'var(--text-muted)';
+        await customAlert('設定の保存に失敗しました: ' + e.message);
+    } finally {
+        toggle.disabled = false;
+    }
+}
+
 window.createBackupForUI = createBackupForUI;
 window.loadBackupsForUI = loadBackupsForUI;
 window.restoreBackupForUI = restoreBackupForUI;
+window.toggleAutoBackup = toggleAutoBackup;
 
 
 // --- Scheduled Maintenance ---

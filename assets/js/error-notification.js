@@ -133,11 +133,18 @@ class ErrorNotification {
   }
 
   show(message, options = {}) {
+    const defaultTitles = {
+      error: 'エラーが発生しました',
+      warning: '警告',
+      info: 'お知らせ',
+      success: '完了'
+    };
+    const type = options.type || 'error';
     const {
-      title = 'エラーが発生しました',
-      type = 'error', // error, warning, info, success
+      title = defaultTitles[type] || 'お知らせ',
       duration = 5000,
-      persistent = false
+      persistent = false,
+      icon = this.getIcon(type)
     } = options;
 
     // 最大通知数を超える場合は古いものを削除
@@ -150,12 +157,12 @@ class ErrorNotification {
 
     const notification = document.createElement('div');
     notification.className = `error-notification ${type}`;
-    
-    const icon = this.getIcon(type);
-    
+
+    const iconHtml = icon ? `<span class="error-icon">${icon}</span>` : '';
+
     notification.innerHTML = `
       <div class="error-title">
-        <span class="error-icon">${icon}</span>
+        ${iconHtml}
         <span>${title}</span>
       </div>
       <div class="error-message">${message}</div>
@@ -199,10 +206,10 @@ class ErrorNotification {
 
   getIcon(type) {
     const icons = {
-      error: '⚠️',
-      warning: '⚡',
-      info: 'ℹ️',
-      success: '✅'
+      error: '',
+      warning: '',
+      info: '',
+      success: ''
     };
     return icons[type] || icons.error;
   }

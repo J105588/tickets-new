@@ -401,6 +401,23 @@
                             データベースの定期バックアップ（スプレッドシート形式）を管理します。<br>
                             <strong style="color:var(--danger);">⚠️ 復元機能は現在のデータベースを完全に上書きします。慎重に操作してください。</strong>
                         </p>
+                        <!-- 自動定期バックアップ切り替えトグル -->
+                        <div style="background: var(--surface-2); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <i class="fas fa-clock" style="color: var(--info); font-size: 1.25rem;"></i>
+                                <div>
+                                    <div style="font-weight: 600; font-size: 0.9rem;">自動定期バックアップ (1日1回)</div>
+                                    <div style="font-size: 0.8rem; color: var(--text-muted);">毎日自動でバックアップ（最大30世代保持）を実行します</div>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <label class="switch">
+                                    <input type="checkbox" id="backup-auto-toggle" onchange="toggleAutoBackup(this.checked)">
+                                    <span class="slider"></span>
+                                </label>
+                                <span id="backup-status-text" style="font-size: 0.85rem; font-weight: 500; min-width: 45px; color: var(--text-muted);">読込中</span>
+                            </div>
+                        </div>
                     </div>
                     <div class="table-scroll" style="max-height:300px; overflow-y:auto;">
                         <table id="table-backups">

@@ -89,6 +89,14 @@ function doPost(e) {
         case 'validate_invite_token':
           response = validateAdminToken(params.token);
           break;
+        case 'admin_backup_settings':
+          var op = params.op; // 'get' or 'save'
+          if (op === 'save') {
+            response = saveBackupEnabled(params.value === 'true' || params.value === true);
+          } else {
+            response = getBackupEnabled();
+          }
+          break;
         default:
           throw new Error("不明なアクション: " + action);
       }
@@ -140,6 +148,8 @@ function doPost(e) {
         'backupDatabase': backupDatabase,
         'getBackupsList': getBackupsList,
         'restoreDatabase': restoreDatabase,
+        'getBackupEnabled': getBackupEnabled,
+        'saveBackupEnabled': saveBackupEnabled,
         'getGroupsSupabase': getGroupsSupabase,
         'isValidSeatId': isValidSeatId,
         'safeLogOperation': safeLogOperation,
@@ -435,6 +445,14 @@ function doGet(e) {
             response = getGlobalDeadline();
           }
           break;
+        case 'admin_backup_settings':
+          var op = e.parameter.op; // 'get' or 'save'
+          if (op === 'save') {
+            response = saveBackupEnabled(e.parameter.value === 'true' || e.parameter.value === true);
+          } else {
+            response = getBackupEnabled();
+          }
+          break;
 
 
         case 'admin_manage_master':
@@ -542,6 +560,8 @@ function doGet(e) {
           'validateAdminToken': validateAdminToken,
           'getGlobalDeadline': getGlobalDeadline,
           'saveGlobalDeadline': saveGlobalDeadline,
+          'getBackupEnabled': getBackupEnabled,
+          'saveBackupEnabled': saveBackupEnabled,
           'getMasterData': getMasterData,
           'saveGroup': saveGroup,
           'saveEventDate': saveEventDate,
@@ -1605,7 +1625,8 @@ function isReservedAdminAction(actionOrFunc) {
     'execDangerCommand', 'initiateDangerCommand', 'confirmDangerCommand', 'listDangerPending', 'performDangerAction',
     'getOperationLogs', 'getLogStatistics', 'getClientAuditLogs', 'getClientAuditStatistics',
     'saveGlobalDeadline', 'saveGroup', 'saveEventDate', 'saveTimeSlot', 'deleteMaster',
-    'broadcastAdminNotice', 'fetchAdminNotices'
+    'broadcastAdminNotice', 'fetchAdminNotices',
+    'getBackupEnabled', 'saveBackupEnabled'
   ];
   
   return adminFunctions.indexOf(actionOrFunc) !== -1;
